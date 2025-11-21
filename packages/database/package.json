@@ -1,0 +1,12 @@
+{
+  "name": "@repo/database",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "types": "npx supabase gen types typescript --project-id ojtcdnkaahqufwalsmxi > database.types.ts"
+  },
+  "devDependencies": {
+    "supabase": "^1.0.0", 
+    "typescript": "^5.0.0"
+  }
+}

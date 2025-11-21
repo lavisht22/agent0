@@ -1,0 +1,12 @@
+{
+  "name": "runner",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@repo/database": "workspace:*"
+  }
+}
