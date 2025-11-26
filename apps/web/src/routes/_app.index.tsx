@@ -3,10 +3,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Construction } from "lucide-react";
 
 export const Route = createFileRoute("/_app/")({
-	component: DashboardPage,
+	component: RouteComponent,
 });
 
-function DashboardPage() {
+function RouteComponent() {
 	return (
 		<div className="flex flex-col items-center justify-center h-[60vh]">
 			<Card className="w-full max-w-lg">

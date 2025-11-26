@@ -9,19 +9,14 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as NewRouteImport } from './routes/new'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as AppCreateWorkspaceRouteImport } from './routes/_app.create-workspace'
 import { Route as AppWorkspaceWorkspaceIdRouteImport } from './routes/_app.workspace.$workspaceId'
 import { Route as AppWorkspaceWorkspaceIdIndexRouteImport } from './routes/_app.workspace.$workspaceId.index'
 import { Route as AppWorkspaceWorkspaceIdProvidersRouteImport } from './routes/_app.workspace.$workspaceId.providers'
 
-const NewRoute = NewRouteImport.update({
-  id: '/new',
-  path: '/new',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -34,6 +29,11 @@ const AppRoute = AppRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCreateWorkspaceRoute = AppCreateWorkspaceRouteImport.update({
+  id: '/create-workspace',
+  path: '/create-workspace',
   getParentRoute: () => AppRoute,
 } as any)
 const AppWorkspaceWorkspaceIdRoute = AppWorkspaceWorkspaceIdRouteImport.update({
@@ -56,7 +56,7 @@ const AppWorkspaceWorkspaceIdProvidersRoute =
 
 export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
-  '/new': typeof NewRoute
+  '/create-workspace': typeof AppCreateWorkspaceRoute
   '/': typeof AppIndexRoute
   '/workspace/$workspaceId': typeof AppWorkspaceWorkspaceIdRouteWithChildren
   '/workspace/$workspaceId/providers': typeof AppWorkspaceWorkspaceIdProvidersRoute
@@ -64,7 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
-  '/new': typeof NewRoute
+  '/create-workspace': typeof AppCreateWorkspaceRoute
   '/': typeof AppIndexRoute
   '/workspace/$workspaceId/providers': typeof AppWorkspaceWorkspaceIdProvidersRoute
   '/workspace/$workspaceId': typeof AppWorkspaceWorkspaceIdIndexRoute
@@ -73,7 +73,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/auth': typeof AuthRoute
-  '/new': typeof NewRoute
+  '/_app/create-workspace': typeof AppCreateWorkspaceRoute
   '/_app/': typeof AppIndexRoute
   '/_app/workspace/$workspaceId': typeof AppWorkspaceWorkspaceIdRouteWithChildren
   '/_app/workspace/$workspaceId/providers': typeof AppWorkspaceWorkspaceIdProvidersRoute
@@ -83,7 +83,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/auth'
-    | '/new'
+    | '/create-workspace'
     | '/'
     | '/workspace/$workspaceId'
     | '/workspace/$workspaceId/providers'
@@ -91,7 +91,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
-    | '/new'
+    | '/create-workspace'
     | '/'
     | '/workspace/$workspaceId/providers'
     | '/workspace/$workspaceId'
@@ -99,7 +99,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_app'
     | '/auth'
-    | '/new'
+    | '/_app/create-workspace'
     | '/_app/'
     | '/_app/workspace/$workspaceId'
     | '/_app/workspace/$workspaceId/providers'
@@ -109,18 +109,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   AuthRoute: typeof AuthRoute
-  NewRoute: typeof NewRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/new': {
-      id: '/new'
-      path: '/new'
-      fullPath: '/new'
-      preLoaderRoute: typeof NewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -140,6 +132,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/create-workspace': {
+      id: '/_app/create-workspace'
+      path: '/create-workspace'
+      fullPath: '/create-workspace'
+      preLoaderRoute: typeof AppCreateWorkspaceRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/workspace/$workspaceId': {
@@ -184,11 +183,13 @@ const AppWorkspaceWorkspaceIdRouteWithChildren =
   )
 
 interface AppRouteChildren {
+  AppCreateWorkspaceRoute: typeof AppCreateWorkspaceRoute
   AppIndexRoute: typeof AppIndexRoute
   AppWorkspaceWorkspaceIdRoute: typeof AppWorkspaceWorkspaceIdRouteWithChildren
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppCreateWorkspaceRoute: AppCreateWorkspaceRoute,
   AppIndexRoute: AppIndexRoute,
   AppWorkspaceWorkspaceIdRoute: AppWorkspaceWorkspaceIdRouteWithChildren,
 }
@@ -198,7 +199,6 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   AuthRoute: AuthRoute,
-  NewRoute: NewRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

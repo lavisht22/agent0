@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { Button, Input, Form, InputOtp, addToast } from "@heroui/react";
+import { addToast, Button, Form, Input, InputOtp } from "@heroui/react";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
 import { supabase } from "../lib/supabase";
 
 export const Route = createFileRoute("/auth")({
-	component: AuthPage,
+	component: RouteComponent,
 	beforeLoad: async () => {
 		const {
 			data: { session },
@@ -15,7 +15,7 @@ export const Route = createFileRoute("/auth")({
 	},
 });
 
-function AuthPage() {
+function RouteComponent() {
 	const [email, setEmail] = useState("");
 	const [otp, setOtp] = useState("");
 	const [loading, setLoading] = useState(false);

@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "../lib/supabase";
 
 export const Route = createFileRoute("/_app")({
-	component: AppLayout,
+	component: LayoutComponent,
 	beforeLoad: async () => {
 		const {
 			data: { session },
@@ -13,6 +13,6 @@ export const Route = createFileRoute("/_app")({
 	},
 });
 
-function AppLayout() {
+function LayoutComponent() {
 	return <Outlet />;
 }

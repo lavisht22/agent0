@@ -1,23 +1,15 @@
 import { addToast, Button, Form, Input } from "@heroui/react";
 import { useMutation } from "@tanstack/react-query";
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { nanoid } from "nanoid";
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
 
-export const Route = createFileRoute("/new")({
-	component: AppLayout,
-	beforeLoad: async () => {
-		const {
-			data: { session },
-		} = await supabase.auth.getSession();
-		if (!session) {
-			throw redirect({ to: "/auth" });
-		}
-	},
+export const Route = createFileRoute("/_app/create-workspace")({
+	component: RouteComponent,
 });
 
-function AppLayout() {
+function RouteComponent() {
 	const navigate = useNavigate();
 
 	const [name, setName] = useState("");
@@ -51,7 +43,7 @@ function AppLayout() {
 		},
 		onSuccess: (workspace) => {
 			// TODO: Invalidate the workspaces query
-			navigate({ to: `/${workspace.id}` });
+			navigate({ to: `/workspace/${workspace.id}` });
 		},
 	});
 

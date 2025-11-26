@@ -100,7 +100,7 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 						<DropdownItem
 							key="create"
 							startContent={<LucidePlusSquare className="size-4" />}
-							onPress={() => navigate({ to: "/new" })}
+							onPress={() => navigate({ to: "/create-workspace" })}
 						>
 							Create Workspace
 						</DropdownItem>
