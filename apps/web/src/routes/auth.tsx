@@ -33,11 +33,12 @@ function RouteComponent() {
 			});
 
 			if (error) throw error;
+
 			setStep("otp");
-		} catch (err: any) {
+		} catch (err: unknown) {
 			addToast({
 				title: "Error",
-				description: err.message,
+				description: (err as Error).message,
 				color: "danger",
 			});
 		} finally {
@@ -57,11 +58,12 @@ function RouteComponent() {
 			});
 
 			if (error) throw error;
+
 			navigate({ to: "/" });
-		} catch (err: any) {
+		} catch (err: unknown) {
 			addToast({
 				title: "Error",
-				description: err.message,
+				description: (err as Error).message,
 				color: "danger",
 			});
 		} finally {
