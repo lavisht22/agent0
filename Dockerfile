@@ -18,5 +18,6 @@ COPY --from=build /prod/runner /app
 COPY --from=build /usr/src/app/apps/runner/dist /app/dist
 COPY --from=build /usr/src/app/apps/web/dist /app/public
 
-EXPOSE 2223
+ENV PORT=8080
+EXPOSE 8080
 CMD [ "node", "dist/index.js" ]
