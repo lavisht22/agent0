@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      agents: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          name: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agents_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       providers: {
         Row: {
           created_at: string
@@ -69,6 +101,48 @@ export type Database = {
           name?: string | null
         }
         Relationships: []
+      }
+      versions: {
+        Row: {
+          agent_id: string
+          created_at: string
+          data: Json
+          id: string
+          is_deployed: boolean
+          provider_id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          data: Json
+          id: string
+          is_deployed?: boolean
+          provider_id: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          data?: Json
+          id?: string
+          is_deployed?: boolean
+          provider_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "versions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "versions_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "providers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       workspace_user: {
         Row: {

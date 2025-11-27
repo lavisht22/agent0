@@ -3,6 +3,7 @@ import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
+import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { PROVIDER_TYPES } from "@/lib/providers";
 import { providersQuery } from "@/lib/queries";
@@ -49,7 +50,7 @@ function RouteComponent() {
 			data: string;
 		}) => {
 			const { error } = await supabase.from("providers").insert({
-				id: crypto.randomUUID(),
+				id: nanoid(),
 				name: values.name,
 				type: values.type,
 				data: JSON.parse(values.data),

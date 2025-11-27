@@ -69,7 +69,11 @@ function RouteComponent() {
 						Actions
 					</TableColumn>
 				</TableHeader>
-				<TableBody items={providers || []} isLoading={isLoading}>
+				<TableBody
+					items={providers || []}
+					isLoading={isLoading}
+					emptyContent="You haven't added any providers yet."
+				>
 					{(item) => (
 						<TableRow key={item.id} className="hover:bg-default-100">
 							<TableCell>{item.name}</TableCell>
