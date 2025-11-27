@@ -47,6 +47,7 @@ export function ProviderForm({
 		const formData = new FormData(e.currentTarget);
 		const dataStr = formData.get("data") as string;
 
+		// biome-ignore lint/suspicious/noImplicitAnyLet: <We are parsing provider data>
 		let parsedData;
 		try {
 			parsedData = JSON.parse(dataStr);
