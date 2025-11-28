@@ -8,9 +8,11 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.71",
+    "@ai-sdk/xai": "^2.0.39",
     "@fastify/cors": "^11.1.0",
     "@fastify/static": "^8.3.0",
     "@repo/database": "workspace:*",
+    "@supabase/supabase-js": "^2.84.0",
     "ai": "^5.0.98",
     "dotenv": "^17.2.3",
     "fastify": "^5.6.2",
