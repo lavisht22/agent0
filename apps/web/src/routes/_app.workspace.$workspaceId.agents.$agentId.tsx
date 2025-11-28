@@ -1,4 +1,4 @@
-import { Button } from "@heroui/react";
+import { addToast, Button } from "@heroui/react";
 import type { Json } from "@repo/database";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,7 +10,8 @@ import { Messages, type MessageT, messageSchema } from "@/components/messages";
 import { ProviderSelector } from "@/components/provider-selector";
 import { agentVersionsQuery, providersQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { LucideCornerUpLeft } from "lucide-react";
 
 export const Route = createFileRoute(
 	"/_app/workspace/$workspaceId/agents/$agentId",
@@ -175,6 +176,29 @@ function RouteComponent() {
 		},
 	});
 
+	const handleAddToConversation = useCallback(() => {
+		const newMessages = form.getFieldValue("messages").slice();
+
+		generatedMessages.forEach((msg) => {
+			newMessages.push(msg);
+		});
+
+		form.setFieldValue("messages", newMessages);
+		setGeneratedMessages([]);
+	}, [form.getFieldValue, form.setFieldValue, generatedMessages]);
+
+	const handleRun = useCallback(() => {
+		try {
+			throw new Error("Not implemented yet");
+		} catch {
+			addToast({
+				title: "Error",
+				description: "Failed to run the agent.",
+				color: "danger",
+			});
+		}
+	}, []);
+
 	const isLoading =
 		createMutation.isPending ||
 		updateMutation.isPending ||
@@ -237,17 +261,34 @@ function RouteComponent() {
 						</form.Field>
 					</div>
 					<div className="flex justify-end p-4 border-t border-default-200">
-						<Button color="secondary" type="button">
-							Generate
+						<Button color="primary" type="button" onPress={handleRun}>
+							Run
 						</Button>
 					</div>
 				</div>
 
-				<div className="flex-1 p-4 overflow-y-auto">
+				<div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
+					{generatedMessages.length === 0 && (
+						<p className="text-sm text-default-500 my-auto text-center">
+							Run your agent to see the generated response here.
+						</p>
+					)}
 					<Messages
+						isReadOnly
 						value={generatedMessages}
 						onValueChange={setGeneratedMessages}
 					/>
+					<div>
+						{generatedMessages.length > 0 && (
+							<Button
+								variant="flat"
+								startContent={<LucideCornerUpLeft className="size-4" />}
+								onPress={handleAddToConversation}
+							>
+								Add to conversation
+							</Button>
+						)}
+					</div>
 				</div>
 			</div>
 		</form>

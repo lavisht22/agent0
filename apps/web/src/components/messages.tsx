@@ -173,9 +173,11 @@ function UserMessage({
 }
 
 function AssistantMessage({
+	isReadOnly,
 	value,
 	onValueChange,
 }: {
+	isReadOnly?: boolean;
 	value: Extract<MessageT, { role: "assistant" }>["content"];
 	onValueChange: (
 		value: Extract<MessageT, { role: "assistant" }>["content"] | null,
@@ -185,22 +187,25 @@ function AssistantMessage({
 		<Card>
 			<CardHeader className="flex items-center justify-between pl-3 pr-1 h-10">
 				<span className="text-sm text-default-500">Assistant</span>
-				<div className="flex gap-2">
-					<Button
-						size="sm"
-						isIconOnly
-						variant="light"
-						onPress={() => onValueChange(null)}
-					>
-						<LucideMinusCircle className="size-3.5" />
-					</Button>
-				</div>
+				{!isReadOnly && (
+					<div className="flex gap-2">
+						<Button
+							size="sm"
+							isIconOnly
+							variant="light"
+							onPress={() => onValueChange(null)}
+						>
+							<LucideMinusCircle className="size-3.5" />
+						</Button>
+					</div>
+				)}
 			</CardHeader>
 			<CardBody className="p-0 flex flex-col gap-2">
 				{value.map((part, index) => {
 					if (part.type === "text") {
 						return (
 							<Textarea
+								isReadOnly={isReadOnly}
 								maxRows={1000000000000}
 								key={`${index + 1}`}
 								radius="none"
@@ -212,19 +217,21 @@ function AssistantMessage({
 									onValueChange(newContent);
 								}}
 								endContent={
-									<Button
-										className="-mr-2"
-										size="sm"
-										isIconOnly
-										variant="light"
-										onPress={() => {
-											const newContent = [...value];
-											newContent.splice(index, 1);
-											onValueChange(newContent);
-										}}
-									>
-										<LucideTrash className="size-3.5" />
-									</Button>
+									!isReadOnly && (
+										<Button
+											className="-mr-2"
+											size="sm"
+											isIconOnly
+											variant="light"
+											onPress={() => {
+												const newContent = [...value];
+												newContent.splice(index, 1);
+												onValueChange(newContent);
+											}}
+										>
+											<LucideTrash className="size-3.5" />
+										</Button>
+									)
 								}
 							/>
 						);
@@ -239,9 +246,14 @@ function AssistantMessage({
 interface MessagesProps {
 	value: MessageT[];
 	onValueChange: (value: MessageT[]) => void;
+	isReadOnly?: boolean;
 }
 
-export function Messages({ value, onValueChange }: MessagesProps) {
+export function Messages({
+	value,
+	onValueChange,
+	isReadOnly = false,
+}: MessagesProps) {
 	return (
 		<div className="flex flex-col gap-4">
 			{value.map((message, index) => {
@@ -291,6 +303,7 @@ export function Messages({ value, onValueChange }: MessagesProps) {
 					return (
 						<AssistantMessage
 							key={`${index + 1}`}
+							isReadOnly={isReadOnly}
 							value={message.content}
 							onValueChange={(content) => {
 								const newMessages = [...value];
