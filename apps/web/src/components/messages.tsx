@@ -1,4 +1,5 @@
-import { Textarea } from "@heroui/react";
+import { Button, Card, CardBody, CardHeader, Textarea } from "@heroui/react";
+import { LucideMinusCircle, LucideTrash } from "lucide-react";
 import { z } from "zod";
 
 const systemMessageSchema = z.object({
@@ -90,14 +91,20 @@ function SystemMessage({
 	onValueChange: (value: string) => void;
 }) {
 	return (
-		<div>
-			<Textarea
-				variant="bordered"
-				label="System"
-				value={value}
-				onValueChange={onValueChange}
-			/>
-		</div>
+		<Card>
+			<CardHeader className="flex items-center justify-between pl-3 pr-1 h-10">
+				<span className="text-sm text-default-500">System</span>
+			</CardHeader>
+			<CardBody className="p-0">
+				<Textarea
+					maxRows={1000000000000}
+					radius="none"
+					placeholder="Enter system message..."
+					value={value}
+					onValueChange={onValueChange}
+				/>
+			</CardBody>
+		</Card>
 	);
 }
 
@@ -107,30 +114,125 @@ function UserMessage({
 }: {
 	value: Extract<MessageT, { role: "user" }>["content"];
 	onValueChange: (
-		value: Extract<MessageT, { role: "user" }>["content"],
+		value: Extract<MessageT, { role: "user" }>["content"] | null,
 	) => void;
 }) {
 	return (
-		<div className="flex flex-col gap-2">
-			{value.map((part, index) => {
-				if (part.type === "text") {
-					return (
-						<Textarea
-							key={`${index + 1}`}
-							variant="bordered"
-							label="User"
-							value={part.text}
-							onValueChange={(text) => {
-								const newContent = [...value];
-								newContent[index] = { ...part, text };
-								onValueChange(newContent);
-							}}
-						/>
-					);
-				}
-				return null;
-			})}
-		</div>
+		<Card>
+			<CardHeader className="flex items-center justify-between pl-3 pr-1 h-10">
+				<span className="text-sm text-default-500">User</span>
+				<div className="flex gap-2">
+					<Button
+						size="sm"
+						isIconOnly
+						variant="light"
+						onPress={() => onValueChange(null)}
+					>
+						<LucideMinusCircle className="size-3.5" />
+					</Button>
+				</div>
+			</CardHeader>
+			<CardBody className="p-0 flex flex-col gap-2">
+				{value.map((part, index) => {
+					if (part.type === "text") {
+						return (
+							<Textarea
+								maxRows={1000000000000}
+								key={`${index + 1}`}
+								radius="none"
+								placeholder="Enter user message..."
+								value={part.text}
+								onValueChange={(text) => {
+									const newContent = [...value];
+									newContent[index] = { ...part, text };
+									onValueChange(newContent);
+								}}
+								endContent={
+									<Button
+										className="-mr-2"
+										size="sm"
+										isIconOnly
+										variant="light"
+										onPress={() => {
+											const newContent = [...value];
+											newContent.splice(index, 1);
+											onValueChange(newContent);
+										}}
+									>
+										<LucideTrash className="size-3.5" />
+									</Button>
+								}
+							/>
+						);
+					}
+					return null;
+				})}
+			</CardBody>
+		</Card>
+	);
+}
+
+function AssistantMessage({
+	value,
+	onValueChange,
+}: {
+	value: Extract<MessageT, { role: "assistant" }>["content"];
+	onValueChange: (
+		value: Extract<MessageT, { role: "assistant" }>["content"] | null,
+	) => void;
+}) {
+	return (
+		<Card>
+			<CardHeader className="flex items-center justify-between pl-3 pr-1 h-10">
+				<span className="text-sm text-default-500">Assistant</span>
+				<div className="flex gap-2">
+					<Button
+						size="sm"
+						isIconOnly
+						variant="light"
+						onPress={() => onValueChange(null)}
+					>
+						<LucideMinusCircle className="size-3.5" />
+					</Button>
+				</div>
+			</CardHeader>
+			<CardBody className="p-0 flex flex-col gap-2">
+				{value.map((part, index) => {
+					if (part.type === "text") {
+						return (
+							<Textarea
+								maxRows={1000000000000}
+								key={`${index + 1}`}
+								radius="none"
+								placeholder="Enter assistant message..."
+								value={part.text}
+								onValueChange={(text) => {
+									const newContent = [...value];
+									newContent[index] = { ...part, text };
+									onValueChange(newContent);
+								}}
+								endContent={
+									<Button
+										className="-mr-2"
+										size="sm"
+										isIconOnly
+										variant="light"
+										onPress={() => {
+											const newContent = [...value];
+											newContent.splice(index, 1);
+											onValueChange(newContent);
+										}}
+									>
+										<LucideTrash className="size-3.5" />
+									</Button>
+								}
+							/>
+						);
+					}
+					return null;
+				})}
+			</CardBody>
+		</Card>
 	);
 }
 
@@ -141,7 +243,7 @@ interface MessagesProps {
 
 export function Messages({ value, onValueChange }: MessagesProps) {
 	return (
-		<div>
+		<div className="flex flex-col gap-4">
 			{value.map((message, index) => {
 				if (message.role === "system") {
 					return (
@@ -170,10 +272,37 @@ export function Messages({ value, onValueChange }: MessagesProps) {
 							onValueChange={(content) => {
 								const newMessages = [...value];
 
-								newMessages[index] = {
-									role: "user",
-									content,
-								};
+								if (content === null) {
+									newMessages.splice(index, 1);
+								} else {
+									newMessages[index] = {
+										role: "user",
+										content,
+									};
+								}
+
+								onValueChange(newMessages);
+							}}
+						/>
+					);
+				}
+
+				if (message.role === "assistant") {
+					return (
+						<AssistantMessage
+							key={`${index + 1}`}
+							value={message.content}
+							onValueChange={(content) => {
+								const newMessages = [...value];
+
+								if (content === null) {
+									newMessages.splice(index, 1);
+								} else {
+									newMessages[index] = {
+										role: "assistant",
+										content,
+									};
+								}
 
 								onValueChange(newMessages);
 							}}

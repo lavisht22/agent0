@@ -10,6 +10,7 @@ import { Messages, type MessageT, messageSchema } from "@/components/messages";
 import { ProviderSelector } from "@/components/provider-selector";
 import { agentVersionsQuery, providersQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
+import { useState } from "react";
 
 export const Route = createFileRoute(
 	"/_app/workspace/$workspaceId/agents/$agentId",
@@ -31,6 +32,12 @@ function RouteComponent() {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const isNewAgent = agentId === "new";
+	const [generatedMessages, setGeneratedMessages] = useState<MessageT[]>([
+		{
+			role: "assistant",
+			content: [{ type: "text", text: "Generated response will appear here." }],
+		},
+	]);
 
 	// Fetch available providers
 	const { data: providers, isLoading: isLoadingProviders } = useQuery(
@@ -237,7 +244,10 @@ function RouteComponent() {
 				</div>
 
 				<div className="flex-1 p-4 overflow-y-auto">
-					<p>Right Side</p>
+					<Messages
+						value={generatedMessages}
+						onValueChange={setGeneratedMessages}
+					/>
 				</div>
 			</div>
 		</form>
