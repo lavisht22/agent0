@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { nanoid } from "nanoid";
 import { toast } from "sonner";
 import { z } from "zod";
+import { Messages, type MessageT, messageSchema } from "@/components/messages";
 import { agentVersionsQuery, providersQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
 
@@ -15,95 +16,11 @@ export const Route = createFileRoute(
 	component: RouteComponent,
 });
 
-const systemMessageSchema = z.object({
-	role: z.literal("system"),
-	content: z.string().min(1, "System message content is required"),
-});
-
-const userMessageSchema = z.object({
-	role: z.literal("user"),
-	content: z
-		.array(
-			z.union([
-				z.object({
-					type: z.literal("text"),
-					text: z.string(),
-				}),
-				z.object({
-					type: z.literal("image"),
-					image: z.string(),
-					mediaType: z.string().optional(),
-				}),
-				z.object({
-					type: z.literal("file"),
-					data: z.string(),
-					mediaType: z.string(),
-				}),
-			]),
-		)
-		.min(1, "User message must have at least one content part"),
-});
-
-const assistantMessage = z.object({
-	role: z.literal("assistant"),
-	content: z.union([
-		z.string().min(1, "Assistant message content is required"),
-		z
-			.array(
-				z.union([
-					z.object({
-						type: z.literal("text"),
-						text: z.string(),
-					}),
-					z.object({
-						type: z.literal("reasoning"),
-						text: z.string(),
-					}),
-					z.object({
-						type: z.literal("file"),
-						data: z.string(),
-						mediaType: z.string(),
-						fileName: z.string().optional(),
-					}),
-					z.object({
-						type: z.literal("tool-call"),
-						toolCallId: z.string(),
-						toolName: z.string(),
-						input: z.any(),
-					}),
-				]),
-			)
-			.min(1, "Assistant message must have at least one content part"),
-	]),
-});
-
-const toolMessagePart = z.object({
-	type: z.literal("tool"),
-	content: z.array(
-		z.object({
-			type: z.literal("tool-result"),
-			toolCallId: z.string(),
-			toolName: z.string(),
-			output: z.unknown(),
-			isError: z.boolean().optional,
-		}),
-	),
-});
-
 // Zod schema for form validation
 const agentFormSchema = z.object({
 	providerId: z.string().min(1, "Provider is required"),
 	model: z.string().min(1, "Model is required"),
-	messages: z
-		.array(
-			z.union([
-				systemMessageSchema,
-				userMessageSchema,
-				assistantMessage,
-				toolMessagePart,
-			]),
-		)
-		.min(1, "At least one message is required"),
+	messages: z.array(messageSchema).min(1, "At least one message is required"),
 });
 
 // Helper to get error message as string
@@ -213,6 +130,13 @@ function RouteComponent() {
 		defaultValues: {
 			providerId: latestVersion?.provider_id || "",
 			model: (latestVersion?.data as { model?: string } | null)?.model || "",
+			messages: (latestVersion?.data as { messages?: MessageT[] } | null)
+				?.messages || [
+				{
+					role: "system",
+					content: "",
+				},
+			],
 		},
 		validators: {
 			onChange: agentFormSchema,
@@ -307,6 +231,15 @@ function RouteComponent() {
 								description="The AI model to use (e.g., gpt-4, claude-3-opus)"
 								isInvalid={field.state.meta.errors.length > 0}
 								errorMessage={getErrorMessage(field.state.meta.errors)}
+							/>
+						)}
+					</form.Field>
+
+					<form.Field name="messages" mode="array">
+						{(field) => (
+							<Messages
+								value={field.state.value}
+								onValueChange={field.handleChange}
 							/>
 						)}
 					</form.Field>
