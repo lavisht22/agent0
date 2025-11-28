@@ -27,3 +27,19 @@ export const providersQuery = (workspaceId: string) => queryOptions({
     },
     enabled: !!workspaceId,
 })
+
+export const agentsQuery = (workspaceId: string) => queryOptions({
+    queryKey: ["agents", workspaceId],
+    queryFn: async () => {
+        const { data, error } = await supabase
+            .from("agents")
+            .select("*")
+            .eq("workspace_id", workspaceId)
+            .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        return data;
+    },
+    enabled: !!workspaceId,
+})

@@ -16,6 +16,7 @@ import { Route as AppCreateWorkspaceRouteImport } from './routes/_app.create-wor
 import { Route as AppWorkspaceWorkspaceIdRouteImport } from './routes/_app.workspace.$workspaceId'
 import { Route as AppWorkspaceWorkspaceIdIndexRouteImport } from './routes/_app.workspace.$workspaceId.index'
 import { Route as AppWorkspaceWorkspaceIdProvidersIndexRouteImport } from './routes/_app.workspace.$workspaceId.providers.index'
+import { Route as AppWorkspaceWorkspaceIdAgentsIndexRouteImport } from './routes/_app.workspace.$workspaceId.agents.index'
 import { Route as AppWorkspaceWorkspaceIdProvidersProviderIdRouteImport } from './routes/_app.workspace.$workspaceId.providers.$providerId'
 
 const AuthRoute = AuthRouteImport.update({
@@ -54,6 +55,12 @@ const AppWorkspaceWorkspaceIdProvidersIndexRoute =
     path: '/providers/',
     getParentRoute: () => AppWorkspaceWorkspaceIdRoute,
   } as any)
+const AppWorkspaceWorkspaceIdAgentsIndexRoute =
+  AppWorkspaceWorkspaceIdAgentsIndexRouteImport.update({
+    id: '/agents/',
+    path: '/agents/',
+    getParentRoute: () => AppWorkspaceWorkspaceIdRoute,
+  } as any)
 const AppWorkspaceWorkspaceIdProvidersProviderIdRoute =
   AppWorkspaceWorkspaceIdProvidersProviderIdRouteImport.update({
     id: '/providers/$providerId',
@@ -68,6 +75,7 @@ export interface FileRoutesByFullPath {
   '/workspace/$workspaceId': typeof AppWorkspaceWorkspaceIdRouteWithChildren
   '/workspace/$workspaceId/': typeof AppWorkspaceWorkspaceIdIndexRoute
   '/workspace/$workspaceId/providers/$providerId': typeof AppWorkspaceWorkspaceIdProvidersProviderIdRoute
+  '/workspace/$workspaceId/agents': typeof AppWorkspaceWorkspaceIdAgentsIndexRoute
   '/workspace/$workspaceId/providers': typeof AppWorkspaceWorkspaceIdProvidersIndexRoute
 }
 export interface FileRoutesByTo {
@@ -76,6 +84,7 @@ export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/workspace/$workspaceId': typeof AppWorkspaceWorkspaceIdIndexRoute
   '/workspace/$workspaceId/providers/$providerId': typeof AppWorkspaceWorkspaceIdProvidersProviderIdRoute
+  '/workspace/$workspaceId/agents': typeof AppWorkspaceWorkspaceIdAgentsIndexRoute
   '/workspace/$workspaceId/providers': typeof AppWorkspaceWorkspaceIdProvidersIndexRoute
 }
 export interface FileRoutesById {
@@ -87,6 +96,7 @@ export interface FileRoutesById {
   '/_app/workspace/$workspaceId': typeof AppWorkspaceWorkspaceIdRouteWithChildren
   '/_app/workspace/$workspaceId/': typeof AppWorkspaceWorkspaceIdIndexRoute
   '/_app/workspace/$workspaceId/providers/$providerId': typeof AppWorkspaceWorkspaceIdProvidersProviderIdRoute
+  '/_app/workspace/$workspaceId/agents/': typeof AppWorkspaceWorkspaceIdAgentsIndexRoute
   '/_app/workspace/$workspaceId/providers/': typeof AppWorkspaceWorkspaceIdProvidersIndexRoute
 }
 export interface FileRouteTypes {
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/workspace/$workspaceId'
     | '/workspace/$workspaceId/'
     | '/workspace/$workspaceId/providers/$providerId'
+    | '/workspace/$workspaceId/agents'
     | '/workspace/$workspaceId/providers'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/'
     | '/workspace/$workspaceId'
     | '/workspace/$workspaceId/providers/$providerId'
+    | '/workspace/$workspaceId/agents'
     | '/workspace/$workspaceId/providers'
   id:
     | '__root__'
@@ -116,6 +128,7 @@ export interface FileRouteTypes {
     | '/_app/workspace/$workspaceId'
     | '/_app/workspace/$workspaceId/'
     | '/_app/workspace/$workspaceId/providers/$providerId'
+    | '/_app/workspace/$workspaceId/agents/'
     | '/_app/workspace/$workspaceId/providers/'
   fileRoutesById: FileRoutesById
 }
@@ -175,6 +188,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWorkspaceWorkspaceIdProvidersIndexRouteImport
       parentRoute: typeof AppWorkspaceWorkspaceIdRoute
     }
+    '/_app/workspace/$workspaceId/agents/': {
+      id: '/_app/workspace/$workspaceId/agents/'
+      path: '/agents'
+      fullPath: '/workspace/$workspaceId/agents'
+      preLoaderRoute: typeof AppWorkspaceWorkspaceIdAgentsIndexRouteImport
+      parentRoute: typeof AppWorkspaceWorkspaceIdRoute
+    }
     '/_app/workspace/$workspaceId/providers/$providerId': {
       id: '/_app/workspace/$workspaceId/providers/$providerId'
       path: '/providers/$providerId'
@@ -188,6 +208,7 @@ declare module '@tanstack/react-router' {
 interface AppWorkspaceWorkspaceIdRouteChildren {
   AppWorkspaceWorkspaceIdIndexRoute: typeof AppWorkspaceWorkspaceIdIndexRoute
   AppWorkspaceWorkspaceIdProvidersProviderIdRoute: typeof AppWorkspaceWorkspaceIdProvidersProviderIdRoute
+  AppWorkspaceWorkspaceIdAgentsIndexRoute: typeof AppWorkspaceWorkspaceIdAgentsIndexRoute
   AppWorkspaceWorkspaceIdProvidersIndexRoute: typeof AppWorkspaceWorkspaceIdProvidersIndexRoute
 }
 
@@ -196,6 +217,8 @@ const AppWorkspaceWorkspaceIdRouteChildren: AppWorkspaceWorkspaceIdRouteChildren
     AppWorkspaceWorkspaceIdIndexRoute: AppWorkspaceWorkspaceIdIndexRoute,
     AppWorkspaceWorkspaceIdProvidersProviderIdRoute:
       AppWorkspaceWorkspaceIdProvidersProviderIdRoute,
+    AppWorkspaceWorkspaceIdAgentsIndexRoute:
+      AppWorkspaceWorkspaceIdAgentsIndexRoute,
     AppWorkspaceWorkspaceIdProvidersIndexRoute:
       AppWorkspaceWorkspaceIdProvidersIndexRoute,
   }
