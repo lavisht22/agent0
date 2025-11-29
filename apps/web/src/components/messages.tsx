@@ -1,6 +1,7 @@
-import { Button, Card, CardBody, CardHeader, Textarea } from "@heroui/react";
+import { Button, Card, CardBody, CardHeader } from "@heroui/react";
 import { LucideMinusCircle, LucideTrash } from "lucide-react";
 import { z } from "zod";
+import { VariablesTextArea } from "./variables-text-area";
 
 const systemMessageSchema = z.object({
 	role: z.literal("system"),
@@ -102,13 +103,13 @@ function SystemMessage({
 			<CardHeader className="flex items-center justify-between pl-3 pr-1 h-10">
 				<span className="text-sm text-default-500">System</span>
 			</CardHeader>
-			<CardBody className="p-0">
-				<Textarea
-					maxRows={1000000000000}
-					radius="none"
+			<CardBody className="p-3 border-t border-default-200">
+				<VariablesTextArea
 					placeholder="Enter system message..."
+					maxRows={1000000000000}
 					value={value}
-					onValueChange={onValueChange}
+					onChange={(e) => onValueChange(e.target.value)}
+					onVariablePress={() => {}}
 				/>
 			</CardBody>
 		</Card>
@@ -139,22 +140,23 @@ function UserMessage({
 					</Button>
 				</div>
 			</CardHeader>
-			<CardBody className="p-0 flex flex-col gap-2">
+			<CardBody className="p-3 border-t border-default-200 flex flex-col gap-2">
 				{value.map((part, index) => {
 					if (part.type === "text") {
 						return (
-							<Textarea
-								maxRows={1000000000000}
-								key={`${index + 1}`}
-								radius="none"
-								placeholder="Enter user message..."
-								value={part.text}
-								onValueChange={(text) => {
-									const newContent = [...value];
-									newContent[index] = { ...part, text };
-									onValueChange(newContent);
-								}}
-								endContent={
+							<div key={`${index + 1}`}>
+								<div className="flex">
+									<VariablesTextArea
+										maxRows={1000000000000}
+										placeholder="Enter user message..."
+										value={part.text}
+										onChange={(e) => {
+											const newContent = [...value];
+											newContent[index] = { ...part, text: e.target.value };
+											onValueChange(newContent);
+										}}
+										onVariablePress={() => {}}
+									/>
 									<Button
 										className="-mr-2"
 										size="sm"
@@ -168,8 +170,8 @@ function UserMessage({
 									>
 										<LucideTrash className="size-3.5" />
 									</Button>
-								}
-							/>
+								</div>
+							</div>
 						);
 					}
 					return null;
@@ -207,40 +209,39 @@ function AssistantMessage({
 					</div>
 				)}
 			</CardHeader>
-			<CardBody className="p-0 flex flex-col gap-2">
+			<CardBody className="p-3 border-t border-default-200 flex flex-col gap-2">
 				{value.map((part, index) => {
 					if (part.type === "text") {
 						return (
-							<Textarea
-								isReadOnly={isReadOnly}
-								maxRows={1000000000000}
-								key={`${index + 1}`}
-								radius="none"
-								placeholder="Enter assistant message..."
-								value={part.text}
-								onValueChange={(text) => {
-									const newContent = [...value];
-									newContent[index] = { ...part, text };
-									onValueChange(newContent);
-								}}
-								endContent={
-									!isReadOnly && (
-										<Button
-											className="-mr-2"
-											size="sm"
-											isIconOnly
-											variant="light"
-											onPress={() => {
-												const newContent = [...value];
-												newContent.splice(index, 1);
-												onValueChange(newContent);
-											}}
-										>
-											<LucideTrash className="size-3.5" />
-										</Button>
-									)
-								}
-							/>
+							<div key={`${index + 1}`} className="flex">
+								<VariablesTextArea
+									readOnly={isReadOnly}
+									maxRows={1000000000000}
+									placeholder="Enter assistant message..."
+									value={part.text}
+									onChange={(e) => {
+										const newContent = [...value];
+										newContent[index] = { ...part, text: e.target.value };
+										onValueChange(newContent);
+									}}
+									onVariablePress={() => {}}
+								/>
+								{!isReadOnly && (
+									<Button
+										className="-mr-2"
+										size="sm"
+										isIconOnly
+										variant="light"
+										onPress={() => {
+											const newContent = [...value];
+											newContent.splice(index, 1);
+											onValueChange(newContent);
+										}}
+									>
+										<LucideTrash className="size-3.5" />
+									</Button>
+								)}
+							</div>
 						);
 					}
 					return null;
