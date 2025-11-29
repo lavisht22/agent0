@@ -5,6 +5,7 @@ import {
 	DropdownItem,
 	DropdownMenu,
 	DropdownTrigger,
+	useDisclosure,
 } from "@heroui/react";
 import type { Json } from "@repo/database";
 import { useForm } from "@tanstack/react-form";
@@ -13,6 +14,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import type { TextStreamPart, Tool } from "ai";
 import { events } from "fetch-event-stream";
 import {
+	LucideBraces,
 	LucideCornerUpLeft,
 	LucideListPlus,
 	LucideLoader2,
@@ -28,6 +30,7 @@ import {
 	messageSchema,
 } from "@/components/messages";
 import { ProviderSelector } from "@/components/provider-selector";
+import { VariablesDrawer } from "@/components/variables-drawer";
 import { agentVersionsQuery, providersQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
 
@@ -53,6 +56,12 @@ function RouteComponent() {
 	const isNewAgent = agentId === "new";
 	const [generatedMessages, setGeneratedMessages] = useState<MessageT[]>([]);
 	const [isRunning, setIsRunning] = useState(false);
+	const [variableValues, setVariableValues] = useState<Record<string, string>>(
+		{},
+	);
+
+	const { isOpen: isVariablesOpen, onOpenChange: onVariablesOpenChange } =
+		useDisclosure();
 
 	// Fetch available providers
 	const { data: providers, isLoading: isLoadingProviders } = useQuery(
@@ -326,6 +335,24 @@ function RouteComponent() {
 				<p>Name</p>
 
 				<div className="flex items-center gap-2">
+					<form.Subscribe selector={(state) => state.values.messages}>
+						{(messages) => (
+							<VariablesDrawer
+								isOpen={isVariablesOpen}
+								onOpenChange={onVariablesOpenChange}
+								messages={messages}
+								values={variableValues}
+								onValuesChange={setVariableValues}
+							/>
+						)}
+					</form.Subscribe>
+					<Button
+						isIconOnly
+						variant="flat"
+						onPress={() => onVariablesOpenChange()}
+					>
+						<LucideBraces className="size-4" />
+					</Button>
 					<form.Subscribe
 						selector={(state) => ({
 							canSubmit: state.canSubmit,
@@ -364,6 +391,7 @@ function RouteComponent() {
 								<Messages
 									value={field.state.value}
 									onValueChange={field.handleChange}
+									onVariablePress={onVariablesOpenChange}
 								/>
 							)}
 						</form.Field>
@@ -434,6 +462,7 @@ function RouteComponent() {
 						isReadOnly
 						value={generatedMessages}
 						onValueChange={setGeneratedMessages}
+						onVariablePress={onVariablesOpenChange}
 					/>
 
 					<div>

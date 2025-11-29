@@ -94,9 +94,11 @@ export type MessageT = z.infer<typeof messageSchema>;
 function SystemMessage({
 	value,
 	onValueChange,
+	onVariablePress,
 }: {
 	value: string;
 	onValueChange: (value: string) => void;
+	onVariablePress: () => void;
 }) {
 	return (
 		<Card>
@@ -109,7 +111,7 @@ function SystemMessage({
 					maxRows={1000000000000}
 					value={value}
 					onChange={(e) => onValueChange(e.target.value)}
-					onVariablePress={() => {}}
+					onVariablePress={onVariablePress}
 				/>
 			</CardBody>
 		</Card>
@@ -119,11 +121,13 @@ function SystemMessage({
 function UserMessage({
 	value,
 	onValueChange,
+	onVariablePress,
 }: {
 	value: Extract<MessageT, { role: "user" }>["content"];
 	onValueChange: (
 		value: Extract<MessageT, { role: "user" }>["content"] | null,
 	) => void;
+	onVariablePress: () => void;
 }) {
 	return (
 		<Card>
@@ -155,7 +159,7 @@ function UserMessage({
 											newContent[index] = { ...part, text: e.target.value };
 											onValueChange(newContent);
 										}}
-										onVariablePress={() => {}}
+										onVariablePress={onVariablePress}
 									/>
 									<Button
 										className="-mr-2"
@@ -185,12 +189,14 @@ function AssistantMessage({
 	isReadOnly,
 	value,
 	onValueChange,
+	onVariablePress,
 }: {
 	isReadOnly?: boolean;
 	value: Extract<MessageT, { role: "assistant" }>["content"];
 	onValueChange: (
 		value: Extract<MessageT, { role: "assistant" }>["content"] | null,
 	) => void;
+	onVariablePress: () => void;
 }) {
 	return (
 		<Card>
@@ -224,7 +230,7 @@ function AssistantMessage({
 										newContent[index] = { ...part, text: e.target.value };
 										onValueChange(newContent);
 									}}
-									onVariablePress={() => {}}
+									onVariablePress={onVariablePress}
 								/>
 								{!isReadOnly && (
 									<Button
@@ -255,12 +261,14 @@ interface MessagesProps {
 	value: MessageT[];
 	onValueChange: (value: MessageT[]) => void;
 	isReadOnly?: boolean;
+	onVariablePress: () => void;
 }
 
 export function Messages({
 	value,
 	onValueChange,
 	isReadOnly = false,
+	onVariablePress,
 }: MessagesProps) {
 	return (
 		<div className="flex flex-col gap-4">
@@ -280,6 +288,7 @@ export function Messages({
 
 								onValueChange(newMessages);
 							}}
+							onVariablePress={onVariablePress}
 						/>
 					);
 				}
@@ -303,6 +312,7 @@ export function Messages({
 
 								onValueChange(newMessages);
 							}}
+							onVariablePress={onVariablePress}
 						/>
 					);
 				}
@@ -327,6 +337,7 @@ export function Messages({
 
 								onValueChange(newMessages);
 							}}
+							onVariablePress={onVariablePress}
 						/>
 					);
 				}
