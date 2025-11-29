@@ -46,7 +46,7 @@ function RouteComponent() {
 						})
 					}
 				>
-					Add Agent
+					Create
 				</Button>
 			</div>
 

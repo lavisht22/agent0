@@ -287,7 +287,7 @@ function RouteComponent() {
 									isLoading={isLoading || state.isSubmitting}
 									isDisabled={!state.canSubmit || isLoading}
 								>
-									{isNewProvider ? "Create Provider" : "Update Provider"}
+									{isNewProvider ? "Create" : "Update"}
 								</Button>
 							)}
 						</form.Subscribe>
