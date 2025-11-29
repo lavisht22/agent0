@@ -5,5 +5,5 @@ export const getAIProvider = (type: string, data: unknown) => {
         return createXai(data as XaiProviderSettings);
     }
 
-    throw new Error(`Unsupported provider type: ${type}`);
+    return null
 }

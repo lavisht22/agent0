@@ -4,11 +4,10 @@ import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import type { TextStreamPart, Tool } from "ai";
-import { stream } from "fetch-event-stream";
+import { events, stream } from "fetch-event-stream";
 import { LucideCornerUpLeft } from "lucide-react";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
 import { z } from "zod";
 import {
 	type assistantMessageSchema,
@@ -90,16 +89,21 @@ function RouteComponent() {
 		},
 		onSuccess: (newAgentId) => {
 			queryClient.invalidateQueries({ queryKey: ["agents", workspaceId] });
-			toast.success("Agent created successfully");
+			addToast({
+				description: "Agent created successfully.",
+				color: "success",
+			});
 			navigate({
 				to: "/workspace/$workspaceId/agents/$agentId",
 				params: { workspaceId, agentId: newAgentId },
 			});
 		},
 		onError: (error) => {
-			toast.error(
-				error instanceof Error ? error.message : "Failed to create agent",
-			);
+			addToast({
+				description:
+					error instanceof Error ? error.message : "Failed to create agent.",
+				color: "danger",
+			});
 		},
 	});
 
@@ -132,12 +136,19 @@ function RouteComponent() {
 			queryClient.invalidateQueries({ queryKey: ["agents", workspaceId] });
 			queryClient.invalidateQueries({ queryKey: ["agent-versions", agentId] });
 			queryClient.invalidateQueries({ queryKey: ["agent", agentId] });
-			toast.success("New version created successfully");
+			addToast({
+				description: "New version created successfully.",
+				color: "success",
+			});
 		},
 		onError: (error) => {
-			toast.error(
-				error instanceof Error ? error.message : "Failed to create new version",
-			);
+			addToast({
+				description:
+					error instanceof Error
+						? error.message
+						: "Failed to create new version.",
+				color: "danger",
+			});
 		},
 	});
 
@@ -150,7 +161,12 @@ function RouteComponent() {
 				id: "",
 				model: "",
 			},
-			messages: [] as MessageT[],
+			messages: [
+				{
+					role: "system",
+					content: "",
+				},
+			] as MessageT[],
 		},
 		validators: {
 			onChange: agentFormSchema,
@@ -196,7 +212,7 @@ function RouteComponent() {
 
 			setGeneratedMessages([]);
 
-			const chunks = await stream(`http://localhost:2223/api/test`, {
+			const response = await fetch(`http://localhost:2223/api/test`, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -209,6 +225,14 @@ function RouteComponent() {
 					},
 				}),
 			});
+
+			if (!response.ok) {
+				throw new Error(
+					(await response.json()).message || "Failed to run agent.",
+				);
+			}
+
+			const chunks = events(response);
 
 			const generatedMessageState: MessageT[] = [];
 
@@ -257,10 +281,9 @@ function RouteComponent() {
 				setGeneratedMessages([...generatedMessageState]);
 			}
 		} catch (error) {
-			console.error(error);
 			addToast({
-				title: "Error",
-				description: "Failed to run the agent.",
+				description:
+					error instanceof Error ? error.message : "Failed to run agent.",
 				color: "danger",
 			});
 		} finally {

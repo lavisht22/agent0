@@ -50,7 +50,7 @@ fastify.post('/api/test', async (request, reply) => {
     const { provider_id, data } = request.body as { provider_id: string; data: { model: string, messages: ModelMessage[] } };
 
     if (!provider_id) {
-        return reply.code(400).send({ error: 'provider_id is required' });
+        return reply.code(400).send({ message: 'provider_id is required' });
     }
 
     const { data: provider, error } = await supabase
@@ -60,10 +60,15 @@ fastify.post('/api/test', async (request, reply) => {
         .single();
 
     if (error || !provider) {
-        return reply.code(404).send({ error: 'Provider not found' });
+        return reply.code(404).send({ message: 'Provider not found' });
     }
 
     const aiProvider = getAIProvider(provider.type, provider.data);
+
+    if (!aiProvider) {
+        return reply.code(400).send({ message: `Unsupported provider type: ${provider.type}` });
+    }
+
     const { model, messages } = data;
 
     const result = streamText({
@@ -110,6 +115,7 @@ fastify.post('/api/test', async (request, reply) => {
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
     });
+
     return reply.send(stream);
 });
 

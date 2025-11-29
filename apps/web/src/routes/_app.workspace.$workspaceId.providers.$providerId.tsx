@@ -1,10 +1,16 @@
-import { Button, Input, Select, SelectItem, Textarea } from "@heroui/react";
+import {
+	addToast,
+	Button,
+	Input,
+	Select,
+	SelectItem,
+	Textarea,
+} from "@heroui/react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { nanoid } from "nanoid";
-import { toast } from "sonner";
 import { PROVIDER_TYPES } from "@/lib/providers";
 import { providersQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
@@ -61,16 +67,21 @@ function RouteComponent() {
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["providers", workspaceId] });
-			toast.success("Provider created successfully");
+			addToast({
+				description: "Provider created successfully.",
+				color: "success",
+			});
 			navigate({
 				to: "/workspace/$workspaceId/providers",
 				params: { workspaceId },
 			});
 		},
 		onError: (error) => {
-			toast.error(
-				error instanceof Error ? error.message : "Failed to create provider",
-			);
+			addToast({
+				description:
+					error instanceof Error ? error.message : "Failed to create provider.",
+				color: "danger",
+			});
 		},
 	});
 
@@ -94,16 +105,21 @@ function RouteComponent() {
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["providers", workspaceId] });
-			toast.success("Provider updated successfully");
+			addToast({
+				description: "Provider updated successfully.",
+				color: "success",
+			});
 			navigate({
 				to: "/workspace/$workspaceId/providers",
 				params: { workspaceId },
 			});
 		},
 		onError: (error) => {
-			toast.error(
-				error instanceof Error ? error.message : "Failed to update provider",
-			);
+			addToast({
+				description:
+					error instanceof Error ? error.message : "Failed to update provider.",
+				color: "danger",
+			});
 		},
 	});
 

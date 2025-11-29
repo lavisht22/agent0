@@ -35,10 +35,12 @@ function RouteComponent() {
 			if (error) throw error;
 
 			setStep("otp");
-		} catch (err: unknown) {
+		} catch (error) {
 			addToast({
-				title: "Error",
-				description: (err as Error).message,
+				description:
+					error instanceof Error
+						? error.message
+						: "Unable to send OTP at the moment.",
 				color: "danger",
 			});
 		} finally {
@@ -60,10 +62,12 @@ function RouteComponent() {
 			if (error) throw error;
 
 			navigate({ to: "/" });
-		} catch (err: unknown) {
+		} catch (error) {
 			addToast({
-				title: "Error",
-				description: (err as Error).message,
+				description:
+					error instanceof Error
+						? error.message
+						: "Unable to verify OTP at the moment.",
 				color: "danger",
 			});
 		} finally {

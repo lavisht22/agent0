@@ -34,10 +34,11 @@ function RouteComponent() {
 			return data;
 		},
 		onError: (error) => {
-			console.log(error);
 			addToast({
-				title: "Error",
-				description: "Unable to create new workspace at the moment.",
+				description:
+					error instanceof Error
+						? error.message
+						: "Failed to create workspace.",
 				color: "danger",
 			});
 		},
