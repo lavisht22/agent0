@@ -9,7 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import { type ModelMessage, stepCountIs, streamText, tool } from 'ai';
 import Fastify from 'fastify';
 import { z } from 'zod';
-import { getAIProvider } from './lib/providers';
+import { getAIProvider } from './lib/providers.js';
 
 
 // biome-ignore lint/style/noNonNullAssertion: <>

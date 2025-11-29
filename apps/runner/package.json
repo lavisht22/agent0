@@ -19,6 +19,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@types/json-schema": "^7.0.15",
     "@types/node": "^22.19.1",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
