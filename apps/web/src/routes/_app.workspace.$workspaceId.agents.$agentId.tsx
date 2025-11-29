@@ -3,15 +3,22 @@ import type { Json } from "@repo/database";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import type { TextStreamPart, Tool } from "ai";
+import { stream } from "fetch-event-stream";
+import { LucideCornerUpLeft } from "lucide-react";
 import { nanoid } from "nanoid";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { Messages, type MessageT, messageSchema } from "@/components/messages";
+import {
+	type assistantMessageSchema,
+	Messages,
+	type MessageT,
+	messageSchema,
+} from "@/components/messages";
 import { ProviderSelector } from "@/components/provider-selector";
 import { agentVersionsQuery, providersQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
-import { useCallback, useState } from "react";
-import { LucideCornerUpLeft } from "lucide-react";
 
 export const Route = createFileRoute(
 	"/_app/workspace/$workspaceId/agents/$agentId",
@@ -39,6 +46,7 @@ function RouteComponent() {
 			content: [{ type: "text", text: "Generated response will appear here." }],
 		},
 	]);
+	const [isRunning, setIsRunning] = useState(false);
 
 	// Fetch available providers
 	const { data: providers, isLoading: isLoadingProviders } = useQuery(
@@ -187,17 +195,83 @@ function RouteComponent() {
 		setGeneratedMessages([]);
 	}, [form.getFieldValue, form.setFieldValue, generatedMessages]);
 
-	const handleRun = useCallback(() => {
+	const handleRun = useCallback(async () => {
 		try {
-			throw new Error("Not implemented yet");
-		} catch {
+			setIsRunning(true);
+
+			setGeneratedMessages([]);
+
+			const chunks = await stream(`http://localhost:2223/api/test`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					provider_id: form.getFieldValue("provider").id,
+					data: {
+						model: form.getFieldValue("provider").model,
+						messages: form.getFieldValue("messages"),
+					},
+				}),
+			});
+
+			const generatedMessageState: MessageT[] = [];
+
+			for await (const chunk of chunks) {
+				if (!chunk.data) continue;
+
+				const parsed = JSON.parse(chunk.data) as TextStreamPart<{
+					[key: string]: Tool<unknown, unknown>;
+				}>;
+
+				if (parsed.type === "start-step") {
+					generatedMessageState.push({
+						role: "assistant",
+						content: [],
+					});
+				}
+
+				type AssistantMessage = z.infer<typeof assistantMessageSchema>;
+				const lastMessage = generatedMessageState[
+					generatedMessageState.length - 1
+				] as AssistantMessage;
+
+				if (parsed.type === "text-start") {
+					lastMessage.content.push({
+						type: "text",
+						text: "",
+					});
+				}
+
+				if (parsed.type === "text-delta") {
+					const lastPart = lastMessage.content[lastMessage.content.length - 1];
+
+					if (lastPart.type === "text") {
+						lastPart.text += parsed.text;
+					}
+				}
+
+				if (parsed.type === "tool-call") {
+					// TODO: handle this
+				}
+
+				if (parsed.type === "tool-result") {
+					// TODO: handle this
+				}
+
+				setGeneratedMessages([...generatedMessageState]);
+			}
+		} catch (error) {
+			console.error(error);
 			addToast({
 				title: "Error",
 				description: "Failed to run the agent.",
 				color: "danger",
 			});
+		} finally {
+			setIsRunning(false);
 		}
-	}, []);
+	}, [form.getFieldValue]);
 
 	const isLoading =
 		createMutation.isPending ||
@@ -261,14 +335,19 @@ function RouteComponent() {
 						</form.Field>
 					</div>
 					<div className="flex justify-end p-4 border-t border-default-200">
-						<Button color="primary" type="button" onPress={handleRun}>
+						<Button
+							color="primary"
+							type="button"
+							onPress={handleRun}
+							isLoading={isRunning}
+						>
 							Run
 						</Button>
 					</div>
 				</div>
 
 				<div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
-					{generatedMessages.length === 0 && (
+					{!isRunning && generatedMessages.length === 0 && (
 						<p className="text-sm text-default-500 my-auto text-center">
 							Run your agent to see the generated response here.
 						</p>
@@ -279,7 +358,7 @@ function RouteComponent() {
 						onValueChange={setGeneratedMessages}
 					/>
 					<div>
-						{generatedMessages.length > 0 && (
+						{!isRunning && generatedMessages.length > 0 && (
 							<Button
 								variant="flat"
 								startContent={<LucideCornerUpLeft className="size-4" />}

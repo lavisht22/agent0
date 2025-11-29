@@ -1,14 +1,16 @@
 import 'dotenv/config';
 import path from 'node:path';
+import { ReadableStream } from 'node:stream/web';
 import { fileURLToPath } from 'node:url';
+import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
 import type { Database } from '@repo/database';
 import { createClient } from '@supabase/supabase-js';
+import { type ModelMessage, stepCountIs, streamText, tool } from 'ai';
 import Fastify from 'fastify';
-import { getAIProvider } from './lib/providers';
-import { stepCountIs, streamText, tool, type ModelMessage } from 'ai';
-import { ReadableStream } from 'node:stream/web';
 import { z } from 'zod';
+import { getAIProvider } from './lib/providers';
+
 
 // biome-ignore lint/style/noNonNullAssertion: <>
 const supabase = createClient<Database>(process.env.SUPABASE_URL!, process.env.SUPABASE_API_KEY!);
@@ -23,6 +25,12 @@ const fastify = Fastify({ logger: true });
 fastify.register(fastifyStatic, {
     root: path.join(__dirname, '../public'), // Points to the copied web/dist folder
     prefix: '/', // Serve at root
+});
+
+
+await fastify.register(cors, {
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
 });
 
 // 2. Catch-all for SPA (Single Page App) Routing

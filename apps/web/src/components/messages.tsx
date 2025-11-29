@@ -31,7 +31,7 @@ const userMessageSchema = z.object({
 		.min(1, "User message must have at least one content part"),
 });
 
-const assistantMessage = z.object({
+export const assistantMessageSchema = z.object({
 	role: z.literal("assistant"),
 	content: z
 		.array(
@@ -56,12 +56,19 @@ const assistantMessage = z.object({
 					toolName: z.string(),
 					input: z.any(),
 				}),
+				z.object({
+					type: z.literal("tool-result"),
+					toolCallId: z.string(),
+					toolName: z.string(),
+					output: z.any(),
+					isError: z.boolean().optional(),
+				}),
 			]),
 		)
 		.min(1, "Assistant message must have at least one content part"),
 });
 
-const toolMessageSchema = z.object({
+export const toolMessageSchema = z.object({
 	role: z.literal("tool"),
 	content: z.array(
 		z.object({
@@ -77,7 +84,7 @@ const toolMessageSchema = z.object({
 export const messageSchema = z.discriminatedUnion("role", [
 	systemMessageSchema,
 	userMessageSchema,
-	assistantMessage,
+	assistantMessageSchema,
 	toolMessageSchema,
 ]);
 
