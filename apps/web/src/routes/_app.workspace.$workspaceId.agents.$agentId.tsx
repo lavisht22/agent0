@@ -1,11 +1,18 @@
-import { addToast, Button } from "@heroui/react";
+import {
+	addToast,
+	Button,
+	Dropdown,
+	DropdownItem,
+	DropdownMenu,
+	DropdownTrigger,
+} from "@heroui/react";
 import type { Json } from "@repo/database";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import type { TextStreamPart, Tool } from "ai";
-import { events, stream } from "fetch-event-stream";
-import { LucideCornerUpLeft } from "lucide-react";
+import { events } from "fetch-event-stream";
+import { LucideCornerUpLeft, LucideListPlus, LucidePlay } from "lucide-react";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
@@ -352,12 +359,50 @@ function RouteComponent() {
 							)}
 						</form.Field>
 					</div>
-					<div className="flex justify-end p-4 border-t border-default-200">
+					<div className="flex justify-between items-center p-4 border-t border-default-200">
+						<Dropdown placement="top-start">
+							<DropdownTrigger>
+								<Button
+									variant="flat"
+									startContent={<LucideListPlus className="size-4" />}
+								>
+									Add
+								</Button>
+							</DropdownTrigger>
+							<DropdownMenu>
+								<DropdownItem
+									key="user"
+									title="User Message"
+									onPress={() => {
+										const currentMessages = form.getFieldValue("messages");
+										form.setFieldValue("messages", [
+											...currentMessages,
+											{ role: "user", content: [{ type: "text", text: "" }] },
+										]);
+									}}
+								/>
+								<DropdownItem
+									key="assistant"
+									title="Assistant Message"
+									onPress={() => {
+										const currentMessages = form.getFieldValue("messages");
+										form.setFieldValue("messages", [
+											...currentMessages,
+											{
+												role: "assistant",
+												content: [{ type: "text", text: "" }],
+											},
+										]);
+									}}
+								/>
+							</DropdownMenu>
+						</Dropdown>
 						<Button
 							color="primary"
 							type="button"
 							onPress={handleRun}
 							isLoading={isRunning}
+							startContent={<LucidePlay className="size-4" />}
 						>
 							Run
 						</Button>
@@ -375,6 +420,7 @@ function RouteComponent() {
 						value={generatedMessages}
 						onValueChange={setGeneratedMessages}
 					/>
+
 					<div>
 						{!isRunning && generatedMessages.length > 0 && (
 							<Button
