@@ -31,6 +31,7 @@ import {
 } from "@/components/messages";
 import { ProviderSelector } from "@/components/provider-selector";
 import { VariablesDrawer } from "@/components/variables-drawer";
+import { useLocalStorage } from "@/hooks/use-local-storage";
 import { agentVersionsQuery, providersQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
 
@@ -56,9 +57,9 @@ function RouteComponent() {
 	const isNewAgent = agentId === "new";
 	const [generatedMessages, setGeneratedMessages] = useState<MessageT[]>([]);
 	const [isRunning, setIsRunning] = useState(false);
-	const [variableValues, setVariableValues] = useState<Record<string, string>>(
-		{},
-	);
+	const [variableValues, setVariableValues] = useLocalStorage<
+		Record<string, string>
+	>(`agent-variables-${agentId}`, {});
 
 	const { isOpen: isVariablesOpen, onOpenChange: onVariablesOpenChange } =
 		useDisclosure();
