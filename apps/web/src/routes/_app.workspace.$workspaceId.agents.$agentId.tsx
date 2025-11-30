@@ -398,7 +398,7 @@ function RouteComponent() {
 						})}
 					>
 						{(state) => {
-							if (state.isDirty) {
+							if (state.isDirty || isNewAgent) {
 								return <p className="text-sm text-default-500">Unsaved</p>;
 							}
 
@@ -412,18 +412,21 @@ function RouteComponent() {
 					<HistoryDrawer
 						isOpen={isHistoryOpen}
 						onOpenChange={onHistoryOpenChange}
+						workspaceId={workspaceId}
 						versions={versions || []}
 						onSelectionChange={(v: Tables<"versions">) => {
 							setVersion(v);
 						}}
 					/>
-					<Button
-						isIconOnly
-						variant="flat"
-						onPress={() => onHistoryOpenChange()}
-					>
-						<LucideHistory className="size-4" />
-					</Button>
+					{versions?.length && (
+						<Button
+							isIconOnly
+							variant="flat"
+							onPress={() => onHistoryOpenChange()}
+						>
+							<LucideHistory className="size-4" />
+						</Button>
+					)}
 
 					<form.Subscribe selector={(state) => state.values.messages}>
 						{(messages) => (

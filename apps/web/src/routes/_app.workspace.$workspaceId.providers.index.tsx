@@ -89,7 +89,7 @@ function RouteComponent() {
 											key={item.id}
 											onPress={() => navigate({ to: item.id })}
 										>
-											Edit provider
+											Edit
 										</DropdownItem>
 									</DropdownMenu>
 								</Dropdown>
