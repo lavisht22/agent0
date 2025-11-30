@@ -6,6 +6,9 @@ import {
 	DropdownItem,
 	DropdownMenu,
 	DropdownTrigger,
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
 	useDisclosure,
 } from "@heroui/react";
 import type { Json, Tables } from "@repo/database";
@@ -22,6 +25,7 @@ import {
 	LucideListPlus,
 	LucideLoader2,
 	LucidePlay,
+	LucideSettings2,
 } from "lucide-react";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
@@ -575,16 +579,33 @@ function RouteComponent() {
 			<div className="flex flex-1 overflow-hidden">
 				<div className="flex-1 flex flex-col border-r border-default-200 min-h-0">
 					<div className="flex-1 overflow-y-auto p-4 space-y-4">
-						<form.Field name="provider">
-							{(field) => (
-								<ProviderSelector
-									value={field.state.value}
-									onChange={field.handleChange}
-									providers={providers || []}
-									isInvalid={field.state.meta.errors.length > 0}
-								/>
-							)}
-						</form.Field>
+						<div className="flex gap-2">
+							<form.Field name="provider">
+								{(field) => (
+									<ProviderSelector
+										value={field.state.value}
+										onChange={field.handleChange}
+										providers={providers || []}
+										isInvalid={field.state.meta.errors.length > 0}
+									/>
+								)}
+							</form.Field>
+
+							<Popover placement="bottom-end">
+								<PopoverTrigger>
+									<Button
+										size="sm"
+										startContent={<LucideSettings2 className="size-4" />}
+										variant="flat"
+									>
+										Parameters
+									</Button>
+								</PopoverTrigger>
+								<PopoverContent className="p-3">
+									Implement Parameeters Here
+								</PopoverContent>
+							</Popover>
+						</div>
 
 						<form.Field name="messages" mode="array">
 							{(field) => (

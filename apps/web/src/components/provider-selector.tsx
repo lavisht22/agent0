@@ -49,7 +49,11 @@ export function ProviderSelector({
 	return (
 		<Popover placement="bottom-start" isOpen={isOpen} onOpenChange={setIsOpen}>
 			<PopoverTrigger>
-				<Button variant="flat" color={isInvalid ? "danger" : "default"}>
+				<Button
+					size="sm"
+					variant="flat"
+					color={isInvalid ? "danger" : "default"}
+				>
 					{currentProvider
 						? `@${currentProvider.name}/${value.model}`
 						: "Select Provider"}
