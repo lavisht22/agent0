@@ -49,7 +49,7 @@ fastify.setNotFoundHandler((req, reply) => {
 // API Routes
 // Test API endpoint (for development/testing purposes)
 fastify.post('/api/v1/test', async (request, reply) => {
-    const { provider_id, data } = request.body as { provider_id: string; data: { model: string, messages: ModelMessage[], variables?: Record<string, string> } };
+    const { provider_id, data } = request.body as { provider_id: string; data: { model: string, messages: ModelMessage[], maxOutputTokens?: number, variables?: Record<string, string> } };
 
     if (!provider_id) {
         return reply.code(400).send({ message: 'provider_id is required' });
@@ -71,12 +71,14 @@ fastify.post('/api/v1/test', async (request, reply) => {
         return reply.code(400).send({ message: `Unsupported provider type: ${provider.type}` });
     }
 
-    const { model, messages, variables = {} } = data;
+    const { model, messages, maxOutputTokens, variables = {} } = data;
 
     const processedMessages = JSON.parse(applyVariablesToMessages(JSON.stringify(messages), variables)) as ModelMessage[]
 
     const result = streamText({
         model: aiProvider(model),
+        maxOutputTokens,
+        stopWhen: stepCountIs(5),
         messages: processedMessages,
         tools: {
             weather: tool({
@@ -90,7 +92,6 @@ fastify.post('/api/v1/test', async (request, reply) => {
                 }),
             }),
         },
-        stopWhen: stepCountIs(5),
     });
 
     const encoder = new TextEncoder();
@@ -182,11 +183,10 @@ fastify.post('/api/v1/run', async (request, reply) => {
     }
 
     // Extract version data
-    const versionData = version.data as { model?: string; messages?: ModelMessage[] };
-    const messages = versionData.messages || [];
-    const model = versionData.model;
+    const { messages, model, maxOutputTokens } = version.data as { model?: string; maxOutputTokens?: number; messages?: ModelMessage[] };
 
-    if (!model || messages.length === 0) {
+
+    if (!model || !messages || messages.length === 0) {
         return reply.code(400).send({ message: 'Agent configuration is invalid' });
     }
 
@@ -223,9 +223,10 @@ fastify.post('/api/v1/run', async (request, reply) => {
     // Create AI stream
     const result = streamText({
         model: aiProvider(model),
+        maxOutputTokens,
+        stopWhen: stepCountIs(5),
         messages: processedMessages,
         tools,
-        stopWhen: stepCountIs(5),
     });
 
     // Handle streaming response

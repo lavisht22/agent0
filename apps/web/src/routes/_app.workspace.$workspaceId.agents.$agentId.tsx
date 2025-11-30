@@ -6,6 +6,7 @@ import {
 	DropdownItem,
 	DropdownMenu,
 	DropdownTrigger,
+	Input,
 	Popover,
 	PopoverContent,
 	PopoverTrigger,
@@ -55,9 +56,9 @@ const agentFormSchema = z.object({
 		id: z.string(),
 		model: z.string(),
 	}),
+	maxOutputTokens: z.number(),
 	messages: z.array(messageSchema).min(1, "At least one message is required"),
 });
-
 function RouteComponent() {
 	const { workspaceId, agentId } = Route.useParams();
 	const navigate = useNavigate();
@@ -113,10 +114,7 @@ function RouteComponent() {
 
 	// Create mutation (creates both agent and first version)
 	const createMutation = useMutation({
-		mutationFn: async (values: {
-			provider: { id: string; model: string };
-			messages: MessageT[];
-		}) => {
+		mutationFn: async (values: z.infer<typeof agentFormSchema>) => {
 			const newAgentId = nanoid();
 			const newVersionId = nanoid();
 
@@ -137,6 +135,7 @@ function RouteComponent() {
 				data: {
 					model: values.provider.model,
 					messages: values.messages,
+					maxOutputTokens: values.maxOutputTokens,
 				} as unknown as Json,
 				is_deployed: false,
 			});
@@ -167,10 +166,7 @@ function RouteComponent() {
 
 	// Update mutation (creates new version)
 	const updateMutation = useMutation({
-		mutationFn: async (values: {
-			provider: { id: string; model: string };
-			messages: MessageT[];
-		}) => {
+		mutationFn: async (values: z.infer<typeof agentFormSchema>) => {
 			const newVersionId = nanoid();
 
 			// Create new version
@@ -183,6 +179,7 @@ function RouteComponent() {
 					data: {
 						model: values.provider.model,
 						messages: values.messages,
+						maxOutputTokens: values.maxOutputTokens,
 					} as unknown as Json,
 					is_deployed: false,
 				})
@@ -281,6 +278,7 @@ function RouteComponent() {
 				id: "",
 				model: "",
 			},
+			maxOutputTokens: 2048,
 			messages: [
 				{
 					role: "system",
@@ -314,6 +312,7 @@ function RouteComponent() {
 		const data = version.data as {
 			model?: string;
 			messages?: MessageT[];
+			maxOutputTokens?: number;
 		};
 
 		setTimeout(() => {
@@ -324,6 +323,7 @@ function RouteComponent() {
 						model: data.model || "",
 					},
 					messages: data.messages || [],
+					maxOutputTokens: data.maxOutputTokens || 2048,
 				},
 				{ keepDefaultValues: true },
 			);
@@ -591,7 +591,7 @@ function RouteComponent() {
 								)}
 							</form.Field>
 
-							<Popover placement="bottom-end">
+							<Popover placement="bottom">
 								<PopoverTrigger>
 									<Button
 										size="sm"
@@ -601,8 +601,20 @@ function RouteComponent() {
 										Parameters
 									</Button>
 								</PopoverTrigger>
-								<PopoverContent className="p-3">
-									Implement Parameeters Here
+								<PopoverContent className="p-4 flex flex-col gap-4 w-64">
+									<form.Field name="maxOutputTokens">
+										{(field) => (
+											<Input
+												variant="bordered"
+												type="number"
+												label="Max Output Tokens"
+												value={field.state.value.toString()}
+												onValueChange={(value) =>
+													field.handleChange(parseInt(value, 10))
+												}
+											/>
+										)}
+									</form.Field>
 								</PopoverContent>
 							</Popover>
 						</div>
