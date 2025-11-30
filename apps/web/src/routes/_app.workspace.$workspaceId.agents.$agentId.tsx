@@ -1,6 +1,7 @@
 import {
 	addToast,
 	Button,
+	ButtonGroup,
 	Dropdown,
 	DropdownItem,
 	DropdownMenu,
@@ -15,6 +16,7 @@ import type { TextStreamPart, Tool } from "ai";
 import { events } from "fetch-event-stream";
 import {
 	LucideBraces,
+	LucideChevronDown,
 	LucideCornerUpLeft,
 	LucideHistory,
 	LucideListPlus,
@@ -94,12 +96,16 @@ function RouteComponent() {
 	});
 
 	useEffect(() => {
+		if (version) {
+			return;
+		}
+
 		if (!versions || versions.length === 0) {
 			return;
 		}
 
 		setVersion(versions[0]);
-	}, [versions]);
+	}, [versions, version]);
 
 	// Create mutation (creates both agent and first version)
 	const createMutation = useMutation({
@@ -158,31 +164,35 @@ function RouteComponent() {
 	// Update mutation (creates new version)
 	const updateMutation = useMutation({
 		mutationFn: async (values: {
-			provider: {
-				id: string;
-				model: string;
-			};
+			provider: { id: string; model: string };
 			messages: MessageT[];
 		}) => {
 			const newVersionId = nanoid();
 
 			// Create new version
-			const { error: versionError } = await supabase.from("versions").insert({
-				id: newVersionId,
-				agent_id: agentId,
-				provider_id: values.provider.id,
-				data: {
-					model: values.provider.model,
-					messages: values.messages,
-				} as unknown as Json,
-				is_deployed: false,
-			});
+			const { data: version, error: versionError } = await supabase
+				.from("versions")
+				.insert({
+					id: newVersionId,
+					agent_id: agentId,
+					provider_id: values.provider.id,
+					data: {
+						model: values.provider.model,
+						messages: values.messages,
+					} as unknown as Json,
+					is_deployed: false,
+				})
+				.select()
+				.single();
 
 			if (versionError) throw versionError;
+
+			return version;
 		},
-		onSuccess: () => {
+		onSuccess: (data) => {
 			queryClient.invalidateQueries({ queryKey: ["agents", workspaceId] });
 			queryClient.invalidateQueries({ queryKey: ["agent-versions", agentId] });
+			setVersion(data);
 			addToast({
 				description: "New version created successfully.",
 				color: "success",
@@ -194,6 +204,43 @@ function RouteComponent() {
 					error instanceof Error
 						? error.message
 						: "Failed to create new version.",
+				color: "danger",
+			});
+		},
+	});
+
+	// Publish mutation
+	const publishMutation = useMutation({
+		mutationFn: async (version_id: string) => {
+			await supabase
+				.from("versions")
+				.update({ is_deployed: false })
+				.eq("agent_id", agentId)
+				.throwOnError();
+
+			const { data: version, error: versionError } = await supabase
+				.from("versions")
+				.update({ is_deployed: true })
+				.eq("id", version_id)
+				.select()
+				.single();
+
+			if (versionError) throw versionError;
+
+			return version;
+		},
+		onSuccess: (data) => {
+			queryClient.invalidateQueries({ queryKey: ["agent-versions", agentId] });
+			setVersion(data);
+			addToast({
+				description: "Version published successfully.",
+				color: "success",
+			});
+		},
+		onError: (error) => {
+			addToast({
+				description:
+					error instanceof Error ? error.message : "Failed to publish version.",
 				color: "danger",
 			});
 		},
@@ -240,11 +287,17 @@ function RouteComponent() {
 		validators: {
 			onChange: agentFormSchema,
 		},
-		onSubmit: async ({ value }) => {
+		onSubmit: async ({ value, meta }) => {
+			const { publish } = meta as { publish: boolean };
+
 			if (isNewAgent) {
 				await createMutation.mutateAsync(value);
 			} else {
-				await updateMutation.mutateAsync(value);
+				const version = await updateMutation.mutateAsync(value);
+
+				if (publish) {
+					await publishMutation.mutateAsync(version.id);
+				}
 			}
 		},
 	});
@@ -452,18 +505,70 @@ function RouteComponent() {
 						selector={(state) => ({
 							canSubmit: state.canSubmit,
 							isSubmitting: state.isSubmitting,
+							isDirty: state.isDirty,
 						})}
 					>
-						{(state) => (
-							<Button
-								type="submit"
-								color="primary"
-								isLoading={state.isSubmitting}
-								isDisabled={!state.canSubmit}
-							>
-								{isNewAgent ? "Create" : "Update"}
-							</Button>
-						)}
+						{(state) => {
+							// New agent - show Create button
+							if (isNewAgent) {
+								return (
+									<Button
+										color="primary"
+										isLoading={state.isSubmitting}
+										isDisabled={!state.canSubmit}
+										onPress={() => form.handleSubmit({ publish: false })}
+									>
+										Create
+									</Button>
+								);
+							}
+
+							return (
+								<ButtonGroup>
+									<Button
+										color="primary"
+										isLoading={
+											state.isSubmitting ||
+											updateMutation.isPending ||
+											publishMutation.isPending
+										}
+										isDisabled={
+											!state.canSubmit ||
+											(!state.isDirty && version?.is_deployed)
+										}
+										onPress={async () => {
+											if (state.isDirty) {
+												form.handleSubmit({ publish: true });
+											} else {
+												if (!version) return;
+												await publishMutation.mutateAsync(version.id);
+											}
+										}}
+									>
+										Publish
+									</Button>
+									<Dropdown placement="bottom-end" isDisabled={!state.isDirty}>
+										<DropdownTrigger>
+											<Button
+												isIconOnly
+												color="primary"
+												isDisabled={!state.isDirty}
+											>
+												<LucideChevronDown className="size-4" />
+											</Button>
+										</DropdownTrigger>
+										<DropdownMenu>
+											<DropdownItem
+												key="update-only"
+												onPress={() => form.handleSubmit({ publish: false })}
+											>
+												Update Only
+											</DropdownItem>
+										</DropdownMenu>
+									</Dropdown>
+								</ButtonGroup>
+							);
+						}}
 					</form.Subscribe>
 				</div>
 			</div>

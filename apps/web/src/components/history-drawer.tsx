@@ -65,7 +65,7 @@ export const HistoryDrawer = ({
 									<p className="text-sm text-default-500">#{version.id}</p>
 
 									{version.is_deployed && (
-										<Chip color="success" size="sm">
+										<Chip color="success" size="sm" variant="flat">
 											PUBLISHED
 										</Chip>
 									)}
