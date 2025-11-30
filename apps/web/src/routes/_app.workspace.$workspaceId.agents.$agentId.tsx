@@ -59,6 +59,7 @@ const agentFormSchema = z.object({
 	}),
 	maxOutputTokens: z.number(),
 	temperature: z.number(),
+	maxStepCount: z.number(),
 	messages: z.array(messageSchema).min(1, "At least one message is required"),
 });
 function RouteComponent() {
@@ -136,9 +137,10 @@ function RouteComponent() {
 				provider_id: values.provider.id,
 				data: {
 					model: values.provider.model,
-					temperature: values.temperature,
-					messages: values.messages,
 					maxOutputTokens: values.maxOutputTokens,
+					temperature: values.temperature,
+					maxStepCount: values.maxStepCount,
+					messages: values.messages,
 				} as unknown as Json,
 				is_deployed: false,
 			});
@@ -181,9 +183,10 @@ function RouteComponent() {
 					provider_id: values.provider.id,
 					data: {
 						model: values.provider.model,
-						temperature: values.temperature,
-						messages: values.messages,
 						maxOutputTokens: values.maxOutputTokens,
+						temperature: values.temperature,
+						maxStepCount: values.maxStepCount,
+						messages: values.messages,
 					} as unknown as Json,
 					is_deployed: false,
 				})
@@ -284,6 +287,7 @@ function RouteComponent() {
 			},
 			maxOutputTokens: 2048,
 			temperature: 0.7,
+			maxStepCount: 10,
 			messages: [
 				{
 					role: "system",
@@ -316,9 +320,10 @@ function RouteComponent() {
 
 		const data = version.data as {
 			model?: string;
-			temperature?: number;
-			messages?: MessageT[];
 			maxOutputTokens?: number;
+			temperature?: number;
+			maxStepCount?: number;
+			messages?: MessageT[];
 		};
 
 		setTimeout(() => {
@@ -330,6 +335,7 @@ function RouteComponent() {
 					},
 					maxOutputTokens: data.maxOutputTokens || 2048,
 					temperature: data.temperature || 0.7,
+					maxStepCount: data.maxStepCount || 10,
 					messages: data.messages || [],
 				},
 				{ keepDefaultValues: true },
@@ -369,6 +375,7 @@ function RouteComponent() {
 						model: form.getFieldValue("provider").model,
 						maxOutputTokens: form.getFieldValue("maxOutputTokens"),
 						temperature: form.getFieldValue("temperature"),
+						maxStepCount: form.getFieldValue("maxStepCount"),
 						messages: form.getFieldValue("messages"),
 						variables: variableValues,
 					},
@@ -636,6 +643,21 @@ function RouteComponent() {
 												minValue={0}
 												maxValue={1}
 												step={0.01}
+											/>
+										)}
+									</form.Field>
+									<form.Field name="maxStepCount">
+										{(field) => (
+											<Slider
+												size="sm"
+												label="Max Step Count"
+												value={field.state.value}
+												onChange={(value) =>
+													field.handleChange(value as number)
+												}
+												minValue={1}
+												maxValue={10}
+												step={1}
 											/>
 										)}
 									</form.Field>
