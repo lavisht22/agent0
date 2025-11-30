@@ -11,6 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import {
 	Bot,
+	Key,
 	LayoutDashboard,
 	LucideChevronsUpDown,
 	LucidePlusSquare,
@@ -19,6 +20,7 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 import { workspacesQuery } from "@/lib/queries";
+import { supabase } from "@/lib/supabase";
 
 interface SidebarProps {
 	workspaceId: string;
@@ -33,8 +35,31 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 		return workspaces?.find((workspace) => workspace.id === workspaceId);
 	}, [workspaces, workspaceId]);
 
-	const navItems = useMemo(
-		() => [
+	// Check if current user is admin
+	const { data: isAdmin } = useQuery({
+		queryKey: ["workspace-role", workspaceId],
+		queryFn: async () => {
+			const {
+				data: { user },
+			} = await supabase.auth.getUser();
+			if (!user) return false;
+
+			const { data, error } = await supabase
+				.from("workspace_user")
+				.select("role")
+				.eq("workspace_id", workspaceId)
+				.eq("user_id", user.id)
+				.single();
+
+			if (error) return false;
+
+			return data?.role === "admin";
+		},
+		enabled: !!workspaceId,
+	});
+
+	const navItems = useMemo(() => {
+		const items = [
 			{
 				label: "Dashboard",
 				icon: LayoutDashboard,
@@ -59,9 +84,20 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 				path: `/workspace/${workspaceId}/runs`,
 				active: location.pathname === `/workspace/${workspaceId}/runs`,
 			},
-		],
-		[workspaceId, location.pathname],
-	);
+		];
+
+		// Only show API Keys for admin users
+		if (isAdmin) {
+			items.push({
+				label: "API Keys",
+				icon: Key,
+				path: `/workspace/${workspaceId}/api-keys`,
+				active: location.pathname === `/workspace/${workspaceId}/api-keys`,
+			});
+		}
+
+		return items;
+	}, [workspaceId, location.pathname, isAdmin]);
 
 	return (
 		<div className={`border-r border-default-200 flex flex-col w-52`}>
