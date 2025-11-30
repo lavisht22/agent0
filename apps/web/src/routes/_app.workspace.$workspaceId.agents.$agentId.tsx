@@ -10,6 +10,7 @@ import {
 	Popover,
 	PopoverContent,
 	PopoverTrigger,
+	Slider,
 	useDisclosure,
 } from "@heroui/react";
 import type { Json, Tables } from "@repo/database";
@@ -57,6 +58,7 @@ const agentFormSchema = z.object({
 		model: z.string(),
 	}),
 	maxOutputTokens: z.number(),
+	temperature: z.number(),
 	messages: z.array(messageSchema).min(1, "At least one message is required"),
 });
 function RouteComponent() {
@@ -134,6 +136,7 @@ function RouteComponent() {
 				provider_id: values.provider.id,
 				data: {
 					model: values.provider.model,
+					temperature: values.temperature,
 					messages: values.messages,
 					maxOutputTokens: values.maxOutputTokens,
 				} as unknown as Json,
@@ -178,6 +181,7 @@ function RouteComponent() {
 					provider_id: values.provider.id,
 					data: {
 						model: values.provider.model,
+						temperature: values.temperature,
 						messages: values.messages,
 						maxOutputTokens: values.maxOutputTokens,
 					} as unknown as Json,
@@ -279,6 +283,7 @@ function RouteComponent() {
 				model: "",
 			},
 			maxOutputTokens: 2048,
+			temperature: 0.7,
 			messages: [
 				{
 					role: "system",
@@ -311,6 +316,7 @@ function RouteComponent() {
 
 		const data = version.data as {
 			model?: string;
+			temperature?: number;
 			messages?: MessageT[];
 			maxOutputTokens?: number;
 		};
@@ -322,8 +328,9 @@ function RouteComponent() {
 						id: version.provider_id,
 						model: data.model || "",
 					},
-					messages: data.messages || [],
 					maxOutputTokens: data.maxOutputTokens || 2048,
+					temperature: data.temperature || 0.7,
+					messages: data.messages || [],
 				},
 				{ keepDefaultValues: true },
 			);
@@ -360,6 +367,8 @@ function RouteComponent() {
 					provider_id: form.getFieldValue("provider").id,
 					data: {
 						model: form.getFieldValue("provider").model,
+						maxOutputTokens: form.getFieldValue("maxOutputTokens"),
+						temperature: form.getFieldValue("temperature"),
 						messages: form.getFieldValue("messages"),
 						variables: variableValues,
 					},
@@ -612,6 +621,21 @@ function RouteComponent() {
 												onValueChange={(value) =>
 													field.handleChange(parseInt(value, 10))
 												}
+											/>
+										)}
+									</form.Field>
+									<form.Field name="temperature">
+										{(field) => (
+											<Slider
+												size="sm"
+												label="Temperature"
+												value={field.state.value}
+												onChange={(value) =>
+													field.handleChange(value as number)
+												}
+												minValue={0}
+												maxValue={1}
+												step={0.01}
 											/>
 										)}
 									</form.Field>

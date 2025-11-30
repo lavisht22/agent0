@@ -49,7 +49,7 @@ fastify.setNotFoundHandler((req, reply) => {
 // API Routes
 // Test API endpoint (for development/testing purposes)
 fastify.post('/api/v1/test', async (request, reply) => {
-    const { provider_id, data } = request.body as { provider_id: string; data: { model: string, messages: ModelMessage[], maxOutputTokens?: number, variables?: Record<string, string> } };
+    const { provider_id, data } = request.body as { provider_id: string; data: { model: string, messages: ModelMessage[], maxOutputTokens?: number, temperature?: number, variables?: Record<string, string> } };
 
     if (!provider_id) {
         return reply.code(400).send({ message: 'provider_id is required' });
@@ -71,13 +71,14 @@ fastify.post('/api/v1/test', async (request, reply) => {
         return reply.code(400).send({ message: `Unsupported provider type: ${provider.type}` });
     }
 
-    const { model, messages, maxOutputTokens, variables = {} } = data;
+    const { model, messages, maxOutputTokens, temperature, variables = {} } = data;
 
     const processedMessages = JSON.parse(applyVariablesToMessages(JSON.stringify(messages), variables)) as ModelMessage[]
 
     const result = streamText({
         model: aiProvider(model),
         maxOutputTokens,
+        temperature,
         stopWhen: stepCountIs(5),
         messages: processedMessages,
         tools: {
@@ -183,7 +184,7 @@ fastify.post('/api/v1/run', async (request, reply) => {
     }
 
     // Extract version data
-    const { messages, model, maxOutputTokens } = version.data as { model?: string; maxOutputTokens?: number; messages?: ModelMessage[] };
+    const { messages, model, maxOutputTokens, temperature } = version.data as { model?: string; maxOutputTokens?: number; messages?: ModelMessage[]; temperature?: number };
 
 
     if (!model || !messages || messages.length === 0) {
@@ -224,6 +225,7 @@ fastify.post('/api/v1/run', async (request, reply) => {
     const result = streamText({
         model: aiProvider(model),
         maxOutputTokens,
+        temperature,
         stopWhen: stepCountIs(5),
         messages: processedMessages,
         tools,
