@@ -6,6 +6,7 @@ import {
 	DropdownMenu,
 	DropdownSection,
 	DropdownTrigger,
+	User,
 } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "@tanstack/react-router";
@@ -14,13 +15,14 @@ import {
 	KeySquare,
 	LayoutDashboard,
 	LucideChevronsUpDown,
+	LucideLogOut,
 	LucidePlusSquare,
 	PlayCircle,
 	Server,
 	Settings,
 } from "lucide-react";
 import { useMemo } from "react";
-import { workspacesQuery } from "@/lib/queries";
+import { userQuery, workspacesQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
 
 interface SidebarProps {
@@ -58,6 +60,8 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 		},
 		enabled: !!workspaceId,
 	});
+
+	const { data: userData } = useQuery(userQuery);
 
 	const navItems = useMemo(() => {
 		const items = [
@@ -176,8 +180,32 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 				})}
 			</nav>
 
-			<div className="border-t border-default-200">
-				{/* TODO: Implement user menu here */}
+			<div className="border-t border-default-200 p-4">
+				<Dropdown placement="right-start">
+					<DropdownTrigger className="cursor-pointer">
+						<User
+							name={userData?.user.name || ""}
+							description={userData?.claims.email || ""}
+							avatarProps={{
+								size: "sm",
+								src: `https://api.dicebear.com/9.x/initials/svg?seed=${userData?.user.name}`,
+							}}
+						/>
+					</DropdownTrigger>
+					<DropdownMenu>
+						<DropdownItem
+							key="logout"
+							color="danger"
+							startContent={<LucideLogOut className="size-4" />}
+							onPress={() => {
+								supabase.auth.signOut();
+								navigate({ to: "/" });
+							}}
+						>
+							Logout
+						</DropdownItem>
+					</DropdownMenu>
+				</Dropdown>
 			</div>
 		</div>
 	);

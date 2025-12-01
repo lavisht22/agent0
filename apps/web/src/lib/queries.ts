@@ -92,3 +92,22 @@ export const apiKeysQuery = (workspaceId: string) => queryOptions({
     },
     enabled: !!workspaceId,
 })
+
+export const userQuery = queryOptions({
+    queryKey: ['user'],
+    queryFn: async () => {
+        const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+
+        if (claimsError) throw claimsError;
+
+        const claims = claimsData?.claims;
+
+        if (!claims?.sub) throw new Error("User not found");
+
+        const { data: user, error: userError } = await supabase.from("users").select("*").eq("id", claims.sub).single();
+
+        if (userError) throw userError;
+
+        return { claims, user };
+    },
+})
