@@ -53,15 +53,18 @@ export const Route = createFileRoute(
 
 // Zod schema for form validation
 const agentFormSchema = z.object({
-	provider: z.object({
-		id: z.string(),
-		model: z.string(),
-	}),
+	providers: z.array(
+		z.object({
+			id: z.string(),
+			model: z.string(),
+		}),
+	),
 	maxOutputTokens: z.number(),
 	temperature: z.number(),
 	maxStepCount: z.number(),
 	messages: z.array(messageSchema).min(1, "At least one message is required"),
 });
+
 function RouteComponent() {
 	const { workspaceId, agentId } = Route.useParams();
 	const navigate = useNavigate();
@@ -134,9 +137,8 @@ function RouteComponent() {
 			const { error: versionError } = await supabase.from("versions").insert({
 				id: newVersionId,
 				agent_id: newAgentId,
-				provider_id: values.provider.id,
 				data: {
-					model: values.provider.model,
+					providers: values.providers,
 					maxOutputTokens: values.maxOutputTokens,
 					temperature: values.temperature,
 					maxStepCount: values.maxStepCount,
@@ -180,9 +182,8 @@ function RouteComponent() {
 				.insert({
 					id: newVersionId,
 					agent_id: agentId,
-					provider_id: values.provider.id,
 					data: {
-						model: values.provider.model,
+						providers: values.providers,
 						maxOutputTokens: values.maxOutputTokens,
 						temperature: values.temperature,
 						maxStepCount: values.maxStepCount,
@@ -281,10 +282,7 @@ function RouteComponent() {
 	// Initialize TanStack Form
 	const form = useForm({
 		defaultValues: {
-			provider: {
-				id: "",
-				model: "",
-			},
+			providers: [] as { id: string; model: string }[],
 			maxOutputTokens: 2048,
 			temperature: 0.7,
 			maxStepCount: 10,
@@ -319,7 +317,7 @@ function RouteComponent() {
 		}
 
 		const data = version.data as {
-			model?: string;
+			providers?: [];
 			maxOutputTokens?: number;
 			temperature?: number;
 			maxStepCount?: number;
@@ -329,10 +327,7 @@ function RouteComponent() {
 		setTimeout(() => {
 			form.reset(
 				{
-					provider: {
-						id: version.provider_id,
-						model: data.model || "",
-					},
+					providers: data.providers || [],
 					maxOutputTokens: data.maxOutputTokens || 2048,
 					temperature: data.temperature || 0.7,
 					maxStepCount: data.maxStepCount || 10,
@@ -370,15 +365,8 @@ function RouteComponent() {
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
-					provider_id: form.getFieldValue("provider").id,
-					data: {
-						model: form.getFieldValue("provider").model,
-						maxOutputTokens: form.getFieldValue("maxOutputTokens"),
-						temperature: form.getFieldValue("temperature"),
-						maxStepCount: form.getFieldValue("maxStepCount"),
-						messages: form.getFieldValue("messages"),
-						variables: variableValues,
-					},
+					data: form.state.values,
+					variables: variableValues,
 				}),
 			});
 
@@ -596,7 +584,7 @@ function RouteComponent() {
 				<div className="flex-1 flex flex-col border-r border-default-200 min-h-0">
 					<div className="flex-1 overflow-y-auto p-4 space-y-4">
 						<div className="flex gap-2">
-							<form.Field name="provider">
+							<form.Field name="providers">
 								{(field) => (
 									<ProviderSelector
 										value={field.state.value}

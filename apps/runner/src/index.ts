@@ -46,37 +46,59 @@ fastify.setNotFoundHandler((req, reply) => {
     }
 });
 
-// API Routes
-// Test API endpoint (for development/testing purposes)
-fastify.post('/api/v1/test', async (request, reply) => {
-    const { provider_id, data } = request.body as { provider_id: string; data: { model: string, messages: ModelMessage[], maxOutputTokens?: number, temperature?: number, maxStepCount?: number, variables?: Record<string, string> } };
 
-    if (!provider_id) {
-        return reply.code(400).send({ message: 'provider_id is required' });
+type VersionData = {
+    providers: { id: string; model: string }[];
+    messages: ModelMessage[],
+    maxOutputTokens?: number,
+    temperature?: number,
+    maxStepCount?: number,
+};
+
+
+
+
+const generateResult = async (data: VersionData, variables: Record<string, string>) => {
+    const { providers, messages, maxOutputTokens, temperature, maxStepCount } = data
+
+    const { data: availableProviders, error: availableProvidersError } = await supabase
+        .from("providers")
+        .select("*")
+        .in("id", providers.map(p => p.id))
+
+    if (availableProvidersError) {
+        throw availableProvidersError;
     }
 
-    const { data: provider, error } = await supabase
-        .from('providers')
-        .select('*')
-        .eq('id', provider_id)
-        .single();
-
-    if (error || !provider) {
-        return reply.code(404).send({ message: 'Provider not found' });
+    if (availableProviders.length === 0) {
+        throw new Error("No valid providers found")
     }
 
-    const aiProvider = getAIProvider(provider.type, provider.data);
+    const providersHydrated = providers.map(p => {
+        const availableProvider = availableProviders.find(ap => ap.id === p.id);
+
+        if (!availableProvider) {
+            throw new Error(`Provider ${p.id} not found`);
+        }
+
+        return {
+            ...p,
+            ...availableProvider,
+        }
+    });
+
+    const randomProvider = providersHydrated[Math.floor(Math.random() * providersHydrated.length)];
+
+    const aiProvider = getAIProvider(randomProvider.type, randomProvider.data);
 
     if (!aiProvider) {
-        return reply.code(400).send({ message: `Unsupported provider type: ${provider.type}` });
+        throw new Error(`Unsupported provider type: ${randomProvider.type}`);
     }
-
-    const { model, messages, maxOutputTokens, temperature, maxStepCount, variables = {} } = data;
 
     const processedMessages = JSON.parse(applyVariablesToMessages(JSON.stringify(messages), variables)) as ModelMessage[]
 
     const result = streamText({
-        model: aiProvider(model),
+        model: aiProvider(randomProvider.model),
         maxOutputTokens,
         temperature,
         stopWhen: stepCountIs(maxStepCount || 10),
@@ -94,6 +116,16 @@ fastify.post('/api/v1/test', async (request, reply) => {
             }),
         },
     });
+
+    return result;
+}
+
+
+// API Routes
+fastify.post('/api/v1/test', async (request, reply) => {
+    const { data, variables } = request.body as { data: unknown, variables: Record<string, string> }
+
+    const result = await generateResult(data as VersionData, variables);
 
     const encoder = new TextEncoder();
 
@@ -115,7 +147,6 @@ fastify.post('/api/v1/test', async (request, reply) => {
         },
     });
 
-
     reply.headers({
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
@@ -125,7 +156,7 @@ fastify.post('/api/v1/test', async (request, reply) => {
     return reply.send(stream);
 });
 
-// Run API endpoint (for production use with API key authentication)
+
 fastify.post('/api/v1/run', async (request, reply) => {
     const { agent_id, variables = {}, stream = false } = request.body as {
         agent_id: string;
@@ -140,26 +171,17 @@ fastify.post('/api/v1/run', async (request, reply) => {
 
     // Extract and validate API key from headers
     const apiKey = request.headers['x-api-key'] as string;
+
     if (!apiKey) {
         return reply.code(401).send({ message: 'API key is required' });
-    }
-
-    // Verify API key exists and get workspace
-    const { data: apiKeyData, error: apiKeyError } = await supabase
-        .from('api_keys')
-        .select('workspace_id')
-        .eq('id', apiKey)
-        .single();
-
-    if (apiKeyError || !apiKeyData) {
-        return reply.code(401).send({ message: 'Invalid API key' });
     }
 
     // Get agent and verify it belongs to the same workspace
     const { data: agent, error: agentError } = await supabase
         .from('agents')
-        .select('workspace_id')
+        .select('workspaces(id, api_keys(id)), versions(*)')
         .eq('id', agent_id)
+        .eq("versions.is_deployed", true)
         .single();
 
     if (agentError || !agent) {
@@ -167,69 +189,18 @@ fastify.post('/api/v1/run', async (request, reply) => {
     }
 
     // Verify workspace access
-    if (agent.workspace_id !== apiKeyData.workspace_id) {
-        return reply.code(403).send({ message: 'Access denied to this agent' });
+    if (!agent.workspaces.api_keys.map(ak => ak.id).includes(apiKey)) {
+        return reply.code(403).send({ message: 'Access denied' });
     }
 
-    // Get the deployed version of the agent
-    const { data: version, error: versionError } = await supabase
-        .from('versions')
-        .select('*, providers(*)')
-        .eq('agent_id', agent_id)
-        .eq('is_deployed', true)
-        .single();
-
-    if (versionError || !version) {
+    if (agent.versions.length === 0) {
         return reply.code(404).send({ message: 'No deployed version found for this agent' });
     }
 
-    // Extract version data
-    const { messages, model, maxOutputTokens, temperature, maxStepCount } = version.data as { model?: string; maxOutputTokens?: number; messages?: ModelMessage[]; temperature?: number; maxStepCount?: number };
-
-
-    if (!model || !messages || messages.length === 0) {
-        return reply.code(400).send({ message: 'Agent configuration is invalid' });
-    }
-
-    // Get provider from the version
-    const provider = version.providers;
-    if (!provider) {
-        return reply.code(404).send({ message: 'Provider not found' });
-    }
-
-    const aiProvider = getAIProvider(provider.type, provider.data);
-    if (!aiProvider) {
-        return reply.code(400).send({ message: `Unsupported provider type: ${provider.type}` });
-    }
-
-    // Apply variables to messages
-    const processedMessages = JSON.parse(
-        applyVariablesToMessages(JSON.stringify(messages), variables)
-    ) as ModelMessage[];
-
-
-    const tools = {
-        weather: tool({
-            description: 'Get the weather in a location',
-            inputSchema: z.object({
-                location: z.string().describe('The location to get the weather for'),
-            }),
-            execute: async ({ location }) => ({
-                location,
-                temperature: 72 + Math.floor(Math.random() * 21) - 10,
-            }),
-        }),
-    }
+    const version = agent.versions[0];
 
     // Create AI stream
-    const result = streamText({
-        model: aiProvider(model),
-        maxOutputTokens,
-        temperature,
-        stopWhen: stepCountIs(maxStepCount || 10),
-        messages: processedMessages,
-        tools,
-    });
+    const result = await generateResult(version.data as VersionData, variables);
 
     // Handle streaming response
     if (stream) {
