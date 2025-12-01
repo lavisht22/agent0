@@ -30,8 +30,8 @@ function RouteComponent() {
 	const { data: providers, isLoading } = useQuery(providersQuery(workspaceId));
 
 	return (
-		<div className="p-6">
-			<div className="flex justify-between items-center mb-6">
+		<div className="p-6 space-y-6">
+			<div className="flex justify-between items-center">
 				<div>
 					<h1 className="text-2xl font-medium tracking-tight">Providers</h1>
 					<p className="text-default-500">

@@ -17,6 +17,7 @@ import {
 	LucidePlusSquare,
 	PlayCircle,
 	Server,
+	Settings,
 } from "lucide-react";
 import { useMemo } from "react";
 import { workspacesQuery } from "@/lib/queries";
@@ -86,13 +87,19 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 			},
 		];
 
-		// Only show API Keys for admin users
+		// Only show API Keys and Settings for admin users
 		if (isAdmin) {
 			items.push({
 				label: "API Keys",
 				icon: KeySquare,
 				path: `/workspace/${workspaceId}/api-keys`,
 				active: location.pathname === `/workspace/${workspaceId}/api-keys`,
+			});
+			items.push({
+				label: "Settings",
+				icon: Settings,
+				path: `/workspace/${workspaceId}/settings`,
+				active: location.pathname === `/workspace/${workspaceId}/settings`,
 			});
 		}
 

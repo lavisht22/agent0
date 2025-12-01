@@ -15,6 +15,7 @@ import { Route as AppIndexRouteImport } from './routes/_app.index'
 import { Route as AppCreateWorkspaceRouteImport } from './routes/_app.create-workspace'
 import { Route as AppWorkspaceWorkspaceIdRouteImport } from './routes/_app.workspace.$workspaceId'
 import { Route as AppWorkspaceWorkspaceIdIndexRouteImport } from './routes/_app.workspace.$workspaceId.index'
+import { Route as AppWorkspaceWorkspaceIdSettingsRouteImport } from './routes/_app.workspace.$workspaceId.settings'
 import { Route as AppWorkspaceWorkspaceIdProvidersIndexRouteImport } from './routes/_app.workspace.$workspaceId.providers.index'
 import { Route as AppWorkspaceWorkspaceIdApiKeysIndexRouteImport } from './routes/_app.workspace.$workspaceId.api-keys.index'
 import { Route as AppWorkspaceWorkspaceIdAgentsIndexRouteImport } from './routes/_app.workspace.$workspaceId.agents.index'
@@ -50,6 +51,12 @@ const AppWorkspaceWorkspaceIdIndexRoute =
   AppWorkspaceWorkspaceIdIndexRouteImport.update({
     id: '/',
     path: '/',
+    getParentRoute: () => AppWorkspaceWorkspaceIdRoute,
+  } as any)
+const AppWorkspaceWorkspaceIdSettingsRoute =
+  AppWorkspaceWorkspaceIdSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
     getParentRoute: () => AppWorkspaceWorkspaceIdRoute,
   } as any)
 const AppWorkspaceWorkspaceIdProvidersIndexRoute =
@@ -94,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/create-workspace': typeof AppCreateWorkspaceRoute
   '/': typeof AppIndexRoute
   '/workspace/$workspaceId': typeof AppWorkspaceWorkspaceIdRouteWithChildren
+  '/workspace/$workspaceId/settings': typeof AppWorkspaceWorkspaceIdSettingsRoute
   '/workspace/$workspaceId/': typeof AppWorkspaceWorkspaceIdIndexRoute
   '/workspace/$workspaceId/agents/$agentId': typeof AppWorkspaceWorkspaceIdAgentsAgentIdRoute
   '/workspace/$workspaceId/api-keys/new': typeof AppWorkspaceWorkspaceIdApiKeysNewRoute
@@ -106,6 +114,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/create-workspace': typeof AppCreateWorkspaceRoute
   '/': typeof AppIndexRoute
+  '/workspace/$workspaceId/settings': typeof AppWorkspaceWorkspaceIdSettingsRoute
   '/workspace/$workspaceId': typeof AppWorkspaceWorkspaceIdIndexRoute
   '/workspace/$workspaceId/agents/$agentId': typeof AppWorkspaceWorkspaceIdAgentsAgentIdRoute
   '/workspace/$workspaceId/api-keys/new': typeof AppWorkspaceWorkspaceIdApiKeysNewRoute
@@ -121,6 +130,7 @@ export interface FileRoutesById {
   '/_app/create-workspace': typeof AppCreateWorkspaceRoute
   '/_app/': typeof AppIndexRoute
   '/_app/workspace/$workspaceId': typeof AppWorkspaceWorkspaceIdRouteWithChildren
+  '/_app/workspace/$workspaceId/settings': typeof AppWorkspaceWorkspaceIdSettingsRoute
   '/_app/workspace/$workspaceId/': typeof AppWorkspaceWorkspaceIdIndexRoute
   '/_app/workspace/$workspaceId/agents/$agentId': typeof AppWorkspaceWorkspaceIdAgentsAgentIdRoute
   '/_app/workspace/$workspaceId/api-keys/new': typeof AppWorkspaceWorkspaceIdApiKeysNewRoute
@@ -136,6 +146,7 @@ export interface FileRouteTypes {
     | '/create-workspace'
     | '/'
     | '/workspace/$workspaceId'
+    | '/workspace/$workspaceId/settings'
     | '/workspace/$workspaceId/'
     | '/workspace/$workspaceId/agents/$agentId'
     | '/workspace/$workspaceId/api-keys/new'
@@ -148,6 +159,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/create-workspace'
     | '/'
+    | '/workspace/$workspaceId/settings'
     | '/workspace/$workspaceId'
     | '/workspace/$workspaceId/agents/$agentId'
     | '/workspace/$workspaceId/api-keys/new'
@@ -162,6 +174,7 @@ export interface FileRouteTypes {
     | '/_app/create-workspace'
     | '/_app/'
     | '/_app/workspace/$workspaceId'
+    | '/_app/workspace/$workspaceId/settings'
     | '/_app/workspace/$workspaceId/'
     | '/_app/workspace/$workspaceId/agents/$agentId'
     | '/_app/workspace/$workspaceId/api-keys/new'
@@ -220,6 +233,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWorkspaceWorkspaceIdIndexRouteImport
       parentRoute: typeof AppWorkspaceWorkspaceIdRoute
     }
+    '/_app/workspace/$workspaceId/settings': {
+      id: '/_app/workspace/$workspaceId/settings'
+      path: '/settings'
+      fullPath: '/workspace/$workspaceId/settings'
+      preLoaderRoute: typeof AppWorkspaceWorkspaceIdSettingsRouteImport
+      parentRoute: typeof AppWorkspaceWorkspaceIdRoute
+    }
     '/_app/workspace/$workspaceId/providers/': {
       id: '/_app/workspace/$workspaceId/providers/'
       path: '/providers'
@@ -266,6 +286,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppWorkspaceWorkspaceIdRouteChildren {
+  AppWorkspaceWorkspaceIdSettingsRoute: typeof AppWorkspaceWorkspaceIdSettingsRoute
   AppWorkspaceWorkspaceIdIndexRoute: typeof AppWorkspaceWorkspaceIdIndexRoute
   AppWorkspaceWorkspaceIdAgentsAgentIdRoute: typeof AppWorkspaceWorkspaceIdAgentsAgentIdRoute
   AppWorkspaceWorkspaceIdApiKeysNewRoute: typeof AppWorkspaceWorkspaceIdApiKeysNewRoute
@@ -277,6 +298,7 @@ interface AppWorkspaceWorkspaceIdRouteChildren {
 
 const AppWorkspaceWorkspaceIdRouteChildren: AppWorkspaceWorkspaceIdRouteChildren =
   {
+    AppWorkspaceWorkspaceIdSettingsRoute: AppWorkspaceWorkspaceIdSettingsRoute,
     AppWorkspaceWorkspaceIdIndexRoute: AppWorkspaceWorkspaceIdIndexRoute,
     AppWorkspaceWorkspaceIdAgentsAgentIdRoute:
       AppWorkspaceWorkspaceIdAgentsAgentIdRoute,
