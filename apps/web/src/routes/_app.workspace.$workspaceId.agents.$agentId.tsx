@@ -397,6 +397,7 @@ function RouteComponent() {
 				}
 
 				type AssistantMessage = z.infer<typeof assistantMessageSchema>;
+
 				const lastMessage = generatedMessageState[
 					generatedMessageState.length - 1
 				] as AssistantMessage;
@@ -417,11 +418,49 @@ function RouteComponent() {
 				}
 
 				if (parsed.type === "tool-call") {
-					lastMessage.content.push(parsed);
+					lastMessage.content.push({
+						type: "tool-call",
+						toolCallId: parsed.toolCallId,
+						toolName: parsed.toolName,
+						providerOptions: parsed.providerMetadata,
+						input: parsed.input,
+					});
 				}
 
 				if (parsed.type === "tool-result") {
-					lastMessage.content.push(parsed);
+					generatedMessageState.push({
+						role: "tool",
+						content: [
+							{
+								type: "tool-result",
+								toolCallId: parsed.toolCallId,
+								toolName: parsed.toolName,
+								providerOptions: parsed.providerMetadata,
+								output: {
+									type: "json",
+									value: parsed.output,
+								},
+							},
+						],
+					});
+				}
+
+				if (parsed.type === "tool-error") {
+					generatedMessageState.push({
+						role: "tool",
+						content: [
+							{
+								type: "tool-result",
+								toolCallId: parsed.toolCallId,
+								toolName: parsed.toolName,
+								providerOptions: parsed.providerMetadata,
+								output: {
+									type: "error-json",
+									value: parsed.error,
+								} as unknown,
+							},
+						],
+					});
 				}
 
 				setGeneratedMessages([...generatedMessageState]);

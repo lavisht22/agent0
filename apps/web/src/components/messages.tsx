@@ -17,6 +17,7 @@ import { z } from "zod";
 const systemMessageSchema = z.object({
 	role: z.literal("system"),
 	content: z.string().min(1, "System message content is required"),
+	providerOptions: z.any().optional(),
 });
 
 const userMessageSchema = z.object({
@@ -27,20 +28,24 @@ const userMessageSchema = z.object({
 				z.object({
 					type: z.literal("text"),
 					text: z.string(),
+					providerOptions: z.any().optional(),
 				}),
 				z.object({
 					type: z.literal("image"),
 					image: z.string(),
 					mediaType: z.string().optional(),
+					providerOptions: z.any().optional(),
 				}),
 				z.object({
 					type: z.literal("file"),
 					data: z.string(),
 					mediaType: z.string(),
+					providerOptions: z.any().optional(),
 				}),
 			]),
 		)
 		.min(1, "User message must have at least one content part"),
+	providerOptions: z.any().optional(),
 });
 
 export const assistantMessageSchema = z.object({
@@ -51,33 +56,31 @@ export const assistantMessageSchema = z.object({
 				z.object({
 					type: z.literal("text"),
 					text: z.string(),
+					providerOptions: z.any().optional(),
 				}),
 				z.object({
 					type: z.literal("reasoning"),
 					text: z.string(),
+					providerOptions: z.any().optional(),
 				}),
 				z.object({
 					type: z.literal("file"),
 					data: z.string(),
 					mediaType: z.string(),
 					fileName: z.string().optional(),
+					providerOptions: z.any().optional(),
 				}),
 				z.object({
 					type: z.literal("tool-call"),
 					toolCallId: z.string(),
 					toolName: z.string(),
 					input: z.any(),
-				}),
-				z.object({
-					type: z.literal("tool-result"),
-					toolCallId: z.string(),
-					toolName: z.string(),
-					output: z.any(),
-					isError: z.boolean().optional(),
+					providerOptions: z.any().optional(),
 				}),
 			]),
 		)
 		.min(1, "Assistant message must have at least one content part"),
+	providerOptions: z.any().optional(),
 });
 
 export const toolMessageSchema = z.object({
@@ -89,8 +92,10 @@ export const toolMessageSchema = z.object({
 			toolName: z.string(),
 			output: z.unknown(),
 			isError: z.boolean().optional(),
+			providerOptions: z.any().optional(),
 		}),
 	),
+	providerOptions: z.any().optional(),
 });
 
 export const messageSchema = z.discriminatedUnion("role", [
@@ -165,6 +170,30 @@ function SystemMessage({
 	);
 }
 
+function UserMessagePart({
+	value,
+	onValueChange,
+}: {
+	value: z.infer<typeof userMessageSchema>["content"][number];
+	onValueChange: (
+		value: z.infer<typeof userMessageSchema>["content"][number],
+	) => void;
+}) {
+	if (value.type === "text") {
+		return (
+			<TextareaAutosize
+				className="outline-none w-full resize-none text-sm"
+				placeholder="Enter user message..."
+				maxRows={1000000000000}
+				value={value.text}
+				onChange={(e) => onValueChange({ ...value, text: e.target.value })}
+			/>
+		);
+	}
+
+	return null;
+}
+
 function UserMessage({
 	value,
 	onValueChange,
@@ -202,38 +231,38 @@ function UserMessage({
 			</CardHeader>
 			<CardBody className="p-3 border-t border-default-200 flex flex-col gap-2">
 				{value.map((part, index) => {
-					if (part.type === "text") {
-						return (
-							<div key={`${index + 1}`} className="flex">
-								<TextareaAutosize
-									className="outline-none w-full resize-none text-sm flex-1"
-									maxRows={1000000000000}
-									placeholder="Enter user message..."
-									value={part.text}
-									onChange={(e) => {
-										const newContent = [...value];
-										newContent[index] = { ...part, text: e.target.value };
-										onValueChange(newContent);
-									}}
-								/>
-								<Button
-									className="-mr-2"
-									size="sm"
-									isIconOnly
-									variant="light"
-									onPress={() => {
-										const newContent = [...value];
-										newContent.splice(index, 1);
-										onValueChange(newContent);
-									}}
-								>
-									<LucideTrash2 className="size-3.5" />
-								</Button>
-							</div>
-						);
-					}
+					return (
+						<div key={`${index + 1}`} className="flex">
+							<UserMessagePart
+								value={part}
+								onValueChange={(v) => {
+									const newContent = [...value];
+									newContent[index] = v;
+									onValueChange(newContent);
+								}}
+							/>
 
-					return null;
+							<Button
+								className="-mr-2"
+								size="sm"
+								isIconOnly
+								variant="light"
+								onPress={() => {
+									const newContent = [...value];
+									newContent.splice(index, 1);
+
+									if (newContent.length === 0) {
+										onValueChange(null);
+										return;
+									}
+
+									onValueChange(newContent);
+								}}
+							>
+								<LucideTrash2 className="size-3.5" />
+							</Button>
+						</div>
+					);
 				})}
 				<Variables variables={variables} onVariablePress={onVariablePress} />
 			</CardBody>
@@ -247,7 +276,6 @@ function AssistantMessagePart({
 	onValueChange,
 }: {
 	isReadOnly?: boolean;
-
 	value: z.infer<typeof assistantMessageSchema>["content"][number];
 	onValueChange: (
 		value: z.infer<typeof assistantMessageSchema>["content"][number],
@@ -289,7 +317,7 @@ function AssistantMessagePart({
 		);
 	}
 
-	if (value.type === "tool-call" || value.type === "tool-result") {
+	if (value.type === "tool-call") {
 		return (
 			<div className="w-full space-y-2 bg-default-50 rounded-large">
 				<JsonEditor
@@ -401,22 +429,6 @@ function AssistantMessage({
 								>
 									Tool Call Part
 								</DropdownItem>
-								<DropdownItem
-									key="tool-result"
-									onPress={() =>
-										onValueChange([
-											...value,
-											{
-												type: "tool-result",
-												toolCallId: "",
-												toolName: "",
-												output: {},
-											},
-										])
-									}
-								>
-									Tool Result Part
-								</DropdownItem>
 							</DropdownMenu>
 						</Dropdown>
 					</div>
@@ -427,6 +439,115 @@ function AssistantMessage({
 					return (
 						<div key={`${index + 1}`} className="flex">
 							<AssistantMessagePart
+								isReadOnly={isReadOnly}
+								value={part}
+								onValueChange={(newPart) => {
+									const newContent = [...value];
+									newContent[index] = newPart;
+									onValueChange(newContent);
+								}}
+							/>
+							{!isReadOnly && (
+								<Button
+									className="-mr-2"
+									size="sm"
+									isIconOnly
+									variant="light"
+									onPress={() => {
+										const newContent = [...value];
+										newContent.splice(index, 1);
+
+										if (newContent.length === 0) {
+											onValueChange(null);
+											return;
+										}
+
+										onValueChange(newContent);
+									}}
+								>
+									<LucideTrash2 className="size-3.5" />
+								</Button>
+							)}
+						</div>
+					);
+				})}
+				{variables.length > 0 && (
+					<Variables variables={variables} onVariablePress={onVariablePress} />
+				)}
+			</CardBody>
+		</Card>
+	);
+}
+
+function ToolMessagePart({
+	isReadOnly,
+	value,
+	onValueChange,
+}: {
+	isReadOnly?: boolean;
+	value: z.infer<typeof toolMessageSchema>["content"][number];
+	onValueChange: (
+		value: z.infer<typeof toolMessageSchema>["content"][number],
+	) => void;
+}) {
+	if (value.type === "tool-result") {
+		return (
+			<div className="w-full space-y-2 bg-default-50 rounded-large">
+				<JsonEditor
+					viewOnly={isReadOnly}
+					theme={[
+						defaultTheme,
+						{
+							container: {
+								backgroundColor: "transparent",
+								fontSize: "12px",
+							},
+						},
+					]}
+					data={value}
+					setData={(newData) => {
+						onValueChange(
+							newData as z.infer<typeof toolMessageSchema>["content"][number],
+						);
+					}}
+				/>
+			</div>
+		);
+	}
+}
+
+function ToolMessage({
+	isReadOnly,
+	value,
+	onValueChange,
+	onVariablePress,
+}: {
+	isReadOnly?: boolean;
+	value: Extract<MessageT, { role: "tool" }>["content"];
+	onValueChange: (
+		value: Extract<MessageT, { role: "tool" }>["content"] | null,
+	) => void;
+	onVariablePress: () => void;
+}) {
+	const variables = useMemo(() => {
+		const str = JSON.stringify(value);
+
+		const matches = str.matchAll(/\{\{(.*?)\}\}/g);
+		const vars = Array.from(matches).map((m) => m[1].trim());
+
+		return Array.from(new Set(vars));
+	}, [value]);
+
+	return (
+		<Card>
+			<CardHeader className="flex items-center justify-between pl-3 pr-1 h-10">
+				<span className="text-sm text-default-500">Tool</span>
+			</CardHeader>
+			<CardBody className="p-3 border-t border-default-200 flex flex-col gap-3">
+				{value.map((part, index) => {
+					return (
+						<div key={`${index + 1}`} className="flex">
+							<ToolMessagePart
 								isReadOnly={isReadOnly}
 								value={part}
 								onValueChange={(newPart) => {
@@ -541,6 +662,31 @@ export function Messages({
 								} else {
 									newMessages[index] = {
 										role: "assistant",
+										content,
+									};
+								}
+
+								onValueChange(newMessages);
+							}}
+							onVariablePress={onVariablePress}
+						/>
+					);
+				}
+
+				if (message.role === "tool") {
+					return (
+						<ToolMessage
+							key={`${index + 1}`}
+							isReadOnly={isReadOnly}
+							value={message.content}
+							onValueChange={(content) => {
+								const newMessages = [...value];
+
+								if (content === null) {
+									newMessages.splice(index, 1);
+								} else {
+									newMessages[index] = {
+										role: "tool",
 										content,
 									};
 								}

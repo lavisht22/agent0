@@ -46,7 +46,6 @@ fastify.setNotFoundHandler((req, reply) => {
     }
 });
 
-
 type VersionData = {
     providers: { id: string; model: string }[];
     messages: ModelMessage[],
@@ -54,9 +53,6 @@ type VersionData = {
     temperature?: number,
     maxStepCount?: number,
 };
-
-
-
 
 const generateResult = async (data: VersionData, variables: Record<string, string>) => {
     const { providers, messages, maxOutputTokens, temperature, maxStepCount } = data
@@ -109,10 +105,12 @@ const generateResult = async (data: VersionData, variables: Record<string, strin
                 inputSchema: z.object({
                     location: z.string().describe('The location to get the weather for'),
                 }),
-                execute: async ({ location }) => ({
-                    location,
-                    temperature: 72 + Math.floor(Math.random() * 21) - 10,
-                }),
+                execute: async ({ location }) => {
+                    return {
+                        location,
+                        temperature: 72 + Math.floor(Math.random() * 21) - 10,
+                    }
+                },
             }),
         },
     });
@@ -234,9 +232,9 @@ fastify.post('/api/v1/run', async (request, reply) => {
 
     // Handle non-streaming response
     try {
-        const steps = await result.steps;
+        const { messages } = await result.response;
 
-        return reply.send({ messages: steps.map(step => ({ role: 'assistant', content: step.content })) });
+        return reply.send({ messages });
     } catch (err) {
         console.error("Error processing agent run", err);
         return reply.code(500).send({ message: 'Error processing agent run' });
