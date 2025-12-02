@@ -7,6 +7,9 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@ai-sdk/azure": "^2.0.77",
+    "@ai-sdk/google": "^2.0.44",
+    "@ai-sdk/google-vertex": "^3.0.85",
     "@ai-sdk/openai": "^2.0.71",
     "@ai-sdk/xai": "^2.0.39",
     "@fastify/cors": "^11.1.0",
