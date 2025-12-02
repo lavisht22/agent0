@@ -1,5 +1,15 @@
-import { Button, Card, CardBody, CardHeader } from "@heroui/react";
-import { LucideBraces, LucideMinusCircle, LucideTrash } from "lucide-react";
+import {
+	Button,
+	Card,
+	CardBody,
+	CardHeader,
+	Dropdown,
+	DropdownItem,
+	DropdownMenu,
+	DropdownTrigger,
+} from "@heroui/react";
+import { defaultTheme, JsonEditor } from "json-edit-react";
+import { LucideBraces, LucidePlus, LucideTrash2 } from "lucide-react";
 import { useMemo } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { z } from "zod";
@@ -186,7 +196,7 @@ function UserMessage({
 						variant="light"
 						onPress={() => onValueChange(null)}
 					>
-						<LucideMinusCircle className="size-3.5" />
+						<LucideTrash2 className="size-3.5" />
 					</Button>
 				</div>
 			</CardHeader>
@@ -217,7 +227,7 @@ function UserMessage({
 										onValueChange(newContent);
 									}}
 								>
-									<LucideTrash className="size-3.5" />
+									<LucideTrash2 className="size-3.5" />
 								</Button>
 							</div>
 						);
@@ -229,6 +239,82 @@ function UserMessage({
 			</CardBody>
 		</Card>
 	);
+}
+
+function AssistantMessagePart({
+	isReadOnly,
+	value,
+	onValueChange,
+}: {
+	isReadOnly?: boolean;
+
+	value: z.infer<typeof assistantMessageSchema>["content"][number];
+	onValueChange: (
+		value: z.infer<typeof assistantMessageSchema>["content"][number],
+	) => void;
+}) {
+	if (value.type === "text") {
+		return (
+			<TextareaAutosize
+				className="outline-none w-full resize-none text-sm"
+				readOnly={isReadOnly}
+				maxRows={1000000000000}
+				placeholder="Enter assistant message..."
+				value={value.text}
+				onChange={(e) => {
+					onValueChange({
+						...value,
+						text: e.target.value,
+					});
+				}}
+			/>
+		);
+	}
+
+	if (value.type === "reasoning") {
+		return (
+			<TextareaAutosize
+				className="outline-none w-full resize-none text-sm text-default-500"
+				readOnly={isReadOnly}
+				maxRows={10}
+				placeholder="Enter assistant reasoning..."
+				value={value.text}
+				onChange={(e) => {
+					onValueChange({
+						...value,
+						text: e.target.value,
+					});
+				}}
+			/>
+		);
+	}
+
+	if (value.type === "tool-call" || value.type === "tool-result") {
+		return (
+			<div className="w-full space-y-2 bg-default-50 rounded-large">
+				<JsonEditor
+					viewOnly={isReadOnly}
+					theme={[
+						defaultTheme,
+						{
+							container: {
+								backgroundColor: "transparent",
+								fontSize: "12px",
+							},
+						},
+					]}
+					data={value}
+					setData={(newData) => {
+						onValueChange(
+							newData as z.infer<
+								typeof assistantMessageSchema
+							>["content"][number],
+						);
+					}}
+				/>
+			</div>
+		);
+	}
 }
 
 function AssistantMessage({
@@ -259,55 +345,123 @@ function AssistantMessage({
 				<span className="text-sm text-default-500">Assistant</span>
 				{!isReadOnly && (
 					<div className="flex gap-2">
-						<Button
-							size="sm"
-							isIconOnly
-							variant="light"
-							onPress={() => onValueChange(null)}
-						>
-							<LucideMinusCircle className="size-3.5" />
-						</Button>
+						<Dropdown>
+							<DropdownTrigger>
+								<Button
+									size="sm"
+									isIconOnly
+									variant="light"
+									onPress={() => onValueChange(null)}
+								>
+									<LucidePlus className="size-3.5" />
+								</Button>
+							</DropdownTrigger>
+							<DropdownMenu>
+								<DropdownItem
+									key="text"
+									onPress={() =>
+										onValueChange([
+											...value,
+											{
+												type: "text",
+												text: "",
+											},
+										])
+									}
+								>
+									Text Part
+								</DropdownItem>
+								<DropdownItem
+									key="reasoning"
+									onPress={() =>
+										onValueChange([
+											...value,
+											{
+												type: "reasoning",
+												text: "",
+											},
+										])
+									}
+								>
+									Reasoning Part
+								</DropdownItem>
+								<DropdownItem
+									key="tool-call"
+									onPress={() =>
+										onValueChange([
+											...value,
+											{
+												type: "tool-call",
+												toolCallId: "",
+												toolName: "",
+												input: {},
+											},
+										])
+									}
+								>
+									Tool Call Part
+								</DropdownItem>
+								<DropdownItem
+									key="tool-result"
+									onPress={() =>
+										onValueChange([
+											...value,
+											{
+												type: "tool-result",
+												toolCallId: "",
+												toolName: "",
+												output: {},
+											},
+										])
+									}
+								>
+									Tool Result Part
+								</DropdownItem>
+							</DropdownMenu>
+						</Dropdown>
 					</div>
 				)}
 			</CardHeader>
-			<CardBody className="p-3 border-t border-default-200 flex flex-col gap-2">
+			<CardBody className="p-3 border-t border-default-200 flex flex-col gap-3">
 				{value.map((part, index) => {
-					if (part.type === "text") {
-						return (
-							<div key={`${index + 1}`} className="flex">
-								<TextareaAutosize
-									className="outline-none w-full resize-none text-sm"
-									readOnly={isReadOnly}
-									maxRows={1000000000000}
-									placeholder="Enter assistant message..."
-									value={part.text}
-									onChange={(e) => {
+					return (
+						<div key={`${index + 1}`} className="flex">
+							<AssistantMessagePart
+								isReadOnly={isReadOnly}
+								value={part}
+								onValueChange={(newPart) => {
+									const newContent = [...value];
+									newContent[index] = newPart;
+									onValueChange(newContent);
+								}}
+							/>
+							{!isReadOnly && (
+								<Button
+									className="-mr-2"
+									size="sm"
+									isIconOnly
+									variant="light"
+									onPress={() => {
 										const newContent = [...value];
-										newContent[index] = { ...part, text: e.target.value };
+										newContent.splice(index, 1);
+
+										if (newContent.length === 0) {
+											onValueChange(null);
+											return;
+										}
+
 										onValueChange(newContent);
 									}}
-								/>
-								{!isReadOnly && (
-									<Button
-										className="-mr-2"
-										size="sm"
-										isIconOnly
-										variant="light"
-										onPress={() => {
-											const newContent = [...value];
-											newContent.splice(index, 1);
-											onValueChange(newContent);
-										}}
-									>
-										<LucideTrash className="size-3.5" />
-									</Button>
-								)}
-							</div>
-						);
-					}
-					return null;
+								>
+									<LucideTrash2 className="size-3.5" />
+								</Button>
+							)}
+						</div>
+					);
 				})}
-				<Variables variables={variables} onVariablePress={onVariablePress} />
+				{variables.length > 0 && (
+					<Variables variables={variables} onVariablePress={onVariablePress} />
+				)}
 			</CardBody>
 		</Card>
 	);

@@ -417,11 +417,11 @@ function RouteComponent() {
 				}
 
 				if (parsed.type === "tool-call") {
-					// TODO: handle this
+					lastMessage.content.push(parsed);
 				}
 
 				if (parsed.type === "tool-result") {
-					// TODO: handle this
+					lastMessage.content.push(parsed);
 				}
 
 				setGeneratedMessages([...generatedMessageState]);
