@@ -10,7 +10,7 @@ export class Agent0 {
         this.baseUrl = config.baseUrl || 'https://app.agent0.com'; // Default URL, can be overridden
     }
 
-    private async fetchApi(endpoint: string, body: any): Promise<Response> {
+    private async fetchApi(endpoint: string, body: unknown): Promise<Response> {
         const url = `${this.baseUrl}${endpoint}`;
 
         const headers = {

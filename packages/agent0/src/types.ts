@@ -1,4 +1,4 @@
-import type { StepResult, ToolSet } from "ai";
+import type { ModelMessage } from "ai";
 
 export interface Agent0Config {
     apiKey: string;
@@ -10,11 +10,7 @@ export interface RunOptions {
     variables?: Record<string, string>;
 }
 
-export interface Message {
-    role: 'assistatnt'
-    content: StepResult<ToolSet>["content"];
-}
-
 export interface GenerateResponse {
-    messages: Message[];
+    messages: ModelMessage[];
+    text: string;
 }
