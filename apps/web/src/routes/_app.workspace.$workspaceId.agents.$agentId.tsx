@@ -10,6 +10,8 @@ import {
 	Popover,
 	PopoverContent,
 	PopoverTrigger,
+	Select,
+	SelectItem,
 	Slider,
 	useDisclosure,
 } from "@heroui/react";
@@ -62,6 +64,7 @@ const agentFormSchema = z.object({
 		}),
 	),
 	maxOutputTokens: z.number(),
+	outputFormat: z.enum(["text", "json"]),
 	temperature: z.number(),
 	maxStepCount: z.number(),
 	messages: z.array(messageSchema).min(1, "At least one message is required"),
@@ -142,6 +145,7 @@ function RouteComponent() {
 				data: {
 					providers: values.providers,
 					maxOutputTokens: values.maxOutputTokens,
+					outputFormat: values.outputFormat,
 					temperature: values.temperature,
 					maxStepCount: values.maxStepCount,
 					messages: values.messages,
@@ -187,6 +191,7 @@ function RouteComponent() {
 					data: {
 						providers: values.providers,
 						maxOutputTokens: values.maxOutputTokens,
+						outputFormat: values.outputFormat,
 						temperature: values.temperature,
 						maxStepCount: values.maxStepCount,
 						messages: values.messages,
@@ -286,6 +291,7 @@ function RouteComponent() {
 		defaultValues: {
 			providers: [] as { id: string; model: string }[],
 			maxOutputTokens: 2048,
+			outputFormat: "text" as "text" | "json",
 			temperature: 0.7,
 			maxStepCount: 10,
 			messages: [
@@ -321,6 +327,7 @@ function RouteComponent() {
 		const data = version.data as {
 			providers?: [];
 			maxOutputTokens?: number;
+			outputFormat?: "text" | "json";
 			temperature?: number;
 			maxStepCount?: number;
 			messages?: MessageT[];
@@ -331,6 +338,7 @@ function RouteComponent() {
 				{
 					providers: data.providers || [],
 					maxOutputTokens: data.maxOutputTokens || 2048,
+					outputFormat: data.outputFormat || "text",
 					temperature: data.temperature || 0.7,
 					maxStepCount: data.maxStepCount || 10,
 					messages: data.messages || [],
@@ -673,6 +681,22 @@ function RouteComponent() {
 													field.handleChange(parseInt(value, 10))
 												}
 											/>
+										)}
+									</form.Field>
+									<form.Field name="outputFormat">
+										{(field) => (
+											<Select
+												variant="bordered"
+												label="Output Format"
+												selectedKeys={[field.state.value]}
+												onSelectionChange={(keys) => {
+													const value = Array.from(keys)[0] as "text" | "json";
+													field.handleChange(value);
+												}}
+											>
+												<SelectItem key="text">Text</SelectItem>
+												<SelectItem key="json">JSON</SelectItem>
+											</Select>
 										)}
 									</form.Field>
 									<form.Field name="temperature">

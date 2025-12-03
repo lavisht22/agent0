@@ -50,12 +50,13 @@ type VersionData = {
     providers: { id: string; model: string }[];
     messages: ModelMessage[],
     maxOutputTokens?: number,
+    outputFormat?: "text" | "json",
     temperature?: number,
     maxStepCount?: number,
 };
 
 const generateResult = async (data: VersionData, variables: Record<string, string>) => {
-    const { providers, messages, maxOutputTokens, temperature, maxStepCount } = data
+    const { providers, messages, maxOutputTokens, outputFormat, temperature, maxStepCount } = data
 
     const { data: availableProviders, error: availableProvidersError } = await supabase
         .from("providers")
@@ -99,21 +100,21 @@ const generateResult = async (data: VersionData, variables: Record<string, strin
         temperature,
         stopWhen: stepCountIs(maxStepCount || 10),
         messages: processedMessages,
-        output: Output.json(),
-        tools: {
-            weather: tool({
-                description: 'Get the weather in a location',
-                inputSchema: z.object({
-                    location: z.string().describe('The location to get the weather for'),
-                }),
-                execute: async ({ location }) => {
-                    return {
-                        location,
-                        temperature: 72 + Math.floor(Math.random() * 21) - 10,
-                    }
-                },
-            }),
-        },
+        output: outputFormat === "json" ? Output.json() : Output.text(),
+        // tools: {
+        //     weather: tool({
+        //         description: 'Get the weather in a location',
+        //         inputSchema: z.object({
+        //             location: z.string().describe('The location to get the weather for'),
+        //         }),
+        //         execute: async ({ location }) => {
+        //             return {
+        //                 location,
+        //                 temperature: 72 + Math.floor(Math.random() * 21) - 10,
+        //             }
+        //         },
+        //     }),
+        // },
     });
 
     return result;
