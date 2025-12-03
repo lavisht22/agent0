@@ -1,7 +1,6 @@
 import {
 	Accordion,
 	AccordionItem,
-	Alert,
 	addToast,
 	Button,
 	ButtonGroup,
