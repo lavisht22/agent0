@@ -71,12 +71,7 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 				path: `/workspace/${workspaceId}`,
 				active: location.pathname === `/workspace/${workspaceId}`,
 			},
-			{
-				label: "Providers",
-				icon: Server,
-				path: `/workspace/${workspaceId}/providers`,
-				active: location.pathname === `/workspace/${workspaceId}/providers`,
-			},
+
 			{
 				label: "Agents",
 				icon: Bot,
@@ -93,6 +88,12 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 
 		// Only show API Keys and Settings for admin users
 		if (isAdmin) {
+			items.push({
+				label: "Providers",
+				icon: Server,
+				path: `/workspace/${workspaceId}/providers`,
+				active: location.pathname === `/workspace/${workspaceId}/providers`,
+			});
 			items.push({
 				label: "API Keys",
 				icon: KeySquare,
