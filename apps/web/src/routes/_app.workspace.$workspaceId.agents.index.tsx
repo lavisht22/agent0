@@ -1,5 +1,4 @@
 import {
-	addToast,
 	Button,
 	Dropdown,
 	DropdownItem,
