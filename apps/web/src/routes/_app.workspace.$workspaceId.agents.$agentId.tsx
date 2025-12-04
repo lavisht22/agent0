@@ -370,6 +370,19 @@ function RouteComponent() {
 			setErrors([]);
 			setWarnings([]);
 
+			// Get the user's session to include the JWT token
+			const {
+				data: { session },
+			} = await supabase.auth.getSession();
+
+			if (!session) {
+				addToast({
+					description: "You must be logged in to run agents.",
+					color: "danger",
+				});
+				return;
+			}
+
 			const url = import.meta.env.DEV
 				? "http://localhost:2223/api/v1/test"
 				: "/api/v1/test";
@@ -378,6 +391,7 @@ function RouteComponent() {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
+					Authorization: `Bearer ${session.access_token}`,
 				},
 				body: JSON.stringify({
 					data: form.state.values,

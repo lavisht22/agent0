@@ -140,9 +140,44 @@ const createSSEStream = (result: Awaited<ReturnType<typeof streamResult>>) => {
 
 // API Routes
 fastify.post('/api/v1/test', async (request, reply) => {
-    const { data, variables } = request.body as { data: unknown, variables: Record<string, string> }
+    // Extract and validate JWT token from Authorization header
+    const token = request.headers.authorization?.split('Bearer ')[1];
 
-    const result = await streamResult(data as VersionData, variables);
+    if (!token) {
+        return reply.code(401).send({ message: 'No token provided' });
+    }
+
+    // Validate the token with Supabase
+    const { data: claims, error: userError } = await supabase.auth.getClaims(token);
+
+    if (userError) {
+        return reply.code(401).send({ message: 'Invalid token' });
+    }
+
+    if (!claims) {
+        return reply.code(401).send({ message: 'Failed to get claims' });
+    }
+
+    const { data, variables } = request.body as { data: unknown, variables: Record<string, string> }
+    const versionData = data as VersionData;
+
+    // Get the provider to check workspace access
+    const { data: provider, error: providerError } = await supabase
+        .from("providers")
+        .select("workspaces(workspace_user(user_id, role))")
+        .eq("id", versionData.model.provider_id)
+        .eq("workspaces.workspace_user.user_id", claims.claims.sub)
+        .single();
+
+    if (providerError || !provider) {
+        return reply.code(404).send({ message: 'Provider not found' });
+    }
+
+    if (provider.workspaces.workspace_user.length === 0) {
+        return reply.code(403).send({ message: 'Access denied' });
+    }
+
+    const result = await streamResult(versionData, variables);
     const stream = createSSEStream(result);
 
     reply.headers({
