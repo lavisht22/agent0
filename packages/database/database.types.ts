@@ -123,6 +123,45 @@ export type Database = {
           },
         ]
       }
+      runs: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          version_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          id: string
+          version_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          version_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "runs_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "versions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "runs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           created_at: string

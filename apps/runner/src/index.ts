@@ -4,10 +4,19 @@ import { ReadableStream } from 'node:stream/web';
 import { fileURLToPath } from 'node:url';
 import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
-import type { Database } from '@repo/database';
+import type { Database, Json } from '@repo/database';
 import { createClient } from '@supabase/supabase-js';
-import { generateText, type ModelMessage, Output, stepCountIs, streamText } from 'ai';
+import {
+    generateText,
+    type ModelMessage,
+    Output,
+    type StepResult,
+    stepCountIs,
+    streamText,
+    type ToolSet,
+} from 'ai';
 import Fastify from 'fastify';
+import { nanoid } from 'nanoid';
 import { getAIProvider } from './lib/providers.js';
 import { applyVariablesToMessages } from './lib/variables.js';
 
@@ -67,7 +76,6 @@ const prepareProviderAndMessages = async (data: VersionData, variables: Record<s
         throw providerError;
     }
 
-
     const aiProvider = getAIProvider(provider.type, provider.data);
 
     if (!aiProvider) {
@@ -81,22 +89,6 @@ const prepareProviderAndMessages = async (data: VersionData, variables: Record<s
         provider,
         processedMessages
     };
-}
-
-const generateResult = async (data: VersionData, variables: Record<string, string>) => {
-    const { maxOutputTokens, outputFormat, temperature, maxStepCount } = data
-    const { model, processedMessages } = await prepareProviderAndMessages(data, variables);
-
-    const result = generateText({
-        model,
-        maxOutputTokens,
-        temperature,
-        stopWhen: stepCountIs(maxStepCount || 10),
-        messages: processedMessages,
-        output: outputFormat === "json" ? Output.json() : Output.text(),
-    });
-
-    return result;
 }
 
 const streamResult = async (data: VersionData, variables: Record<string, string>) => {
@@ -190,7 +182,41 @@ fastify.post('/api/v1/test', async (request, reply) => {
 });
 
 
+async function insertRun(workspace_id: string, version_id: string, data: unknown, startTime: number) {
+    await supabase.from("runs").insert({
+        id: nanoid(),
+        workspace_id,
+        version_id,
+        data: data as unknown as Json,
+        created_at: new Date(startTime).toISOString(),
+    });
+}
+
+
 fastify.post('/api/v1/run', async (request, reply) => {
+    const startTime = Date.now();
+
+    const runData: {
+        request?: VersionData & { model: { provider_id: string, name: string }, stream: boolean },
+        steps?: StepResult<ToolSet>[],
+        error?: {
+            name: string;
+            message: string;
+            cause?: unknown;
+        },
+        metrics: {
+            preProcessingTime: number,
+            firstTokenTime: number,
+            responseTime: number,
+        }
+    } = {
+        metrics: {
+            preProcessingTime: 0,
+            firstTokenTime: 0,
+            responseTime: 0,
+        }
+    };
+
     const { agent_id, variables = {}, stream = false } = request.body as {
         agent_id: string;
         variables?: Record<string, string>;
@@ -231,11 +257,52 @@ fastify.post('/api/v1/run', async (request, reply) => {
     }
 
     const version = agent.versions[0];
+    const data = version.data as VersionData;
+    const { model, processedMessages } = await prepareProviderAndMessages(data, variables);
+    const { maxOutputTokens, outputFormat, temperature, maxStepCount } = data
+
+    const payload = {
+        model,
+        maxOutputTokens,
+        temperature,
+        stopWhen: stepCountIs(maxStepCount || 10),
+        messages: processedMessages,
+        output: outputFormat === "json" ? Output.json() : Output.text(),
+    }
+
+    runData.request = { ...payload, model: data.model, stream };
+    runData.metrics.preProcessingTime = Date.now() - startTime;
+
 
     try {
-        // Handle streaming response
         if (stream) {
-            const result = await streamResult(version.data as VersionData, variables);
+            const result = streamText({
+                ...payload,
+                onChunk: () => {
+                    if (runData.metrics.firstTokenTime === 0) {
+                        runData.metrics.firstTokenTime = Date.now() - runData.metrics.preProcessingTime - startTime;
+                    }
+                },
+                onFinish: async ({ steps }) => {
+                    runData.metrics.responseTime = Date.now() - runData.metrics.preProcessingTime - startTime;
+                    runData.steps = steps;
+                    await insertRun(agent.workspaces.id, version.id, runData, startTime);
+                },
+                onError: async ({ error }) => {
+                    if (runData.metrics.firstTokenTime === 0) {
+                        runData.metrics.firstTokenTime = Date.now() - runData.metrics.preProcessingTime - startTime;
+                    }
+                    runData.metrics.responseTime = Date.now() - runData.metrics.preProcessingTime - startTime;
+
+                    runData.error = {
+                        name: error instanceof Error ? error.name : "UnknownError",
+                        message: error instanceof Error ? error.message : "Unknown error occured.",
+                        cause: error instanceof Error ? (error as Error & { cause?: unknown }).cause : undefined
+                    }
+                    await insertRun(agent.workspaces.id, version.id, runData, startTime);
+                }
+            });
+
             const streamResponse = createSSEStream(result);
 
             reply.headers({
@@ -248,16 +315,29 @@ fastify.post('/api/v1/run', async (request, reply) => {
         }
 
         // Handle non-streaming response
+        const result = await generateText({
+            ...payload
+        });
 
-        const result = await generateResult(version.data as VersionData, variables);
+        const { response, text, steps } = result;
+        runData.steps = steps;
 
-        const { messages } = await result.response;
-        const text = await result.text;
-
-        return reply.send({ text, messages });
+        reply.send({
+            text, messages: response.messages
+        });
     } catch (error) {
-        return reply.code(500).send(error);
+        runData.error = {
+            name: error instanceof Error ? error.name : "UnknownError",
+            message: error instanceof Error ? error.message : "Unknown error occured.",
+            cause: error instanceof Error ? (error as Error & { cause?: unknown }).cause : undefined
+        }
+
+        reply.code(500).send(error);
     }
+
+    runData.metrics.firstTokenTime = Date.now() - runData.metrics.preProcessingTime - startTime;
+    runData.metrics.responseTime = Date.now() - runData.metrics.preProcessingTime - startTime;
+    insertRun(agent.workspaces.id, version.id, runData, startTime);
 });
 
 
