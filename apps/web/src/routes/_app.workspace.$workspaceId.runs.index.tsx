@@ -23,7 +23,7 @@ import {
 import IDCopy from "@/components/id-copy";
 import { runsQuery } from "@/lib/queries";
 
-export const Route = createFileRoute("/_app/workspace/$workspaceId/runs")({
+export const Route = createFileRoute("/_app/workspace/$workspaceId/runs/")({
 	component: RouteComponent,
 });
 
@@ -45,7 +45,7 @@ function RouteComponent() {
 
 					navigate({
 						to: key.toString(),
-					});
+					})
 				}}
 				shadow="none"
 				radius="none"
@@ -125,10 +125,10 @@ function RouteComponent() {
 									</Dropdown>
 								</TableCell>
 							</TableRow>
-						);
+						)
 					}}
 				</TableBody>
 			</Table>
 		</div>
-	);
+	)
 }

@@ -109,6 +109,22 @@ export const runsQuery = (workspaceId: string) => queryOptions({
     enabled: !!workspaceId,
 })
 
+export const runQuery = (runId: string) => queryOptions({
+    queryKey: ["run", runId],
+    queryFn: async () => {
+        const { data, error } = await supabase
+            .from("runs")
+            .select("*, versions(id, agents(id, name))")
+            .eq("id", runId)
+            .single();
+
+        if (error) throw error;
+
+        return data;
+    },
+    enabled: !!runId,
+})
+
 export const userQuery = queryOptions({
     queryKey: ['user'],
     queryFn: async () => {
