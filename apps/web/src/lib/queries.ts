@@ -93,6 +93,22 @@ export const apiKeysQuery = (workspaceId: string) => queryOptions({
     enabled: !!workspaceId,
 })
 
+export const runsQuery = (workspaceId: string) => queryOptions({
+    queryKey: ["runs", workspaceId],
+    queryFn: async () => {
+        const { data, error } = await supabase
+            .from("runs")
+            .select("*, versions(*, agents(*))")
+            .eq("workspace_id", workspaceId)
+            .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        return data;
+    },
+    enabled: !!workspaceId,
+})
+
 export const userQuery = queryOptions({
     queryKey: ['user'],
     queryFn: async () => {

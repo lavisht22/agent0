@@ -55,9 +55,10 @@ function RouteComponent() {
 			</div>
 
 			<Table
+				aria-label="Providers Table"
 				onRowAction={(key) => {
-					console.log("ROW", key);
 					if (!key) return;
+
 					navigate({
 						to: key.toString(),
 					});
