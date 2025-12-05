@@ -28,6 +28,8 @@ export interface RunOptions {
     variables?: Record<string, string>;
     /** Runtime model overrides for load balancing, fallbacks, etc. */
     overrides?: ModelOverrides;
+    /** Extra messages to append to the agent's prompt (used as-is, no variable substitution) */
+    extraMessages?: ModelMessage[];
 }
 
 export interface GenerateResponse {

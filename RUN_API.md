@@ -34,7 +34,10 @@ x-api-key: <your-api-key>
     "maxOutputTokens": number (optional),
     "temperature": number (optional),
     "maxStepCount": number (optional)
-  }
+  },
+  "extra_messages": [
+    { "role": "user", "content": "..." }
+  ]
 }
 ```
 
@@ -49,6 +52,7 @@ x-api-key: <your-api-key>
   - **maxOutputTokens**: Override the maximum output tokens
   - **temperature**: Override the temperature setting
   - **maxStepCount**: Override the maximum step count
+  - **extra_messages** (optional): Array of messages to append to the agent's prompt (used as-is, no variable substitution)
 
 ## Response
 

@@ -226,7 +226,7 @@ fastify.post('/api/v1/run', async (request, reply) => {
         }
     };
 
-    const { agent_id, variables = {}, stream = false, overrides } = request.body as {
+    const { agent_id, variables = {}, stream = false, overrides, extra_messages } = request.body as {
         agent_id: string;
         variables?: Record<string, string>;
         stream?: boolean;
@@ -239,6 +239,7 @@ fastify.post('/api/v1/run', async (request, reply) => {
             temperature?: number;
             maxStepCount?: number;
         };
+        extra_messages?: ModelMessage[];
     };
 
     // Validate request body
@@ -289,12 +290,15 @@ fastify.post('/api/v1/run', async (request, reply) => {
     const { model, processedMessages } = await prepareProviderAndMessages(data, variables);
     const { maxOutputTokens, outputFormat, temperature, maxStepCount } = data
 
+    // Append extra messages if provided (used as-is, no variable substitution)
+    const finalMessages = extra_messages ? [...processedMessages, ...extra_messages] : processedMessages;
+
     const payload = {
         model,
         maxOutputTokens,
         temperature,
         stopWhen: stepCountIs(maxStepCount || 10),
-        messages: processedMessages,
+        messages: finalMessages,
         output: outputFormat === "json" ? Output.json() : Output.text(),
     }
 

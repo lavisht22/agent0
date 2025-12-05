@@ -37,6 +37,7 @@ export class Agent0 {
             agent_id: options.agentId,
             variables: options.variables,
             overrides: options.overrides,
+            extra_messages: options.extraMessages,
             stream: false,
         });
 
@@ -48,6 +49,7 @@ export class Agent0 {
             agent_id: options.agentId,
             variables: options.variables,
             overrides: options.overrides,
+            extra_messages: options.extraMessages,
             stream: true,
         });
 

@@ -87,6 +87,7 @@ interface RunOptions {
   agentId: string;                    // The ID of the agent to run
   variables?: Record<string, string>; // Variables to pass to the agent
   overrides?: ModelOverrides;         // Runtime model configuration overrides
+  extraMessages?: Message[];          // Extra messages to append to the prompt
 }
 
 interface ModelOverrides {
@@ -275,6 +276,38 @@ async function runWithFallback(agentId: string, variables: Record<string, string
     });
   }
 }
+```
+
+### Extra Messages
+
+The `extraMessages` option allows you to programmatically append additional messages to the agent's prompt. These messages are used as-is without any variable substitution, making them ideal for:
+- **Dynamic Context**: Add conversation history or context at runtime
+- **Multi-turn Conversations**: Build chat applications by appending user/assistant turns
+- **Retrieved Content**: Inject RAG results or retrieved documents
+
+```typescript
+// Add conversation history to the agent
+const response = await client.generate({
+  agentId: 'agent_123',
+  variables: { topic: 'AI' },
+  extraMessages: [
+    { role: 'user', content: 'What is machine learning?' },
+    { role: 'assistant', content: 'Machine learning is a subset of AI...' },
+    { role: 'user', content: 'Tell me more about neural networks' }
+  ]
+});
+
+// Inject retrieved context (RAG pattern)
+const retrievedDocs = await searchDocuments(query);
+const response = await client.generate({
+  agentId: 'rag-agent',
+  extraMessages: [
+    { 
+      role: 'user', 
+      content: `Context:\n${retrievedDocs.join('\n')}\n\nQuestion: ${query}` 
+    }
+  ]
+});
 ```
 
 ### Error Handling
