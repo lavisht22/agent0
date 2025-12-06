@@ -12,7 +12,7 @@ import { useForm } from "@tanstack/react-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Check, Copy } from "lucide-react";
-import { customAlphabet } from "nanoid";
+import { customAlphabet, nanoid } from "nanoid";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
@@ -32,21 +32,21 @@ function RouteComponent() {
 	// Create mutation
 	const createMutation = useMutation({
 		mutationFn: async (values: { name: string }) => {
-			// Generate a secure API key
-			const nanoid = customAlphabet("abcdefghijklmnopqrstuvwxyz1234567890");
-			const id = nanoid();
-
 			const {
 				data: { user },
 			} = await supabase.auth.getUser();
+
 			if (!user) throw new Error("User not authenticated");
+
+			const key = customAlphabet("abcdefghijklmnopqrstuvwxyz1234567890")();
 
 			// In production, you would hash the key before storing
 			// For now, we're storing the full key ID (this should be hashed)
 			const { error } = await supabase
 				.from("api_keys")
 				.insert({
-					id,
+					id: nanoid(),
+					key,
 					name: values.name,
 					workspace_id: workspaceId,
 					user_id: user.id,
@@ -56,7 +56,7 @@ function RouteComponent() {
 
 			if (error) throw error;
 
-			return id;
+			return key;
 		},
 		onSuccess: (data) => {
 			queryClient.invalidateQueries({ queryKey: ["api-keys", workspaceId] });
