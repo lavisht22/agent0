@@ -17,6 +17,7 @@ import {
 } from 'ai';
 import Fastify from 'fastify';
 import { nanoid } from 'nanoid';
+import * as openpgp from 'openpgp';
 import { getAIProvider } from './lib/providers.js';
 import { applyVariablesToMessages } from './lib/variables.js';
 
@@ -100,7 +101,25 @@ const prepareProviderAndMessages = async (data: VersionData, variables: Record<s
         throw providerError;
     }
 
-    const aiProvider = getAIProvider(provider.type, provider.data);
+    const privateKey = await openpgp.decryptKey({
+        privateKey: await openpgp.readPrivateKey({
+            armoredKey: process.env.PGP_PRIVATE_KEY || ""
+        }),
+        passphrase: process.env.PGP_PRIVATE_KEY_PASSPHRASE || ""
+    })
+
+    const message = await openpgp.readMessage({
+        armoredMessage: provider.encrypted_data
+    });
+
+    const { data: decrypted } = await openpgp.decrypt({
+        message,
+        decryptionKeys: privateKey
+    });
+
+    const config = JSON.parse(decrypted);
+
+    const aiProvider = getAIProvider(provider.type, config);
 
     if (!aiProvider) {
         throw new Error(`Unsupported provider type: ${provider.type}`);

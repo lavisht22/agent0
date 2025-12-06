@@ -49,6 +49,9 @@ importers:
       nanoid:
         specifier: ^5.1.6
         version: 5.1.6
+      openpgp:
+        specifier: ^6.2.2
+        version: 6.2.2
       zod:
         specifier: ^4.1.12
         version: 4.1.12
@@ -119,6 +122,9 @@ importers:
       nanoid:
         specifier: ^5.1.6
         version: 5.1.6
+      openpgp:
+        specifier: ^6.2.2
+        version: 6.2.2
       react:
         specifier: ^19.2.0
         version: 19.2.0
@@ -3084,6 +3090,10 @@ packages:
   on-exit-leak-free@2.1.2:
     resolution: {integrity: sha512-0eJJY6hXLGf1udHwfNftBqH+g73EU4B504nZeKpz1sYRKafAghwxEJunB2O7rDZkL4PGfsMVnTXZ2EjibbqcsA==}
     engines: {node: '>=14.0.0'}
+
+  openpgp@6.2.2:
+    resolution: {integrity: sha512-P/dyEqQ3gfwOCo+xsqffzXjmUhGn4AZTOJ1LCcN21S23vAk+EAvMJOQTsb/C8krL6GjOSBxqGYckhik7+hneNw==}
+    engines: {node: '>= 18.0.0'}
 
   package-json-from-dist@1.0.1:
     resolution: {integrity: sha512-UEZIS3/by4OC8vL3P2dTXRETpebLI2NiI5vIrjaD/5UtrkFX/tNbwjTSRAGC/+7CAo2pIcBaRgWmcBBHcsaCIw==}
@@ -7403,6 +7413,8 @@ snapshots:
   object-property-extractor@1.0.13: {}
 
   on-exit-leak-free@2.1.2: {}
+
+  openpgp@6.2.2: {}
 
   package-json-from-dist@1.0.1: {}
 

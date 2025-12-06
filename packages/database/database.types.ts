@@ -91,7 +91,7 @@ export type Database = {
       providers: {
         Row: {
           created_at: string
-          data: Json
+          encrypted_data: string | null
           id: string
           name: string
           type: string
@@ -100,7 +100,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          data: Json
+          encrypted_data?: string | null
           id: string
           name: string
           type: string
@@ -109,7 +109,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          data?: Json
+          encrypted_data?: string | null
           id?: string
           name?: string
           type?: string
@@ -164,6 +164,38 @@ export type Database = {
           },
           {
             foreignKeyName: "runs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      secrets: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          key: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id: string
+          key: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          key?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "secrets_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"

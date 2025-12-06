@@ -29,6 +29,7 @@
 		"json-edit-react": "^1.29.0",
 		"lucide-react": "^0.545.0",
 		"nanoid": "^5.1.6",
+		"openpgp": "^6.2.2",
 		"react": "^19.2.0",
 		"react-dom": "^19.2.0",
 		"react-textarea-autosize": "^8.5.9",

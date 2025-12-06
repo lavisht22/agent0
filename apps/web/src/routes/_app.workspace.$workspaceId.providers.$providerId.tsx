@@ -11,6 +11,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { nanoid } from "nanoid";
+import * as openpgp from "openpgp";
 import { PROVIDER_TYPES } from "@/lib/providers";
 import { providersQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
@@ -55,11 +56,23 @@ function RouteComponent() {
 			type: string;
 			data: string;
 		}) => {
+			const publicKey = await openpgp.readKey({
+				armoredKey: import.meta.env.VITE_PUBLIC_PGP_PUBLIC_KEY,
+			});
+
+			const encrypted_data = await openpgp.encrypt({
+				encryptionKeys: publicKey,
+				message: await openpgp.createMessage({
+					text: values.data,
+				}),
+			});
+
 			const { error } = await supabase.from("providers").insert({
 				id: nanoid(),
 				name: values.name,
 				type: values.type,
 				data: JSON.parse(values.data),
+				encrypted_data,
 				workspace_id: workspaceId,
 			});
 
@@ -92,12 +105,24 @@ function RouteComponent() {
 			type: string;
 			data: string;
 		}) => {
+			const publicKey = await openpgp.readKey({
+				armoredKey: import.meta.env.VITE_PUBLIC_PGP_PUBLIC_KEY,
+			});
+
+			const encrypted_data = await openpgp.encrypt({
+				encryptionKeys: publicKey,
+				message: await openpgp.createMessage({
+					text: values.data,
+				}),
+			});
+
 			const { error } = await supabase
 				.from("providers")
 				.update({
 					name: values.name,
 					type: values.type,
 					data: JSON.parse(values.data),
+					encrypted_data,
 				})
 				.eq("id", providerId);
 
@@ -128,9 +153,7 @@ function RouteComponent() {
 		defaultValues: {
 			name: currentProvider?.name || "",
 			type: currentProvider?.type || "",
-			data: currentProvider?.data
-				? JSON.stringify(currentProvider.data, null, 2)
-				: "{}",
+			data: "",
 		},
 		onSubmit: async ({ value }) => {
 			if (isNewProvider) {
@@ -170,6 +193,7 @@ function RouteComponent() {
 						e.stopPropagation();
 						form.handleSubmit();
 					}}
+					className="space-y-4"
 				>
 					{/* Name Field */}
 					<form.Field
@@ -253,7 +277,7 @@ function RouteComponent() {
 								classNames={{
 									input: "font-mono text-sm",
 								}}
-								description="Provider-specific configuration in JSON format. This will be passed to the Vercel AI SDK."
+								description="Provider-specific configuration in JSON format. This will override any existing configuration."
 								isInvalid={field.state.meta.errors.length > 0}
 								errorMessage={field.state.meta.errors[0]}
 							/>
