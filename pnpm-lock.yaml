@@ -56,6 +56,9 @@ importers:
         specifier: ^4.1.12
         version: 4.1.12
     devDependencies:
+      '@openpgp/web-stream-tools':
+        specifier: ^0.3.0
+        version: 0.3.0(@types/node@22.19.1)(typescript@5.9.3)
       '@types/json-schema':
         specifier: ^7.0.15
         version: 7.0.15
@@ -1335,6 +1338,18 @@ packages:
   '@lukeed/ms@2.0.2':
     resolution: {integrity: sha512-9I2Zn6+NJLfaGoz9jN3lpwDgAYvfGeNYdbAIjJOqzs4Tpc+VU3Jqq4IofSUBKajiDS8k9fZIg18/z13mpk1bsA==}
     engines: {node: '>=8'}
+
+  '@openpgp/web-stream-tools@0.3.0':
+    resolution: {integrity: sha512-WGCcIti5uAwySkdny5IJ975Vu6fS45LE9Ce3M7vylIWOZwzL4qFUFclskZ6JU7rQ1zgoze6CQ//QKFc/ML2uqw==}
+    engines: {node: '>= 18.0.0'}
+    peerDependencies:
+      '@types/node': '>=18.0.0'
+      typescript: '>=4.7'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+      typescript:
+        optional: true
 
   '@opentelemetry/api@1.9.0':
     resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
@@ -5302,6 +5317,11 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.5
 
   '@lukeed/ms@2.0.2': {}
+
+  '@openpgp/web-stream-tools@0.3.0(@types/node@22.19.1)(typescript@5.9.3)':
+    optionalDependencies:
+      '@types/node': 22.19.1
+      typescript: 5.9.3
 
   '@opentelemetry/api@1.9.0': {}
 

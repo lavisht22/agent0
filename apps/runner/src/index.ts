@@ -17,7 +17,7 @@ import {
 } from 'ai';
 import Fastify from 'fastify';
 import { nanoid } from 'nanoid';
-import * as openpgp from 'openpgp';
+import { decryptMessage } from './lib/openpgp.js';
 import { getAIProvider } from './lib/providers.js';
 import { applyVariablesToMessages } from './lib/variables.js';
 
@@ -101,21 +101,7 @@ const prepareProviderAndMessages = async (data: VersionData, variables: Record<s
         throw providerError;
     }
 
-    const privateKey = await openpgp.decryptKey({
-        privateKey: await openpgp.readPrivateKey({
-            armoredKey: process.env.PGP_PRIVATE_KEY || ""
-        }),
-        passphrase: process.env.PGP_PRIVATE_KEY_PASSPHRASE || ""
-    })
-
-    const message = await openpgp.readMessage({
-        armoredMessage: provider.encrypted_data
-    });
-
-    const { data: decrypted } = await openpgp.decrypt({
-        message,
-        decryptionKeys: privateKey
-    });
+    const decrypted = await decryptMessage(provider.encrypted_data);
 
     const config = JSON.parse(decrypted);
 
