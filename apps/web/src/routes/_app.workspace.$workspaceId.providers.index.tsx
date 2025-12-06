@@ -21,7 +21,7 @@ import { useState } from "react";
 import { ConfirmationModal } from "@/components/confirmation-modal";
 import IDCopy from "@/components/id-copy";
 import { PROVIDER_TYPES } from "@/lib/providers";
-import { providersQuery } from "@/lib/queries";
+import { providersQuery, workspaceUserQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/_app/workspace/$workspaceId/providers/")(
@@ -44,6 +44,7 @@ function RouteComponent() {
 
 	// Fetch Providers
 	const { data: providers, isLoading } = useQuery(providersQuery(workspaceId));
+	const { data: user } = useQuery(workspaceUserQuery(workspaceId));
 
 	// Delete mutation
 	const deleteMutation = useMutation({
@@ -78,24 +79,26 @@ function RouteComponent() {
 			<div className="flex justify-between items-center h-16 border-b border-default-200 box-content px-4">
 				<h1 className="text-xl font-medium tracking-tight">Providers</h1>
 
-				<Button
-					color="primary"
-					startContent={<Plus size={18} />}
-					onPress={() =>
-						navigate({
-							to: "/workspace/$workspaceId/providers/$providerId",
-							params: { workspaceId, providerId: "new" },
-						})
-					}
-				>
-					Create
-				</Button>
+				{user?.role === "admin" && (
+					<Button
+						color="primary"
+						startContent={<Plus size={18} />}
+						onPress={() =>
+							navigate({
+								to: "/workspace/$workspaceId/providers/$providerId",
+								params: { workspaceId, providerId: "new" },
+							})
+						}
+					>
+						Create
+					</Button>
+				)}
 			</div>
 
 			<Table
 				aria-label="Providers Table"
 				onRowAction={(key) => {
-					if (!key) return;
+					if (!key || user?.role !== "admin") return;
 
 					navigate({
 						to: key.toString(),
@@ -138,7 +141,7 @@ function RouteComponent() {
 									{format(item.updated_at, "d LLL, hh:mm a")}
 								</TableCell>
 								<TableCell className="flex justify-end">
-									<Dropdown>
+									<Dropdown isDisabled={user?.role !== "admin"}>
 										<DropdownTrigger>
 											<Button isIconOnly variant="light">
 												<LucideEllipsisVertical className="size-4" />
@@ -156,7 +159,10 @@ function RouteComponent() {
 												className="text-danger"
 												color="danger"
 												onPress={() => {
-													setProviderToDelete({ id: item.id, name: item.name });
+													setProviderToDelete({
+														id: item.id,
+														name: item.name,
+													});
 													onOpen();
 												}}
 											>

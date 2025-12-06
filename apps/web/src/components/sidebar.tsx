@@ -22,7 +22,7 @@ import {
 	Settings,
 } from "lucide-react";
 import { useMemo } from "react";
-import { userQuery, workspacesQuery } from "@/lib/queries";
+import { workspacesQuery, workspaceUserQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
 
 interface SidebarProps {
@@ -38,30 +38,7 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 		return workspaces?.find((workspace) => workspace.id === workspaceId);
 	}, [workspaces, workspaceId]);
 
-	// Check if current user is admin
-	const { data: isAdmin } = useQuery({
-		queryKey: ["workspace-role", workspaceId],
-		queryFn: async () => {
-			const {
-				data: { user },
-			} = await supabase.auth.getUser();
-			if (!user) return false;
-
-			const { data, error } = await supabase
-				.from("workspace_user")
-				.select("role")
-				.eq("workspace_id", workspaceId)
-				.eq("user_id", user.id)
-				.single();
-
-			if (error) return false;
-
-			return data?.role === "admin";
-		},
-		enabled: !!workspaceId,
-	});
-
-	const { data: userData } = useQuery(userQuery);
+	const { data: user } = useQuery(workspaceUserQuery(workspaceId));
 
 	const navItems = useMemo(() => {
 		const items = [
@@ -84,16 +61,16 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 				path: `/workspace/${workspaceId}/runs`,
 				active: location.pathname === `/workspace/${workspaceId}/runs`,
 			},
-		];
-
-		// Only show API Keys and Settings for admin users
-		if (isAdmin) {
-			items.push({
+			{
 				label: "Providers",
 				icon: Server,
 				path: `/workspace/${workspaceId}/providers`,
 				active: location.pathname === `/workspace/${workspaceId}/providers`,
-			});
+			},
+		];
+
+		// Only show API Keys and Settings for admin users
+		if (user?.role === "admin") {
 			items.push({
 				label: "API Keys",
 				icon: KeySquare,
@@ -109,7 +86,7 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 		}
 
 		return items;
-	}, [workspaceId, location.pathname, isAdmin]);
+	}, [workspaceId, location.pathname, user]);
 
 	return (
 		<div className={`border-r border-default-200 flex flex-col w-52`}>
@@ -185,11 +162,11 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 				<Dropdown placement="right-start">
 					<DropdownTrigger className="cursor-pointer">
 						<User
-							name={userData?.user.name || ""}
-							description={userData?.claims.email || ""}
+							name={user?.name || ""}
+							description={user?.email || ""}
 							avatarProps={{
 								size: "sm",
-								src: `https://api.dicebear.com/9.x/initials/svg?seed=${userData?.user.name}`,
+								src: `https://api.dicebear.com/9.x/initials/svg?seed=${user?.name}`,
 							}}
 						/>
 					</DropdownTrigger>

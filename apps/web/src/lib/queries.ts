@@ -125,8 +125,8 @@ export const runQuery = (runId: string) => queryOptions({
     enabled: !!runId,
 })
 
-export const userQuery = queryOptions({
-    queryKey: ['user'],
+export const workspaceUserQuery = (workspaceId: string) => queryOptions({
+    queryKey: ["workspace-user", workspaceId],
     queryFn: async () => {
         const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
 
@@ -140,6 +140,22 @@ export const userQuery = queryOptions({
 
         if (userError) throw userError;
 
-        return { claims, user };
+        const { data: workspaceUser, error: workspaceUserError } = await supabase
+            .from("workspace_user")
+            .select("*")
+            .eq("workspace_id", workspaceId)
+            .eq("user_id", claims.sub)
+            .single();
+
+        if (workspaceUserError) throw workspaceUserError;
+
+        return {
+            id: user.id,
+            name: user.name,
+            email: claims.email,
+            workspace_id: workspaceUser.workspace_id,
+            role: workspaceUser.role,
+        };
     },
+    enabled: !!workspaceId,
 })
