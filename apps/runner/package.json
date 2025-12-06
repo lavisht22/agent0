@@ -1,33 +1,33 @@
 {
-  "name": "runner",
-  "type": "module",
-  "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js"
-  },
-  "dependencies": {
-    "@ai-sdk/azure": "3.0.0-beta.80",
-    "@ai-sdk/google": "3.0.0-beta.62",
-    "@ai-sdk/google-vertex": "4.0.0-beta.96",
-    "@ai-sdk/openai": "3.0.0-beta.78",
-    "@ai-sdk/xai": "3.0.0-beta.48",
-    "@fastify/cors": "^11.1.0",
-    "@fastify/static": "^8.3.0",
-    "@repo/database": "workspace:*",
-    "@supabase/supabase-js": "^2.84.0",
-    "ai": "6.0.0-beta.129",
-    "dotenv": "^17.2.3",
-    "fastify": "^5.6.2",
-    "nanoid": "^5.1.6",
-    "openpgp": "^6.2.2",
-    "zod": "^4.1.12"
-  },
-  "devDependencies": {
-    "@openpgp/web-stream-tools": "^0.3.0",
-    "@types/json-schema": "^7.0.15",
-    "@types/node": "^22.19.1",
-    "tsx": "^4.20.6",
-    "typescript": "^5.9.3"
-  }
+	"name": "runner",
+	"type": "module",
+	"scripts": {
+		"dev": "tsx watch src/index.ts",
+		"build": "tsc && cp src/lib/openpgp.js src/lib/openpgp.d.ts dist/lib/",
+		"start": "node dist/index.js"
+	},
+	"dependencies": {
+		"@ai-sdk/azure": "3.0.0-beta.80",
+		"@ai-sdk/google": "3.0.0-beta.62",
+		"@ai-sdk/google-vertex": "4.0.0-beta.96",
+		"@ai-sdk/openai": "3.0.0-beta.78",
+		"@ai-sdk/xai": "3.0.0-beta.48",
+		"@fastify/cors": "^11.1.0",
+		"@fastify/static": "^8.3.0",
+		"@repo/database": "workspace:*",
+		"@supabase/supabase-js": "^2.84.0",
+		"ai": "6.0.0-beta.129",
+		"dotenv": "^17.2.3",
+		"fastify": "^5.6.2",
+		"nanoid": "^5.1.6",
+		"openpgp": "^6.2.2",
+		"zod": "^4.1.12"
+	},
+	"devDependencies": {
+		"@openpgp/web-stream-tools": "^0.3.0",
+		"@types/json-schema": "^7.0.15",
+		"@types/node": "^22.19.1",
+		"tsx": "^4.20.6",
+		"typescript": "^5.9.3"
+	}
 }
