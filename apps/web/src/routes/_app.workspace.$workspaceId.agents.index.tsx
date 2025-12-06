@@ -1,4 +1,5 @@
 import {
+	addToast,
 	Button,
 	Dropdown,
 	DropdownItem,
@@ -10,13 +11,17 @@ import {
 	TableColumn,
 	TableHeader,
 	TableRow,
+	useDisclosure,
 } from "@heroui/react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { LucideEllipsisVertical, Plus } from "lucide-react";
+import { useState } from "react";
+import { ConfirmationModal } from "@/components/confirmation-modal";
 import IDCopy from "@/components/id-copy";
 import { agentsQuery } from "@/lib/queries";
+import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/_app/workspace/$workspaceId/agents/")({
 	component: RouteComponent,
@@ -25,9 +30,45 @@ export const Route = createFileRoute("/_app/workspace/$workspaceId/agents/")({
 function RouteComponent() {
 	const { workspaceId } = Route.useParams();
 	const navigate = useNavigate();
+	const queryClient = useQueryClient();
+
+	// Delete confirmation modal state
+	const { isOpen, onOpen, onOpenChange } = useDisclosure();
+	const [agentToDelete, setAgentToDelete] = useState<{
+		id: string;
+		name: string;
+	} | null>(null);
 
 	// Fetch Agents
 	const { data: agents, isLoading } = useQuery(agentsQuery(workspaceId));
+
+	// Delete mutation
+	const deleteMutation = useMutation({
+		mutationFn: async (agentId: string) => {
+			const { error } = await supabase
+				.from("agents")
+				.delete()
+				.eq("id", agentId);
+
+			if (error) throw error;
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["agents", workspaceId] });
+			addToast({
+				description: "Agent deleted successfully.",
+				color: "success",
+			});
+			onOpenChange();
+			setAgentToDelete(null);
+		},
+		onError: (error) => {
+			addToast({
+				description:
+					error instanceof Error ? error.message : "Failed to delete agent.",
+				color: "danger",
+			});
+		},
+	});
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
@@ -89,10 +130,21 @@ function RouteComponent() {
 									</DropdownTrigger>
 									<DropdownMenu>
 										<DropdownItem
-											key={item.id}
+											key="edit"
 											onPress={() => navigate({ to: item.id })}
 										>
 											Edit
+										</DropdownItem>
+										<DropdownItem
+											key="delete"
+											className="text-danger"
+											color="danger"
+											onPress={() => {
+												setAgentToDelete({ id: item.id, name: item.name });
+												onOpen();
+											}}
+										>
+											Delete
 										</DropdownItem>
 									</DropdownMenu>
 								</Dropdown>
@@ -101,6 +153,21 @@ function RouteComponent() {
 					)}
 				</TableBody>
 			</Table>
+
+			<ConfirmationModal
+				isOpen={isOpen}
+				onOpenChange={onOpenChange}
+				title="Delete Agent"
+				description={`Are you sure you want to delete "${agentToDelete?.name}"? This action cannot be undone and will delete all versions associated with this agent.`}
+				onConfirm={() => {
+					if (agentToDelete) {
+						deleteMutation.mutate(agentToDelete.id);
+					}
+				}}
+				isLoading={deleteMutation.isPending}
+				confirmText="Delete"
+				confirmColor="danger"
+			/>
 		</div>
 	);
 }

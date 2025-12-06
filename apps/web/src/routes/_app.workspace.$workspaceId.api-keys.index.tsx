@@ -12,12 +12,14 @@ import {
 	TableHeader,
 	TableRow,
 	User,
+	useDisclosure,
 } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { LucideEllipsisVertical, Plus } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { ConfirmationModal } from "@/components/confirmation-modal";
 import IDCopy from "@/components/id-copy";
 
 import { apiKeysQuery, workspacesQuery } from "@/lib/queries";
@@ -31,6 +33,13 @@ function RouteComponent() {
 	const { workspaceId } = Route.useParams();
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
+
+	// Delete confirmation modal state
+	const { isOpen, onOpen, onOpenChange } = useDisclosure();
+	const [keyToDelete, setKeyToDelete] = useState<{
+		id: string;
+		name: string;
+	} | null>(null);
 
 	// Fetch API Keys
 	const { data: apiKeys, isLoading } = useQuery(apiKeysQuery(workspaceId));
@@ -56,6 +65,8 @@ function RouteComponent() {
 				description: "API key deleted successfully.",
 				color: "success",
 			});
+			onOpenChange();
+			setKeyToDelete(null);
 		},
 		onError: (error) => {
 			addToast({
@@ -151,13 +162,8 @@ function RouteComponent() {
 												className="text-danger"
 												color="danger"
 												onPress={() => {
-													if (
-														window.confirm(
-															`Are you sure you want to delete "${item.name}"? This action cannot be undone.`,
-														)
-													) {
-														deleteMutation.mutate(item.id);
-													}
+													setKeyToDelete({ id: item.id, name: item.name });
+													onOpen();
 												}}
 											>
 												Delete
@@ -170,6 +176,21 @@ function RouteComponent() {
 					}}
 				</TableBody>
 			</Table>
+
+			<ConfirmationModal
+				isOpen={isOpen}
+				onOpenChange={onOpenChange}
+				title="Delete API Key"
+				description={`Are you sure you want to delete "${keyToDelete?.name}"? This action cannot be undone.`}
+				onConfirm={() => {
+					if (keyToDelete) {
+						deleteMutation.mutate(keyToDelete.id);
+					}
+				}}
+				isLoading={deleteMutation.isPending}
+				confirmText="Delete"
+				confirmColor="danger"
+			/>
 		</div>
 	);
 }

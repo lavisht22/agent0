@@ -1,4 +1,5 @@
 import {
+	addToast,
 	Button,
 	Dropdown,
 	DropdownItem,
@@ -10,14 +11,18 @@ import {
 	TableColumn,
 	TableHeader,
 	TableRow,
+	useDisclosure,
 } from "@heroui/react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { LucideEllipsisVertical, Plus } from "lucide-react";
+import { useState } from "react";
+import { ConfirmationModal } from "@/components/confirmation-modal";
 import IDCopy from "@/components/id-copy";
 import { PROVIDER_TYPES } from "@/lib/providers";
 import { providersQuery } from "@/lib/queries";
+import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/_app/workspace/$workspaceId/providers/")(
 	{
@@ -28,9 +33,45 @@ export const Route = createFileRoute("/_app/workspace/$workspaceId/providers/")(
 function RouteComponent() {
 	const { workspaceId } = Route.useParams();
 	const navigate = useNavigate();
+	const queryClient = useQueryClient();
+
+	// Delete confirmation modal state
+	const { isOpen, onOpen, onOpenChange } = useDisclosure();
+	const [providerToDelete, setProviderToDelete] = useState<{
+		id: string;
+		name: string;
+	} | null>(null);
 
 	// Fetch Providers
 	const { data: providers, isLoading } = useQuery(providersQuery(workspaceId));
+
+	// Delete mutation
+	const deleteMutation = useMutation({
+		mutationFn: async (providerId: string) => {
+			const { error } = await supabase
+				.from("providers")
+				.delete()
+				.eq("id", providerId);
+
+			if (error) throw error;
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["providers", workspaceId] });
+			addToast({
+				description: "Provider deleted successfully.",
+				color: "success",
+			});
+			onOpenChange();
+			setProviderToDelete(null);
+		},
+		onError: (error) => {
+			addToast({
+				description:
+					error instanceof Error ? error.message : "Failed to delete provider.",
+				color: "danger",
+			});
+		},
+	});
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
@@ -105,10 +146,21 @@ function RouteComponent() {
 										</DropdownTrigger>
 										<DropdownMenu>
 											<DropdownItem
-												key={item.id}
+												key="edit"
 												onPress={() => navigate({ to: item.id })}
 											>
 												Edit
+											</DropdownItem>
+											<DropdownItem
+												key="delete"
+												className="text-danger"
+												color="danger"
+												onPress={() => {
+													setProviderToDelete({ id: item.id, name: item.name });
+													onOpen();
+												}}
+											>
+												Delete
 											</DropdownItem>
 										</DropdownMenu>
 									</Dropdown>
@@ -118,6 +170,21 @@ function RouteComponent() {
 					}}
 				</TableBody>
 			</Table>
+
+			<ConfirmationModal
+				isOpen={isOpen}
+				onOpenChange={onOpenChange}
+				title="Delete Provider"
+				description={`Are you sure you want to delete "${providerToDelete?.name}"? This action cannot be undone and may affect agents using this provider.`}
+				onConfirm={() => {
+					if (providerToDelete) {
+						deleteMutation.mutate(providerToDelete.id);
+					}
+				}}
+				isLoading={deleteMutation.isPending}
+				confirmText="Delete"
+				confirmColor="danger"
+			/>
 		</div>
 	);
 }
