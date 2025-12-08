@@ -18,7 +18,7 @@ export const providersQuery = (workspaceId: string) => queryOptions({
     queryFn: async () => {
         const { data, error } = await supabase
             .from("providers")
-            .select("*")
+            .select("id, name, type, created_at, updated_at")
             .eq("workspace_id", workspaceId)
             .order("created_at", { ascending: false });
 

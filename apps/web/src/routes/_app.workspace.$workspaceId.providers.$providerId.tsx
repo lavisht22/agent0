@@ -123,6 +123,7 @@ function RouteComponent() {
 					type: values.type,
 					data: JSON.parse(values.data),
 					encrypted_data,
+					updated_at: new Date().toISOString(),
 				})
 				.eq("id", providerId);
 
@@ -207,7 +208,7 @@ function RouteComponent() {
 					>
 						{(field) => (
 							<Input
-								label="Provider Name"
+								label="Name"
 								placeholder="e.g., My OpenAI Provider"
 								value={field.state.value}
 								onValueChange={field.handleChange}
@@ -232,7 +233,7 @@ function RouteComponent() {
 					>
 						{(field) => (
 							<Select
-								label="Provider Type"
+								label="Type"
 								placeholder="Select a provider type"
 								selectedKeys={field.state.value ? [field.state.value] : []}
 								onSelectionChange={(keys) => {
@@ -267,7 +268,7 @@ function RouteComponent() {
 					>
 						{(field) => (
 							<Textarea
-								label="Provider Configuration (JSON)"
+								label="Configuration (JSON)"
 								placeholder='{"apiKey": "your-api-key"}'
 								value={field.state.value}
 								onValueChange={field.handleChange}
