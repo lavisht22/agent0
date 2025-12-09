@@ -342,6 +342,7 @@ function RouteComponent() {
 			temperature?: number;
 			maxStepCount?: number;
 			messages?: MessageT[];
+			tools?: { mcp_id: string; name: string }[];
 		};
 
 		setTimeout(() => {

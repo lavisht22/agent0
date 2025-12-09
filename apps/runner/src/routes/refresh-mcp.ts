@@ -3,14 +3,7 @@ import type { Json } from '@repo/database';
 import type { FastifyInstance } from 'fastify';
 import { supabase } from '../lib/db.js';
 import { decryptMessage } from '../lib/openpgp.js';
-
-interface MCPConfig {
-    transport: {
-        type: 'sse' | 'http';
-        url: string;
-        headers?: Record<string, string>;
-    }
-}
+import type { MCPConfig } from '../lib/types.js';
 
 export async function registerRefreshMCPRoute(fastify: FastifyInstance) {
     fastify.post('/api/v1/refresh-mcp', async (request, reply) => {
