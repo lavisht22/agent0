@@ -116,16 +116,30 @@ export const apiKeysQuery = (workspaceId: string) =>
 		enabled: !!workspaceId,
 	});
 
-export const runsQuery = (workspaceId: string, page: number) =>
+export const runsQuery = (
+	workspaceId: string,
+	page: number,
+	dateRange?: { from: string; to: string },
+) =>
 	queryOptions({
-		queryKey: ["runs", workspaceId, page],
+		queryKey: ["runs", workspaceId, page, dateRange],
 		queryFn: async () => {
-			const { data, error } = await supabase
+			let query = supabase
 				.from("runs")
 				.select("id, is_error, is_test, created_at, versions(id, agents(name))")
-				.eq("workspace_id", workspaceId)
+				.eq("workspace_id", workspaceId);
+
+			// Apply date filtering if provided
+			if (dateRange) {
+				query = query.gte("created_at", dateRange.from);
+				query = query.lte("created_at", dateRange.to);
+			}
+
+			query = query
 				.order("created_at", { ascending: false })
 				.range((page - 1) * 20, page * 20);
+
+			const { data, error } = await query;
 
 			if (error) throw error;
 

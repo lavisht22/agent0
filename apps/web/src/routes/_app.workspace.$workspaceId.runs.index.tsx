@@ -25,23 +25,72 @@ import {
 	LucideChevronRight,
 	LucideEllipsisVertical,
 } from "lucide-react";
+import { useMemo } from "react";
+import {
+	computeDateRangeFromPreset,
+	DateRangePicker,
+} from "@/components/date-range-picker";
 import IDCopy from "@/components/id-copy";
 import { runsQuery } from "@/lib/queries";
 
 export const Route = createFileRoute("/_app/workspace/$workspaceId/runs/")({
 	component: RouteComponent,
-	validateSearch: (search: Record<string, unknown>): { page: number } => {
+	validateSearch: (
+		search: Record<string, unknown>,
+	): {
+		page: number;
+		startDate?: string;
+		endDate?: string;
+		datePreset?: string;
+	} => {
+		let dateValues:
+			| { datePreset: string }
+			| { startDate: string; endDate: string };
+
+		if (!search.datePreset && !search.startDate && !search.endDate) {
+			dateValues = {
+				datePreset: "1hr",
+			};
+		} else if (search.datePreset) {
+			dateValues = {
+				datePreset: search.datePreset as string,
+			};
+		} else {
+			dateValues = {
+				startDate: search.startDate as string,
+				endDate: search.endDate as string,
+			};
+		}
+
 		return {
 			page: Number(search?.page ?? 1),
+			...dateValues,
 		};
 	},
 });
 
 function RouteComponent() {
 	const { workspaceId } = Route.useParams();
-	const { page } = Route.useSearch();
+	const { page, ...dateValues } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
-	const { data: runs, isLoading } = useQuery(runsQuery(workspaceId, page));
+
+	// Compute the date range from preset or custom dates
+	const dateRange = useMemo(() => {
+		if (dateValues.datePreset) {
+			return computeDateRangeFromPreset(dateValues.datePreset) ?? undefined;
+		}
+		if (dateValues.startDate && dateValues.endDate) {
+			return {
+				from: dateValues.startDate,
+				to: dateValues.endDate,
+			};
+		}
+		return undefined;
+	}, [dateValues.datePreset, dateValues.startDate, dateValues.endDate]);
+
+	const { data: runs, isLoading } = useQuery(
+		runsQuery(workspaceId, page, dateRange),
+	);
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
@@ -64,7 +113,19 @@ function RouteComponent() {
 				radius="none"
 				topContent={
 					<div className="h-10 w-full flex justify-between">
-						<div />
+						<div>
+							<DateRangePicker
+								value={dateValues}
+								onValueChange={(value) =>
+									navigate({
+										search: {
+											...value,
+											page: 1,
+										},
+									})
+								}
+							/>
+						</div>
 						<div className="flex gap-2">
 							<Tooltip content="Previous">
 								<Button
@@ -74,7 +135,7 @@ function RouteComponent() {
 									isDisabled={page === 1}
 									onPress={() =>
 										navigate({
-											search: { page: page - 1 },
+											search: { ...dateValues, page: page - 1 },
 										})
 									}
 								>
@@ -87,7 +148,9 @@ function RouteComponent() {
 									isIconOnly
 									variant="flat"
 									isDisabled={!runs || runs.length < 20}
-									onPress={() => navigate({ search: { page: page + 1 } })}
+									onPress={() =>
+										navigate({ search: { ...dateValues, page: page + 1 } })
+									}
 								>
 									<LucideChevronRight className="size-3.5" />
 								</Button>
