@@ -24,6 +24,7 @@ import {
 	LucideChevronLeft,
 	LucideChevronRight,
 	LucideEllipsisVertical,
+	RefreshCw,
 } from "lucide-react";
 import { useMemo } from "react";
 import {
@@ -88,9 +89,12 @@ function RouteComponent() {
 		return undefined;
 	}, [dateValues.datePreset, dateValues.startDate, dateValues.endDate]);
 
-	const { data: runs, isLoading } = useQuery(
-		runsQuery(workspaceId, page, dateRange),
-	);
+	const {
+		data: runs,
+		isLoading,
+		isFetching,
+		refetch,
+	} = useQuery(runsQuery(workspaceId, page, dateRange));
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
@@ -127,6 +131,19 @@ function RouteComponent() {
 							/>
 						</div>
 						<div className="flex gap-2">
+							<Tooltip content="Refresh">
+								<Button
+									size="sm"
+									isIconOnly
+									variant="flat"
+									onPress={() => refetch()}
+									isDisabled={isFetching}
+								>
+									<RefreshCw
+										className={`size-3.5 ${isFetching ? "animate-spin" : ""}`}
+									/>
+								</Button>
+							</Tooltip>
 							<Tooltip content="Previous">
 								<Button
 									size="sm"
