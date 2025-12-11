@@ -1,24 +1,16 @@
+import type { GoogleGenerativeAIProviderOptions } from "@ai-sdk/google";
+import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
+import type { XaiProviderOptions } from "@ai-sdk/xai";
 import type { ModelMessage, StepResult, ToolSet } from "ai";
 
-/**
- * Provider-specific options for reasoning/thinking configuration.
- * Each provider has its own format for controlling reasoning behavior.
- */
+// /**
+//  * Provider-specific options for reasoning/thinking configuration.
+//  * Each provider has its own format for controlling reasoning behavior.
+//  */
 export type ProviderOptions = {
-	openai?: {
-		reasoningEffort?: "minimal" | "low" | "medium" | "high";
-		reasoningSummary?: "auto" | "detailed";
-	};
-	xai?: {
-		reasoningEffort?: "low" | "medium" | "high";
-	};
-	google?: {
-		thinkingConfig?: {
-			thinkingBudget?: number;
-			thinkingLevel?: "low" | "medium" | "high";
-			includeThoughts?: boolean;
-		};
-	};
+	openai?: OpenAIResponsesProviderOptions;
+	xai?: XaiProviderOptions;
+	google?: GoogleGenerativeAIProviderOptions;
 };
 
 export type VersionData = {

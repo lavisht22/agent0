@@ -1,6 +1,6 @@
 {
 	"name": "agent0-js",
-	"version": "0.0.6",
+	"version": "0.0.7",
 	"description": "TypeScript SDK for Agent0",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
@@ -21,6 +21,9 @@
 		"typescript": "^5.0.0"
 	},
 	"dependencies": {
+		"@ai-sdk/google": "3.0.0-beta.69",
+		"@ai-sdk/openai": "3.0.0-beta.90",
+		"@ai-sdk/xai": "3.0.0-beta.54",
 		"ai": "^5.0.98"
 	}
 }

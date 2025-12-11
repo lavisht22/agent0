@@ -1,3 +1,6 @@
+import type { GoogleGenerativeAIProviderOptions } from "@ai-sdk/google";
+import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
+import type { XaiProviderOptions } from "@ai-sdk/xai";
 import type { ModelMessage } from "ai";
 
 export interface Agent0Config {
@@ -11,22 +14,11 @@ export interface Agent0Config {
  */
 export interface ProviderOptions {
 	/** OpenAI reasoning effort options */
-	openai?: {
-		reasoningEffort?: "minimal" | "low" | "medium" | "high";
-		reasoningSummary?: "auto" | "detailed";
-	};
+	openai?: OpenAIResponsesProviderOptions;
 	/** xAI reasoning effort options */
-	xai?: {
-		reasoningEffort?: "low" | "medium" | "high";
-	};
+	xai?: XaiProviderOptions;
 	/** Google/Vertex thinking configuration */
-	google?: {
-		thinkingConfig?: {
-			thinkingBudget?: number;
-			thinkingLevel?: "low" | "medium" | "high";
-			includeThoughts?: boolean;
-		};
-	};
+	google?: GoogleGenerativeAIProviderOptions;
 }
 
 /**
