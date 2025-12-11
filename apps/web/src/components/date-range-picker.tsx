@@ -45,15 +45,15 @@ const DATE_PRESETS = [
 	},
 ];
 
-type Value = {
+export type DateRangeValue = {
 	datePreset?: string;
 	startDate?: string;
 	endDate?: string;
 };
 
 interface DateRangePickerProps {
-	value: Value;
-	onValueChange: (value: Value) => void;
+	value: DateRangeValue;
+	onValueChange: (value: DateRangeValue) => void;
 }
 
 /**
@@ -107,7 +107,7 @@ export function computeDateRangeFromPreset(
 /**
  * Helper to get display label for custom date range
  */
-function getCustomDateLabel(value: Value): string {
+function getCustomDateLabel(value: DateRangeValue): string {
 	if (value.startDate && value.endDate) {
 		const start = new Date(value.startDate);
 		const end = new Date(value.endDate);

@@ -26,12 +26,8 @@ import {
 	LucideEllipsisVertical,
 	RefreshCw,
 } from "lucide-react";
-import { useMemo } from "react";
 import { AgentFilter } from "@/components/agent-filter";
-import {
-	computeDateRangeFromPreset,
-	DateRangePicker,
-} from "@/components/date-range-picker";
+import { DateRangePicker } from "@/components/date-range-picker";
 import IDCopy from "@/components/id-copy";
 import {
 	StatusFilter,
@@ -84,26 +80,12 @@ function RouteComponent() {
 	const { page, agentId, status, ...dateValues } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
-	// Compute the date range from preset or custom dates
-	const dateRange = useMemo(() => {
-		if (dateValues.datePreset) {
-			return computeDateRangeFromPreset(dateValues.datePreset) ?? undefined;
-		}
-		if (dateValues.startDate && dateValues.endDate) {
-			return {
-				from: dateValues.startDate,
-				to: dateValues.endDate,
-			};
-		}
-		return undefined;
-	}, [dateValues.datePreset, dateValues.startDate, dateValues.endDate]);
-
 	const {
 		data: runs,
 		isLoading,
 		isFetching,
 		refetch,
-	} = useQuery(runsQuery(workspaceId, page, dateRange, agentId, status));
+	} = useQuery(runsQuery(workspaceId, page, dateValues, agentId, status));
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">

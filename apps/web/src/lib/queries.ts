@@ -1,4 +1,8 @@
 import { queryOptions } from "@tanstack/react-query";
+import {
+	computeDateRangeFromPreset,
+	type DateRangeValue,
+} from "@/components/date-range-picker";
 import { supabase } from "./supabase";
 
 export const workspacesQuery = queryOptions({
@@ -119,12 +123,23 @@ export const apiKeysQuery = (workspaceId: string) =>
 export const runsQuery = (
 	workspaceId: string,
 	page: number,
-	dateRange?: { from: string; to: string },
+	dateFilter: DateRangeValue,
 	agentId?: string,
 	status?: "success" | "failed",
 ) =>
 	queryOptions({
-		queryKey: ["runs", workspaceId, page, dateRange, agentId, status],
+		// Use preset key or custom dates in the query key for stability
+		// When using a preset, the key stays stable even if time passes
+		queryKey: [
+			"runs",
+			workspaceId,
+			page,
+			dateFilter.datePreset
+				? { preset: dateFilter.datePreset }
+				: { from: dateFilter.startDate, to: dateFilter.endDate },
+			agentId,
+			status,
+		],
 		queryFn: async () => {
 			let query = supabase
 				.from("runs")
@@ -133,7 +148,16 @@ export const runsQuery = (
 				)
 				.eq("workspace_id", workspaceId);
 
-			// Apply date filtering if provided
+			// Compute date range at query time
+			// For presets, this ensures we always query with fresh dates
+			let dateRange: { from: string; to: string } | null = null;
+			if (dateFilter.datePreset) {
+				dateRange = computeDateRangeFromPreset(dateFilter.datePreset);
+			} else if (dateFilter.startDate && dateFilter.endDate) {
+				dateRange = { from: dateFilter.startDate, to: dateFilter.endDate };
+			}
+
+			// Apply date filtering if computed
 			if (dateRange) {
 				query = query.gte("created_at", dateRange.from);
 				query = query.lte("created_at", dateRange.to);
@@ -162,7 +186,6 @@ export const runsQuery = (
 			return data;
 		},
 		enabled: !!workspaceId,
-		staleTime: 0,
 	});
 
 export const runQuery = (runId: string) =>
