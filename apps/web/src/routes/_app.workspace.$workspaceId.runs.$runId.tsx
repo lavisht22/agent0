@@ -280,17 +280,15 @@ function RouteComponent() {
 						>
 							<div className="p-4 pt-0">
 								{data.steps && data.steps.length > 0 ? (
-									data.steps.map((step, index) => (
-										<div key={`step-${index + 1}`} className="space-y-2">
-											<h4 className="font-medium">Step {index + 1}</h4>
-											<Messages
-												value={step.response.messages as MessageT[]}
-												onValueChange={() => {}}
-												isReadOnly
-												onVariablePress={() => {}}
-											/>
-										</div>
-									))
+									<Messages
+										value={
+											data.steps[data.steps.length - 1].response
+												.messages as MessageT[]
+										}
+										onValueChange={() => {}}
+										isReadOnly
+										onVariablePress={() => {}}
+									/>
 								) : (
 									<p className="text-default-400 text-sm italic px-4">
 										No response steps available
