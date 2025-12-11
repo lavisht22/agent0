@@ -11,10 +11,12 @@ export const systemMessageSchema = z.object({
 });
 
 export function SystemMessage({
+	isReadOnly,
 	value,
 	onValueChange,
 	onVariablePress,
 }: {
+	isReadOnly?: boolean;
 	value: string;
 	onValueChange: (value: string) => void;
 	onVariablePress: () => void;
@@ -36,6 +38,7 @@ export function SystemMessage({
 			<CardBody className="p-3 border-t border-default-200 flex flex-col gap-4">
 				<TextareaAutosize
 					className="outline-none w-full resize-none text-sm"
+					readOnly={isReadOnly}
 					placeholder="Enter system message..."
 					maxRows={1000000000000}
 					value={value}

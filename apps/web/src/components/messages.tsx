@@ -33,6 +33,7 @@ export function Messages({
 					return (
 						<SystemMessage
 							key={`${index + 1}`}
+							isReadOnly={isReadOnly}
 							value={message.content}
 							onValueChange={(content) => {
 								const newMessages = [...value];
@@ -53,6 +54,7 @@ export function Messages({
 					return (
 						<UserMessage
 							key={`${index + 1}`}
+							isReadOnly={isReadOnly}
 							value={message.content}
 							onValueChange={(content) => {
 								const newMessages = [...value];
