@@ -1,69 +1,69 @@
-import { GeminiIcon, GoogleCloudIcon, MicrosoftIcon, OpenaiIcon, XaiIcon } from "@/components/boxicons";
+import {
+	GeminiIcon,
+	GoogleCloudIcon,
+	MicrosoftIcon,
+	OpenaiIcon,
+	XaiIcon,
+} from "@/components/boxicons";
 
 export const PROVIDER_TYPES = [
-    {
-        key: "xai",
-        icon: XaiIcon,
-        label: "XAI",
-        models: [
-            "grok-4-1-fast-non-reasoning",
-            "grok-4-1-fast-reasoning",
-            "grok-4-fast-non-reasoning",
-            "grok-4-fast-reasoning",
-        ]
-    },
-    {
-        key: "openai",
-        icon: OpenaiIcon,
-        label: "OpenAI",
-        models: [
-            "gpt-5.1",
-            "gpt-5.1-chat-latest",
-            "gpt-5-pro",
-            "gpt-5",
-            "gpt-5-mini",
-            "gpt-5-nano",
-            "gpt-4.1",
-            "gpt-4.1-mini",
-            "gpt-4.1-nano",
-            "o4-mini",
-        ]
-    },
-    {
-        key: "google-vertex",
-        icon: GoogleCloudIcon,
-        label: "Google Vertex AI",
-        models: [
-            "gemini-3-pro-preview",
-            "gemini-2.5-pro",
-            "gemini-2.5-flash",
-        ]
-    },
-    {
-        key: "google",
-        icon: GeminiIcon,
-        label: "Google Generative AI",
-        models: [
-            "gemini-3-pro-preview",
-            "gemini-2.5-pro",
-            "gemini-2.5-flash",
-        ]
-    },
-    {
-        key: "azure",
-        icon: MicrosoftIcon,
-        label: "Azure OpenAI",
-        models: [
-            "gpt-5.1",
-            "gpt-5.1-chat-latest",
-            "gpt-5-pro",
-            "gpt-5",
-            "gpt-5-mini",
-            "gpt-5-nano",
-            "gpt-4.1",
-            "gpt-4.1-mini",
-            "gpt-4.1-nano",
-            "o4-mini",
-        ]
-    },
+	{
+		key: "xai",
+		icon: XaiIcon,
+		label: "XAI",
+		models: [
+			"grok-4-1-fast-non-reasoning",
+			"grok-4-1-fast-reasoning",
+			"grok-4-fast-non-reasoning",
+			"grok-4-fast-reasoning",
+		],
+	},
+	{
+		key: "openai",
+		icon: OpenaiIcon,
+		label: "OpenAI",
+		models: [
+			"gpt-5.2",
+			"gpt-5.1",
+			"gpt-5.1-chat-latest",
+			"gpt-5-pro",
+			"gpt-5",
+			"gpt-5-mini",
+			"gpt-5-nano",
+			"gpt-4.1",
+			"gpt-4.1-mini",
+			"gpt-4.1-nano",
+			"o4-mini",
+		],
+	},
+	{
+		key: "google-vertex",
+		icon: GoogleCloudIcon,
+		label: "Google Vertex AI",
+		models: ["gemini-3-pro-preview", "gemini-2.5-pro", "gemini-2.5-flash"],
+	},
+	{
+		key: "google",
+		icon: GeminiIcon,
+		label: "Google Generative AI",
+		models: ["gemini-3-pro-preview", "gemini-2.5-pro", "gemini-2.5-flash"],
+	},
+	{
+		key: "azure",
+		icon: MicrosoftIcon,
+		label: "Azure OpenAI",
+		models: [
+			"gpt-5.2",
+			"gpt-5.1",
+			"gpt-5.1-chat-latest",
+			"gpt-5-pro",
+			"gpt-5",
+			"gpt-5-mini",
+			"gpt-5-nano",
+			"gpt-4.1",
+			"gpt-4.1-mini",
+			"gpt-4.1-nano",
+			"o4-mini",
+		],
+	},
 ];
