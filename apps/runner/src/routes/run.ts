@@ -113,140 +113,181 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 				prepareMCPServers(data),
 			]);
 
-		const {
-			maxOutputTokens,
-			outputFormat,
-			temperature,
-			maxStepCount,
-			providerOptions,
-		} = data;
-
-		// Append extra messages if provided (used as-is, no variable substitution)
-		const finalMessages = extra_messages
-			? [...processedMessages, ...extra_messages]
-			: processedMessages;
-
-		runData.request = { ...data, messages: finalMessages, stream, overrides };
-		runData.metrics.preProcessingTime = Date.now() - startTime;
-
-		if (stream) {
-			const result = streamText({
-				model,
-				maxOutputTokens,
-				temperature,
-				stopWhen: stepCountIs(maxStepCount || 10),
-				messages: finalMessages,
-				tools: tools as ToolSet,
-				output: outputFormat === "json" ? Output.json() : Output.text(),
-				providerOptions,
-				onChunk: () => {
-					if (runData.metrics.firstTokenTime === 0) {
-						runData.metrics.firstTokenTime =
-							Date.now() - runData.metrics.preProcessingTime - startTime;
-					}
-				},
-				onFinish: async ({ steps }) => {
-					closeAll();
-
-					runData.metrics.responseTime =
-						Date.now() - runData.metrics.preProcessingTime - startTime;
-					runData.steps = steps;
-					await insertRun(
-						agent.workspaces.id,
-						version.id,
-						runData,
-						startTime,
-						false,
-						false,
-					);
-				},
-				onError: async ({ error }) => {
-					closeAll();
-
-					if (runData.metrics.firstTokenTime === 0) {
-						runData.metrics.firstTokenTime =
-							Date.now() - runData.metrics.preProcessingTime - startTime;
-					}
-					runData.metrics.responseTime =
-						Date.now() - runData.metrics.preProcessingTime - startTime;
-
-					runData.error = {
-						name: error instanceof Error ? error.name : "UnknownError",
-						message:
-							error instanceof Error ? error.message : "Unknown error occured.",
-						cause:
-							error instanceof Error
-								? (error as Error & { cause?: unknown }).cause
-								: undefined,
-					};
-					await insertRun(
-						agent.workspaces.id,
-						version.id,
-						runData,
-						startTime,
-						true,
-						false,
-					);
-				},
-			});
-
-			const streamResponse = createSSEStream(result);
-
-			reply.headers({
-				"Content-Type": "text/event-stream",
-				"Cache-Control": "no-cache",
-				Connection: "keep-alive",
-			});
-
-			return reply.send(streamResponse);
-		}
-
+		// Wrap all remaining logic in try-finally to ensure MCP clients are always closed
 		try {
-			const result = await generateText({
-				model,
+			const {
 				maxOutputTokens,
+				outputFormat,
 				temperature,
-				stopWhen: stepCountIs(maxStepCount || 10),
-				messages: finalMessages,
-				tools: tools as ToolSet,
-				output: outputFormat === "json" ? Output.json() : Output.text(),
+				maxStepCount,
 				providerOptions,
-			});
+			} = data;
 
-			const { response, text, steps } = result;
-			runData.steps = steps;
+			// Append extra messages if provided (used as-is, no variable substitution)
+			const finalMessages = extra_messages
+				? [...processedMessages, ...extra_messages]
+				: processedMessages;
 
-			reply.send({
-				text,
-				messages: response.messages,
-			});
-		} catch (error) {
-			runData.error = {
-				name: error instanceof Error ? error.name : "UnknownError",
-				message:
-					error instanceof Error ? error.message : "Unknown error occured.",
-				cause:
-					error instanceof Error
-						? (error as Error & { cause?: unknown }).cause
-						: undefined,
-			};
+			runData.request = { ...data, messages: finalMessages, stream, overrides };
+			runData.metrics.preProcessingTime = Date.now() - startTime;
 
-			reply.code(500).send(error);
+			if (stream) {
+				// Track if stream completed normally (via onFinish or onError)
+				let streamCompleted = false;
+
+				const controller = new 	AbortController();
+
+				const result = streamText({
+					model,
+					maxOutputTokens,
+					temperature,
+					stopWhen: stepCountIs(maxStepCount || 10),
+					messages: finalMessages,
+					tools: tools as ToolSet,
+					output: outputFormat === "json" ? Output.json() : Output.text(),
+					providerOptions,
+					abortSignal: controller.signal,
+					onChunk: () => {
+						if (runData.metrics.firstTokenTime === 0) {
+							runData.metrics.firstTokenTime =
+								Date.now() - runData.metrics.preProcessingTime - startTime;
+						}
+					},
+					
+					onFinish: async ({ steps }) => {
+						streamCompleted = true;
+						closeAll();
+
+						runData.metrics.responseTime =
+							Date.now() - runData.metrics.preProcessingTime - startTime;
+						runData.steps = steps;
+						await insertRun(
+							agent.workspaces.id,
+							version.id,
+							runData,
+							startTime,
+							false,
+							false,
+						);
+					},
+					onError: async ({ error }) => {
+						streamCompleted = true;
+						closeAll();
+
+						if (runData.metrics.firstTokenTime === 0) {
+							runData.metrics.firstTokenTime =
+								Date.now() - runData.metrics.preProcessingTime - startTime;
+						}
+						runData.metrics.responseTime =
+							Date.now() - runData.metrics.preProcessingTime - startTime;
+
+						runData.error = {
+							name: error instanceof Error ? error.name : "UnknownError",
+							message:
+								error instanceof Error ? error.message : "Unknown error occured.",
+							cause:
+								error instanceof Error
+									? (error as Error & { cause?: unknown }).cause
+									: undefined,
+						};
+						await insertRun(
+							agent.workspaces.id,
+							version.id,
+							runData,
+							startTime,
+							true,
+							false,
+						);
+					},
+				});
+
+				// Handle client disconnect - clean up MCP clients if stream didn't complete
+				request.raw.on("close", () => {
+					if (!streamCompleted) {
+						controller.abort();
+						closeAll();
+					}
+				});
+
+				const streamResponse = createSSEStream(result);
+
+				reply.headers({
+					"Content-Type": "text/event-stream",
+					"Cache-Control": "no-cache",
+					Connection: "keep-alive",
+				});
+
+				return reply.send(streamResponse);
+			}
+
+			// Non-streaming path
+			try {
+				const result = await generateText({
+					model,
+					maxOutputTokens,
+					temperature,
+					stopWhen: stepCountIs(maxStepCount || 10),
+					messages: finalMessages,
+					tools: tools as ToolSet,
+					output: outputFormat === "json" ? Output.json() : Output.text(),
+					providerOptions,
+				});
+
+				const { response, text, steps } = result;
+				runData.steps = steps;
+
+				runData.metrics.firstTokenTime =
+					Date.now() - runData.metrics.preProcessingTime - startTime;
+				runData.metrics.responseTime =
+					Date.now() - runData.metrics.preProcessingTime - startTime;
+
+				await insertRun(
+					agent.workspaces.id,
+					version.id,
+					runData,
+					startTime,
+					false,
+					false,
+				);
+
+				return reply.send({
+					text,
+					messages: response.messages,
+				});
+			} catch (error) {
+				runData.error = {
+					name: error instanceof Error ? error.name : "UnknownError",
+					message:
+						error instanceof Error ? error.message : "Unknown error occured.",
+					cause:
+						error instanceof Error
+							? (error as Error & { cause?: unknown }).cause
+							: undefined,
+				};
+
+				runData.metrics.firstTokenTime =
+					Date.now() - runData.metrics.preProcessingTime - startTime;
+				runData.metrics.responseTime =
+					Date.now() - runData.metrics.preProcessingTime - startTime;
+
+				await insertRun(
+					agent.workspaces.id,
+					version.id,
+					runData,
+					startTime,
+					true,
+					false,
+				);
+
+				return reply.code(500).send(error);
+			}
 		} finally {
-			closeAll();
+			// Ensure MCP clients are always closed for non-streaming path
+			// For streaming, this runs immediately after returning the stream,
+			// but cleanup is handled by onFinish/onError/close handlers
+			if (!stream) {
+				closeAll();
+			}
 		}
-
-		runData.metrics.firstTokenTime =
-			Date.now() - runData.metrics.preProcessingTime - startTime;
-		runData.metrics.responseTime =
-			Date.now() - runData.metrics.preProcessingTime - startTime;
-		insertRun(
-			agent.workspaces.id,
-			version.id,
-			runData,
-			startTime,
-			runData.error !== undefined,
-			false,
-		);
 	});
 }
