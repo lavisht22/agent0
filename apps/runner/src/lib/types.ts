@@ -24,21 +24,21 @@ export type VersionData = {
 	providerOptions?: ProviderOptions;
 };
 
+export type RunOverrides = {
+	model?: {
+		provider_id?: string;
+		name?: string;
+	};
+	maxOutputTokens?: number;
+	temperature?: number;
+	maxStepCount?: number;
+	providerOptions?: ProviderOptions;
+};
+
 export type RunData = {
 	request?: VersionData & {
-		stream: boolean;
-		overrides?: {
-			model?: {
-				provider_id?: string;
-				name?: string;
-			};
-			maxOutputTokens?: number;
-			temperature?: number;
-			maxStepCount?: number;
-			providerOptions?: ProviderOptions;
-		};
+		overrides?: RunOverrides;
 	};
-
 	steps?: StepResult<ToolSet>[];
 	error?: {
 		name: string;

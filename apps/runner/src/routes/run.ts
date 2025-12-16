@@ -14,7 +14,7 @@ import {
 	prepareMCPServers,
 	prepareProviderAndMessages,
 } from "../lib/helpers.js";
-import type { ProviderOptions, RunData, VersionData } from "../lib/types.js";
+import type { RunData, RunOverrides, VersionData } from "../lib/types.js";
 
 export async function registerRunRoute(fastify: FastifyInstance) {
 	fastify.post("/api/v1/run", async (request, reply) => {
@@ -38,16 +38,7 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 			agent_id: string;
 			variables?: Record<string, string>;
 			stream?: boolean;
-			overrides?: {
-				model?: {
-					provider_id?: string;
-					name?: string;
-				};
-				maxOutputTokens?: number;
-				temperature?: number;
-				maxStepCount?: number;
-				providerOptions?: ProviderOptions;
-			};
+			overrides?: RunOverrides;
 			extra_messages?: ModelMessage[];
 		};
 
@@ -135,7 +126,7 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 				// Track if stream completed normally (via onFinish or onError)
 				let streamCompleted = false;
 
-				const controller = new 	AbortController();
+				const controller = new AbortController();
 
 				const result = streamText({
 					model,
@@ -153,7 +144,7 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 								Date.now() - runData.metrics.preProcessingTime - startTime;
 						}
 					},
-					
+
 					onFinish: async ({ steps }) => {
 						streamCompleted = true;
 						closeAll();
@@ -184,7 +175,9 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 						runData.error = {
 							name: error instanceof Error ? error.name : "UnknownError",
 							message:
-								error instanceof Error ? error.message : "Unknown error occured.",
+								error instanceof Error
+									? error.message
+									: "Unknown error occured.",
 							cause:
 								error instanceof Error
 									? (error as Error & { cause?: unknown }).cause
