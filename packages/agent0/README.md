@@ -170,7 +170,147 @@ for await (const chunk of stream) {
 }
 ```
 
+### `embed(options: EmbedOptions): Promise<EmbedResponse>`
+
+Generate an embedding for a single text value.
+
+**Parameters:**
+
+Extends Vercel AI SDK's `embed` parameters. Only the `model` property is different:
+
+```typescript
+// All options from Vercel AI SDK's embed() are supported
+// Only the model property uses Agent0's format:
+type EmbedOptions = Omit<VercelEmbedOptions, 'model'> & {
+  model: {
+    provider_id: string;  // The provider ID (from your Agent0 providers)
+    name: string;         // The embedding model name (e.g., 'text-embedding-3-small')
+  };
+};
+
+// Common options include:
+// - value: string           // The text to embed
+// - maxRetries?: number     // Maximum number of retries
+// - headers?: Record<string, string>
+// - providerOptions?: {...} // Provider-specific options
+// - experimental_telemetry?: {...}
+// Plus any future options added to Vercel AI SDK!
+```
+
+**Returns:**
+
+```typescript
+interface EmbedResponse {
+  embedding: number[];    // The embedding vector
+}
+```
+
+**Example:**
+
+```typescript
+const result = await client.embed({
+  model: {
+    provider_id: 'your-openai-provider-id',
+    name: 'text-embedding-3-small'
+  },
+  value: 'Hello, world!'
+});
+
+console.log('Embedding vector length:', result.embedding.length);
+// Store or use the embedding for similarity search, etc.
+```
+
+### `embedMany(options: EmbedManyOptions): Promise<EmbedManyResponse>`
+
+Generate embeddings for multiple text values in a single request.
+
+**Parameters:**
+
+Extends Vercel AI SDK's `embedMany` parameters. Only the `model` property is different:
+
+```typescript
+// All options from Vercel AI SDK's embedMany() are supported
+// Only the model property uses Agent0's format:
+type EmbedManyOptions = Omit<VercelEmbedManyOptions, 'model'> & {
+  model: {
+    provider_id: string;  // The provider ID (from your Agent0 providers)
+    name: string;         // The embedding model name
+  };
+};
+
+// Common options include:
+// - values: string[]        // The texts to embed
+// - maxRetries?: number     // Maximum number of retries
+// - headers?: Record<string, string>
+// - providerOptions?: {...} // Provider-specific options
+// Plus any future options added to Vercel AI SDK!
+```
+
+**Returns:**
+
+```typescript
+interface EmbedManyResponse {
+  embeddings: number[][]; // Array of embedding vectors (one per input value)
+}
+```
+
+**Example:**
+
+```typescript
+const result = await client.embedMany({
+  model: {
+    provider_id: 'your-openai-provider-id',
+    name: 'text-embedding-3-small'
+  },
+  values: [
+    'First document to embed',
+    'Second document to embed',
+    'Third document to embed'
+  ]
+});
+
+console.log('Number of embeddings:', result.embeddings.length);
+result.embeddings.forEach((embedding, i) => {
+  console.log(`Embedding ${i} length:`, embedding.length);
+});
+```
+
+**Using Provider Options:**
+
+Provider-specific options can be passed to customize embedding behavior:
+
+```typescript
+// Example: OpenAI with custom dimensions
+const result = await client.embed({
+  model: {
+    provider_id: 'your-openai-provider-id',
+    name: 'text-embedding-3-small'
+  },
+  value: 'Hello, world!',
+  providerOptions: {
+    openai: {
+      dimensions: 256  // Reduce dimensions for smaller vectors
+    }
+  }
+});
+
+// Example: Google with task type
+const googleResult = await client.embed({
+  model: {
+    provider_id: 'your-google-provider-id',
+    name: 'text-embedding-004'
+  },
+  value: 'Search query text',
+  providerOptions: {
+    google: {
+      taskType: 'RETRIEVAL_QUERY'  // Optimize for search queries
+    }
+  }
+});
+```
+
 ## Examples
+
 
 ### Basic Usage (Node.js)
 
@@ -240,7 +380,58 @@ async function streamExample() {
 streamExample();
 ```
 
+### Embeddings for Semantic Search
+
+Generate embeddings to power semantic search, similarity matching, or RAG (Retrieval-Augmented Generation) applications.
+
+```typescript
+import { Agent0 } from 'agent0-js';
+
+const client = new Agent0({
+  apiKey: process.env.AGENT0_API_KEY!
+});
+
+// Embed documents for a knowledge base
+async function embedDocuments() {
+  const documents = [
+    'Machine learning is a subset of artificial intelligence.',
+    'Neural networks are inspired by the human brain.',
+    'Deep learning uses multiple layers of neural networks.',
+  ];
+
+  const result = await client.embedMany({
+    model: {
+      provider_id: 'your-openai-provider-id',
+      name: 'text-embedding-3-small'
+    },
+    values: documents
+  });
+
+  // Store embeddings in your vector database
+  result.embeddings.forEach((embedding, i) => {
+    console.log(`Document ${i}: ${embedding.length} dimensions`);
+    // vectorDB.insert({ text: documents[i], embedding });
+  });
+}
+
+// Query with semantic search
+async function semanticSearch(query: string) {
+  const queryEmbedding = await client.embed({
+    model: {
+      provider_id: 'your-openai-provider-id',
+      name: 'text-embedding-3-small'
+    },
+    value: query
+  });
+
+  // Use the embedding to find similar documents
+  // const results = await vectorDB.search(queryEmbedding.embedding, { limit: 5 });
+  console.log('Query embedding dimensions:', queryEmbedding.embedding.length);
+}
+```
+
 ### Using Variables
+
 
 Variables allow you to pass dynamic data to your agents. Any variables defined in your agent's prompts will be replaced with the values you provide.
 

@@ -1,7 +1,7 @@
 import type { GoogleGenerativeAIProviderOptions } from "@ai-sdk/google";
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import type { XaiProviderOptions } from "@ai-sdk/xai";
-import type { ModelMessage } from "ai";
+import type { embed, embedMany, ModelMessage } from "ai";
 
 export interface Agent0Config {
 	apiKey: string;
@@ -53,4 +53,52 @@ export interface RunOptions {
 export interface GenerateResponse {
 	messages: ModelMessage[];
 	text: string;
+}
+
+/**
+ * Model specification for Agent0 embedding operations.
+ * Instead of passing an EmbeddingModel instance, pass the provider_id and model name.
+ */
+export interface EmbedModel {
+	/** The provider ID (from your Agent0 providers configuration) */
+	provider_id: string;
+	/** The embedding model name (e.g., 'text-embedding-3-small', 'text-embedding-ada-002') */
+	name: string;
+}
+
+/**
+ * Options for the embed function.
+ * Extends Vercel AI SDK's embed parameters, only modifying the `model` property
+ * to use Agent0's provider_id + name format instead of an EmbeddingModel instance.
+ */
+export type EmbedOptions = Omit<Parameters<typeof embed>[0], "model"> & {
+	model: EmbedModel;
+};
+
+/**
+ * Options for the embedMany function.
+ * Extends Vercel AI SDK's embedMany parameters, only modifying the `model` property
+ * to use Agent0's provider_id + name format instead of an EmbeddingModel instance.
+ */
+export type EmbedManyOptions = Omit<
+	Parameters<typeof embedMany>[0],
+	"model"
+> & {
+	model: EmbedModel;
+};
+
+/**
+ * Response from the embed function.
+ */
+export interface EmbedResponse {
+	/** The embedding vector */
+	embedding: number[];
+}
+
+/**
+ * Response from the embedMany function.
+ */
+export interface EmbedManyResponse {
+	/** The embedding vectors (one per input value) */
+	embeddings: number[][];
 }
