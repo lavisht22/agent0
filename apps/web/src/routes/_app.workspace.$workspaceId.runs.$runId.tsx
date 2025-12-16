@@ -72,9 +72,12 @@ function RouteComponent() {
 	const { isOpen, onOpen, onClose } = useDisclosure();
 
 	const { data: run, isLoading: isRunLoading } = useQuery(runQuery(runId));
-	const { data, isLoading } = useQuery(runDataQuery(runId));
+	const { data: runData, isLoading: isRunDataLoading } = useQuery({
+		...runDataQuery(runId),
+		retry: 0,
+	});
 
-	if (isRunLoading || isLoading) {
+	if (isRunLoading) {
 		return (
 			<div className="h-screen flex items-center justify-center">
 				<Spinner size="lg" />
@@ -82,7 +85,7 @@ function RouteComponent() {
 		);
 	}
 
-	if (!run || !data) {
+	if (!run) {
 		return (
 			<div className="h-screen flex items-center justify-center">
 				<p className="text-default-500">Run not found</p>
@@ -180,88 +183,103 @@ function RouteComponent() {
 						<MetricCard
 							icon={Cpu}
 							label="Model"
-							value={data.request?.model?.name || "Unknown"}
+							value={runData?.request?.model?.name || "Unknown"}
 						/>
 					</div>
 
-					{/* Error Display */}
-					{data.error && (
+					{isRunDataLoading ? (
+						<div className="flex items-center justify-center p-12">
+							<Spinner />
+						</div>
+					) : !runData ? (
 						<Alert
-							title={data.error.name}
-							description={data.error.message}
-							color="danger"
+							title="Run Data Deleted"
+							description="The data for this run has been deleted and is no longer available."
+							color="warning"
 						/>
+					) : (
+						<>
+							{/* Error Display */}
+							{runData.error && (
+								<Alert
+									title={runData.error.name}
+									description={runData.error.message}
+									color="danger"
+								/>
+							)}
+
+							{/* Request & Response Sections */}
+							<Accordion
+								selectionMode="multiple"
+								defaultExpandedKeys={["response"]}
+							>
+								<AccordionItem
+									key="request"
+									aria-label="Request"
+									title={
+										<div className="flex items-center gap-2">
+											<span className="font-medium">Request</span>
+											<Chip size="sm" variant="flat">
+												{runData.request?.messages?.length || 0} messages
+											</Chip>
+											{run.is_stream && (
+												<Chip size="sm" variant="flat" color="secondary">
+													Streaming
+												</Chip>
+											)}
+										</div>
+									}
+								>
+									<div className="p-4 pt-0">
+										{runData.request?.messages &&
+										runData.request.messages.length > 0 ? (
+											<Messages
+												value={runData.request.messages}
+												onValueChange={() => {}}
+												isReadOnly
+												onVariablePress={() => {}}
+											/>
+										) : (
+											<p className="text-default-400 text-sm italic">
+												No request messages available
+											</p>
+										)}
+									</div>
+								</AccordionItem>
+
+								<AccordionItem
+									key="response"
+									aria-label="Response"
+									title={
+										<div className="flex items-center gap-2">
+											<span className="font-medium">Response</span>
+											<Chip size="sm" variant="flat">
+												{runData.steps?.length || 0} steps
+											</Chip>
+										</div>
+									}
+								>
+									<div className="p-4 pt-0">
+										{runData.steps && runData.steps.length > 0 ? (
+											<Messages
+												value={
+													runData.steps[runData.steps.length - 1].response
+														.messages as MessageT[]
+												}
+												onValueChange={() => {}}
+												isReadOnly
+												onVariablePress={() => {}}
+											/>
+										) : (
+											<p className="text-default-400 text-sm italic px-4">
+												No response steps available
+											</p>
+										)}
+									</div>
+								</AccordionItem>
+							</Accordion>
+						</>
 					)}
-
-					{/* Request & Response Sections */}
-					<Accordion
-						selectionMode="multiple"
-						defaultExpandedKeys={["response"]}
-					>
-						<AccordionItem
-							key="request"
-							aria-label="Request"
-							title={
-								<div className="flex items-center gap-2">
-									<span className="font-medium">Request</span>
-									<Chip size="sm" variant="flat">
-										{data.request?.messages?.length || 0} messages
-									</Chip>
-									{run.is_stream && (
-										<Chip size="sm" variant="flat" color="secondary">
-											Streaming
-										</Chip>
-									)}
-								</div>
-							}
-						>
-							<div className="p-4 pt-0">
-								{data.request?.messages && data.request.messages.length > 0 ? (
-									<Messages
-										value={data.request.messages}
-										onValueChange={() => {}}
-										isReadOnly
-										onVariablePress={() => {}}
-									/>
-								) : (
-									<p className="text-default-400 text-sm italic">
-										No request messages available
-									</p>
-								)}
-							</div>
-						</AccordionItem>
-
-						<AccordionItem
-							key="response"
-							aria-label="Response"
-							title={
-								<div className="flex items-center gap-2">
-									<span className="font-medium">Response</span>
-									<Chip size="sm" variant="flat">
-										{data.steps?.length || 0} steps
-									</Chip>
-								</div>
-							}
-						>
-							<div className="p-4 pt-0">
-								{data.steps && data.steps.length > 0 ? (
-									<Messages
-										value={
-											data.steps[data.steps.length - 1].response
-												.messages as MessageT[]
-										}
-										onValueChange={() => {}}
-										isReadOnly
-										onVariablePress={() => {}}
-									/>
-								) : (
-									<p className="text-default-400 text-sm italic px-4">
-										No response steps available
-									</p>
-								)}
-							</div>
-						</AccordionItem>
-					</Accordion>
 				</div>
 			</div>
 
@@ -284,7 +302,7 @@ function RouteComponent() {
 									},
 								},
 							]}
-							data={run.data}
+							data={runData || { error: "Run data not available" }}
 							viewOnly
 						/>
 					</ModalBody>
