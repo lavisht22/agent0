@@ -193,27 +193,39 @@ export type Database = {
         Row: {
           created_at: string
           data: Json
+          first_token_time: number | null
           id: string
           is_error: boolean
+          is_stream: boolean | null
           is_test: boolean
+          pre_processing_time: number | null
+          response_time: number | null
           version_id: string | null
           workspace_id: string
         }
         Insert: {
           created_at?: string
           data?: Json
+          first_token_time?: number | null
           id: string
           is_error?: boolean
+          is_stream?: boolean | null
           is_test?: boolean
+          pre_processing_time?: number | null
+          response_time?: number | null
           version_id?: string | null
           workspace_id: string
         }
         Update: {
           created_at?: string
           data?: Json
+          first_token_time?: number | null
           id?: string
           is_error?: boolean
+          is_stream?: boolean | null
           is_test?: boolean
+          pre_processing_time?: number | null
+          response_time?: number | null
           version_id?: string | null
           workspace_id?: string
         }
@@ -370,6 +382,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_old_runs: { Args: never; Returns: undefined }
       is_workspace_admin: {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: boolean

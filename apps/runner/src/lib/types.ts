@@ -45,11 +45,6 @@ export type RunData = {
 		message: string;
 		cause?: unknown;
 	};
-	metrics: {
-		preProcessingTime: number;
-		firstTokenTime: number;
-		responseTime: number;
-	};
 };
 
 export type MCPConfig = {

@@ -7,10 +7,10 @@ import {
 	type ToolSet,
 } from "ai";
 import type { FastifyInstance } from "fastify";
+import { nanoid } from "nanoid";
 import { supabase } from "../lib/db.js";
 import {
 	createSSEStream,
-	insertRun,
 	prepareMCPServers,
 	prepareProviderAndMessages,
 } from "../lib/helpers.js";
@@ -20,13 +20,7 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 	fastify.post("/api/v1/run", async (request, reply) => {
 		const startTime = Date.now();
 
-		const runData: RunData = {
-			metrics: {
-				preProcessingTime: 0,
-				firstTokenTime: 0,
-				responseTime: 0,
-			},
-		};
+		const runData: RunData = {};
 
 		const {
 			agent_id,
@@ -119,14 +113,16 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 				? [...processedMessages, ...extra_messages]
 				: processedMessages;
 
-			runData.request = { ...data, messages: finalMessages, stream, overrides };
-			runData.metrics.preProcessingTime = Date.now() - startTime;
+			runData.request = { ...data, messages: finalMessages, overrides };
+			const preProcessingTime = Date.now() - startTime;
 
 			if (stream) {
 				// Track if stream completed normally (via onFinish or onError)
 				let streamCompleted = false;
 
 				const controller = new AbortController();
+
+				let firstTokenTime: number | null = null;
 
 				const result = streamText({
 					model,
@@ -139,9 +135,8 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 					providerOptions,
 					abortSignal: controller.signal,
 					onChunk: () => {
-						if (runData.metrics.firstTokenTime === 0) {
-							runData.metrics.firstTokenTime =
-								Date.now() - runData.metrics.preProcessingTime - startTime;
+						if (!firstTokenTime) {
+							firstTokenTime = Date.now() - preProcessingTime - startTime;
 						}
 					},
 
@@ -149,28 +144,32 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 						streamCompleted = true;
 						closeAll();
 
-						runData.metrics.responseTime =
-							Date.now() - runData.metrics.preProcessingTime - startTime;
 						runData.steps = steps;
-						await insertRun(
-							agent.workspaces.id,
-							version.id,
-							runData,
-							startTime,
-							false,
-							false,
-						);
+
+						await supabase.from("runs").insert({
+							id: nanoid(),
+							workspace_id: agent.workspaces.id,
+							version_id: version.id,
+							created_at: new Date(startTime).toISOString(),
+							is_error: false,
+							is_test: false,
+							is_stream: true,
+							pre_processing_time: preProcessingTime,
+							first_token_time: firstTokenTime,
+							response_time:
+								Date.now() -
+								(firstTokenTime || 0) -
+								preProcessingTime -
+								startTime,
+						});
 					},
 					onError: async ({ error }) => {
 						streamCompleted = true;
 						closeAll();
 
-						if (runData.metrics.firstTokenTime === 0) {
-							runData.metrics.firstTokenTime =
-								Date.now() - runData.metrics.preProcessingTime - startTime;
+						if (!firstTokenTime) {
+							firstTokenTime = Date.now() - preProcessingTime - startTime;
 						}
-						runData.metrics.responseTime =
-							Date.now() - runData.metrics.preProcessingTime - startTime;
 
 						runData.error = {
 							name: error instanceof Error ? error.name : "UnknownError",
@@ -183,14 +182,25 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 									? (error as Error & { cause?: unknown }).cause
 									: undefined,
 						};
-						await insertRun(
-							agent.workspaces.id,
-							version.id,
-							runData,
-							startTime,
-							true,
-							false,
-						);
+
+						await supabase.from("runs").insert({
+							id: nanoid(),
+							workspace_id: agent.workspaces.id,
+							version_id: version.id,
+							created_at: new Date(startTime).toISOString(),
+							is_error: true,
+							is_test: false,
+							is_stream: true,
+							pre_processing_time: preProcessingTime,
+							first_token_time: firstTokenTime,
+							response_time:
+								Date.now() -
+								(firstTokenTime || 0) -
+								preProcessingTime -
+								startTime,
+						});
+
+						// runData
 					},
 				});
 
@@ -229,19 +239,20 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 				const { response, text, steps } = result;
 				runData.steps = steps;
 
-				runData.metrics.firstTokenTime =
-					Date.now() - runData.metrics.preProcessingTime - startTime;
-				runData.metrics.responseTime =
-					Date.now() - runData.metrics.preProcessingTime - startTime;
+				await supabase.from("runs").insert({
+					id: nanoid(),
+					workspace_id: agent.workspaces.id,
+					version_id: version.id,
+					created_at: new Date(startTime).toISOString(),
+					is_error: false,
+					is_test: false,
+					is_stream: false,
+					pre_processing_time: preProcessingTime,
+					first_token_time: Date.now() - preProcessingTime - startTime,
+					response_time: Date.now() - preProcessingTime - startTime,
+				});
 
-				await insertRun(
-					agent.workspaces.id,
-					version.id,
-					runData,
-					startTime,
-					false,
-					false,
-				);
+				// runData
 
 				return reply.send({
 					text,
@@ -258,19 +269,20 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 							: undefined,
 				};
 
-				runData.metrics.firstTokenTime =
-					Date.now() - runData.metrics.preProcessingTime - startTime;
-				runData.metrics.responseTime =
-					Date.now() - runData.metrics.preProcessingTime - startTime;
+				await supabase.from("runs").insert({
+					id: nanoid(),
+					workspace_id: agent.workspaces.id,
+					version_id: version.id,
+					created_at: new Date(startTime).toISOString(),
+					is_error: true,
+					is_test: false,
+					is_stream: false,
+					pre_processing_time: preProcessingTime,
+					first_token_time: Date.now() - preProcessingTime - startTime,
+					response_time: Date.now() - preProcessingTime - startTime,
+				});
 
-				await insertRun(
-					agent.workspaces.id,
-					version.id,
-					runData,
-					startTime,
-					true,
-					false,
-				);
+				// runData
 
 				return reply.code(500).send(error);
 			}
