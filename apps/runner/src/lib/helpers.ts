@@ -109,13 +109,28 @@ export const prepareMCPServers = async (data: VersionData) => {
 };
 
 // Helper to create SSE stream from AI result
+// Includes a keep-alive ping mechanism to prevent connection timeouts during long LLM thinking periods
 export const createSSEStream = (
 	result: Awaited<ReturnType<typeof streamText>>,
 ) => {
 	const encoder = new TextEncoder();
+	const PING_INTERVAL_MS = 5000; // Send ping every 5 seconds
 
 	return new ReadableStream({
 		async start(controller) {
+			// Set up ping interval to keep connection alive
+			// SSE comments (lines starting with :) are ignored by clients but keep the connection alive
+			const pingInterval = setInterval(() => {
+				try {
+					const timestamp = Date.now();
+					controller.enqueue(
+						encoder.encode(`: ping ${timestamp}\r\n\r\n`),
+					);
+				} catch {
+					// Controller may be closed, ignore errors
+				}
+			}, PING_INTERVAL_MS);
+
 			try {
 				for await (const part of result.fullStream) {
 					controller.enqueue(
@@ -126,6 +141,7 @@ export const createSSEStream = (
 				console.error("Streaming error", err);
 				controller.error(err);
 			} finally {
+				clearInterval(pingInterval);
 				controller.close();
 			}
 		},
