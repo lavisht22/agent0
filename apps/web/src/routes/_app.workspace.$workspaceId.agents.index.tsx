@@ -5,6 +5,7 @@ import {
 	DropdownItem,
 	DropdownMenu,
 	DropdownTrigger,
+	Input,
 	Spinner,
 	Table,
 	TableBody,
@@ -23,8 +24,9 @@ import {
 	LucideChevronRight,
 	LucideEllipsisVertical,
 	Plus,
+	Search,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ConfirmationModal } from "@/components/confirmation-modal";
 import IDCopy from "@/components/id-copy";
 import { agentsQuery } from "@/lib/queries";
@@ -36,14 +38,16 @@ export const Route = createFileRoute("/_app/workspace/$workspaceId/agents/")({
 		search: Record<string, unknown>,
 	): {
 		page: number;
+		search?: string;
 	} => ({
 		page: Number(search?.page ?? 1),
+		search: (search?.search as string) || undefined,
 	}),
 });
 
 function RouteComponent() {
 	const { workspaceId } = Route.useParams();
-	const { page } = Route.useSearch();
+	const { page, search: searchQuery } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 	const queryClient = useQueryClient();
 
@@ -55,7 +59,37 @@ function RouteComponent() {
 	} | null>(null);
 
 	// Fetch Agents
-	const { data: agents, isLoading } = useQuery(agentsQuery(workspaceId, page));
+	const { data: agents, isLoading } = useQuery(
+		agentsQuery(workspaceId, page, searchQuery),
+	);
+
+	// Local state for search input with debounce
+	const [localSearch, setLocalSearch] = useState(searchQuery || "");
+
+	// Sync local state when URL search changes (e.g., browser back/forward)
+	useEffect(() => {
+		setLocalSearch(searchQuery || "");
+	}, [searchQuery]);
+
+	// Debounce URL update
+	useEffect(() => {
+		const trimmed = localSearch.trim();
+		const currentSearch = searchQuery || "";
+
+		// Don't update if the values are the same
+		if (trimmed === currentSearch) return;
+
+		const timer = setTimeout(() => {
+			navigate({
+				search: {
+					page: 1,
+					search: trimmed || undefined,
+				},
+			});
+		}, 300);
+
+		return () => clearTimeout(timer);
+	}, [localSearch, searchQuery, navigate]);
 
 	// Delete mutation
 	const deleteMutation = useMutation({
@@ -121,7 +155,19 @@ function RouteComponent() {
 				}}
 				isHeaderSticky
 				topContent={
-					<div className="w-full flex justify-end items-center">
+					<div className="w-full flex justify-between items-center">
+						<div className="flex items-center gap-2">
+							<Input
+								size="sm"
+								placeholder="Search agents..."
+								startContent={<Search className="size-3.5 text-default-400" />}
+								className="w-64"
+								value={localSearch}
+								onValueChange={setLocalSearch}
+								isClearable
+								onClear={() => setLocalSearch("")}
+							/>
+						</div>
 						<div className="flex gap-2">
 							<Tooltip content="Previous">
 								<Button
@@ -133,6 +179,7 @@ function RouteComponent() {
 										navigate({
 											search: {
 												page: page - 1,
+												search: searchQuery,
 											},
 										})
 									}
@@ -150,6 +197,7 @@ function RouteComponent() {
 										navigate({
 											search: {
 												page: page + 1,
+												search: searchQuery,
 											},
 										})
 									}

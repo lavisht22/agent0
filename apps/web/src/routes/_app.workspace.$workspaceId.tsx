@@ -11,9 +11,9 @@ function RouteComponent() {
 	return (
 		<div className="flex h-screen overflow-hidden">
 			<Sidebar workspaceId={workspaceId} />
-			<main className="flex-1 overflow-y-auto">
+			<div className="flex-1 overflow-y-auto">
 				<Outlet />
-			</main>
+			</div>
 		</div>
 	);
 }
