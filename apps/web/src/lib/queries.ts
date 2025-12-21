@@ -53,15 +53,16 @@ export const mcpsQuery = (workspaceId: string) =>
 		enabled: !!workspaceId,
 	});
 
-export const agentsQuery = (workspaceId: string) =>
+export const agentsQuery = (workspaceId: string, page = 1) =>
 	queryOptions({
-		queryKey: ["agents", workspaceId],
+		queryKey: ["agents", workspaceId, page],
 		queryFn: async () => {
 			const { data, error } = await supabase
 				.from("agents")
 				.select("*")
 				.eq("workspace_id", workspaceId)
-				.order("created_at", { ascending: false });
+				.order("created_at", { ascending: false })
+				.range((page - 1) * 20, page * 20);
 
 			if (error) throw error;
 

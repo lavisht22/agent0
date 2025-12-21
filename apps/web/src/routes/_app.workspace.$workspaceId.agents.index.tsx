@@ -5,18 +5,25 @@ import {
 	DropdownItem,
 	DropdownMenu,
 	DropdownTrigger,
+	Spinner,
 	Table,
 	TableBody,
 	TableCell,
 	TableColumn,
 	TableHeader,
 	TableRow,
+	Tooltip,
 	useDisclosure,
 } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
-import { LucideEllipsisVertical, Plus } from "lucide-react";
+import {
+	LucideChevronLeft,
+	LucideChevronRight,
+	LucideEllipsisVertical,
+	Plus,
+} from "lucide-react";
 import { useState } from "react";
 import { ConfirmationModal } from "@/components/confirmation-modal";
 import IDCopy from "@/components/id-copy";
@@ -25,11 +32,19 @@ import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/_app/workspace/$workspaceId/agents/")({
 	component: RouteComponent,
+	validateSearch: (
+		search: Record<string, unknown>,
+	): {
+		page: number;
+	} => ({
+		page: Number(search?.page ?? 1),
+	}),
 });
 
 function RouteComponent() {
 	const { workspaceId } = Route.useParams();
-	const navigate = useNavigate();
+	const { page } = Route.useSearch();
+	const navigate = useNavigate({ from: Route.fullPath });
 	const queryClient = useQueryClient();
 
 	// Delete confirmation modal state
@@ -40,7 +55,7 @@ function RouteComponent() {
 	} | null>(null);
 
 	// Fetch Agents
-	const { data: agents, isLoading } = useQuery(agentsQuery(workspaceId));
+	const { data: agents, isLoading } = useQuery(agentsQuery(workspaceId, page));
 
 	// Delete mutation
 	const deleteMutation = useMutation({
@@ -94,7 +109,10 @@ function RouteComponent() {
 				onRowAction={(key) => {
 					if (!key) return;
 					navigate({
-						to: key.toString(),
+						to: "$agentId",
+						params: {
+							agentId: key.toString(),
+						},
 					});
 				}}
 				shadow="none"
@@ -102,6 +120,46 @@ function RouteComponent() {
 					base: "overflow-auto flex-1 w-full",
 				}}
 				isHeaderSticky
+				topContent={
+					<div className="w-full flex justify-end items-center">
+						<div className="flex gap-2">
+							<Tooltip content="Previous">
+								<Button
+									size="sm"
+									isIconOnly
+									variant="flat"
+									isDisabled={page === 1}
+									onPress={() =>
+										navigate({
+											search: {
+												page: page - 1,
+											},
+										})
+									}
+								>
+									<LucideChevronLeft className="size-3.5" />
+								</Button>
+							</Tooltip>
+							<Tooltip content="Next">
+								<Button
+									size="sm"
+									isIconOnly
+									variant="flat"
+									isDisabled={!agents || agents.length < 20}
+									onPress={() =>
+										navigate({
+											search: {
+												page: page + 1,
+											},
+										})
+									}
+								>
+									<LucideChevronRight className="size-3.5" />
+								</Button>
+							</Tooltip>
+						</div>
+					</div>
+				}
 			>
 				<TableHeader>
 					<TableColumn>Name</TableColumn>
@@ -114,6 +172,7 @@ function RouteComponent() {
 				<TableBody
 					items={agents || []}
 					isLoading={isLoading}
+					loadingContent={<Spinner />}
 					emptyContent="You haven't created any agents yet."
 				>
 					{(item) => (
@@ -133,7 +192,14 @@ function RouteComponent() {
 									<DropdownMenu>
 										<DropdownItem
 											key="edit"
-											onPress={() => navigate({ to: item.id })}
+											onPress={() =>
+												navigate({
+													to: "$agentId",
+													params: {
+														agentId: item.id,
+													},
+												})
+											}
 										>
 											Edit
 										</DropdownItem>
