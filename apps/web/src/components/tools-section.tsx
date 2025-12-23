@@ -119,6 +119,11 @@ export default function ToolsSection({
 	const [customToolInputSchema, setCustomToolInputSchema] = useState("");
 	const [inputSchemaError, setInputSchemaError] = useState<string | null>(null);
 
+	// Track the custom tool being edited (null means adding new tool)
+	const [editingCustomTool, setEditingCustomTool] = useState<CustomTool | null>(
+		null,
+	);
+
 	const { data: mcps } = useQuery(mcpsQuery(workspaceId));
 
 	const refreshMcpMutation = useMutation({
@@ -203,7 +208,18 @@ export default function ToolsSection({
 		onValueChange([...value, newTool]);
 	};
 
-	const handleAddCustomTool = () => {
+	const handleEditCustomTool = (tool: CustomTool) => {
+		setEditingCustomTool(tool);
+		setCustomToolTitle(tool.title);
+		setCustomToolDescription(tool.description);
+		setCustomToolInputSchema(
+			tool.inputSchema ? JSON.stringify(tool.inputSchema, null, 2) : "",
+		);
+		setInputSchemaError(null);
+		onOpenCustomToolModal();
+	};
+
+	const handleSaveCustomTool = () => {
 		if (!customToolTitle.trim()) {
 			addToast({
 				title: "Tool title is required.",
@@ -244,9 +260,13 @@ export default function ToolsSection({
 			}
 		}
 
-		// Check if a custom tool with this title already exists
+		// Check if a custom tool with this title already exists (excluding the one being edited)
 		const isAlreadyAdded = value.some((item) => {
 			if (isCustomTool(item)) {
+				// When editing, allow the same title if it matches the original
+				if (editingCustomTool && item.title === editingCustomTool.title) {
+					return false;
+				}
 				return item.title === customToolTitle.trim();
 			}
 			return false;
@@ -267,13 +287,27 @@ export default function ToolsSection({
 			inputSchema: parsedInputSchema,
 		};
 
-		onValueChange([...value, newTool]);
+		if (editingCustomTool) {
+			// Update existing tool
+			onValueChange(
+				value.map((item) => {
+					if (isCustomTool(item) && item.title === editingCustomTool.title) {
+						return newTool;
+					}
+					return item;
+				}),
+			);
+		} else {
+			// Add new tool
+			onValueChange([...value, newTool]);
+		}
 
 		// Reset form and close modal
 		setCustomToolTitle("");
 		setCustomToolDescription("");
 		setCustomToolInputSchema("");
 		setInputSchemaError(null);
+		setEditingCustomTool(null);
 		onCloseCustomToolModal();
 	};
 
@@ -387,8 +421,9 @@ export default function ToolsSection({
 								<Chip
 									key={`custom-${tool.title}`}
 									variant="flat"
-									color="secondary"
 									onClose={() => handleRemoveTool(tool)}
+									className="cursor-pointer"
+									onClick={() => handleEditCustomTool(tool)}
 								>
 									<span>{tool.title}</span>
 									<span className="text-default-400 ml-1 text-xs">Custom</span>
@@ -511,11 +546,20 @@ export default function ToolsSection({
 			{/* Custom Tool Modal */}
 			<Modal
 				isOpen={isCustomToolModalOpen}
-				onClose={onCloseCustomToolModal}
+				onClose={() => {
+					setCustomToolTitle("");
+					setCustomToolDescription("");
+					setCustomToolInputSchema("");
+					setInputSchemaError(null);
+					setEditingCustomTool(null);
+					onCloseCustomToolModal();
+				}}
 				size="xl"
 			>
 				<ModalContent>
-					<ModalHeader>Add Custom Tool</ModalHeader>
+					<ModalHeader>
+						{editingCustomTool ? "Edit Custom Tool" : "Add Custom Tool"}
+					</ModalHeader>
 					<ModalBody className="space-y-4">
 						<Input
 							label="Tool Title"
@@ -561,11 +605,21 @@ export default function ToolsSection({
 						/>
 					</ModalBody>
 					<ModalFooter>
-						<Button variant="flat" onPress={onCloseCustomToolModal}>
+						<Button
+							variant="flat"
+							onPress={() => {
+								setCustomToolTitle("");
+								setCustomToolDescription("");
+								setCustomToolInputSchema("");
+								setInputSchemaError(null);
+								setEditingCustomTool(null);
+								onCloseCustomToolModal();
+							}}
+						>
 							Cancel
 						</Button>
-						<Button color="primary" onPress={handleAddCustomTool}>
-							Add Tool
+						<Button color="primary" onPress={handleSaveCustomTool}>
+							{editingCustomTool ? "Save Changes" : "Add Tool"}
 						</Button>
 					</ModalFooter>
 				</ModalContent>
