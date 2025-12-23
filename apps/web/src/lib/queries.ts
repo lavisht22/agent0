@@ -169,9 +169,7 @@ export const runsQuery = (
 		queryFn: async () => {
 			let query = supabase
 				.from("runs")
-				.select(
-					"id, is_error, is_test, pre_processing_time, first_token_time, response_time, created_at, versions!inner(id, agent_id, agents(name))",
-				)
+				.select("*, versions!inner(id, agent_id, agents(name))")
 				.eq("workspace_id", workspaceId);
 
 			// Compute date range at query time

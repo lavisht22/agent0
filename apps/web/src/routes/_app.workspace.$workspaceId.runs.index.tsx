@@ -35,6 +35,15 @@ import {
 } from "@/components/status-filter";
 import { runsQuery } from "@/lib/queries";
 
+function formatTokens(tokens: number): string {
+	if (tokens >= 1000) {
+		const k = tokens / 1000;
+		// Remove trailing zeros after decimal point
+		return `${k % 1 === 0 ? k : k.toFixed(1)}k`;
+	}
+	return tokens.toString();
+}
+
 export const Route = createFileRoute("/_app/workspace/$workspaceId/runs/")({
 	component: RouteComponent,
 	validateSearch: (
@@ -215,7 +224,8 @@ function RouteComponent() {
 				<TableHeader>
 					<TableColumn>Created At</TableColumn>
 					<TableColumn>Status</TableColumn>
-					<TableColumn>Total Time</TableColumn>
+					<TableColumn>Time</TableColumn>
+					<TableColumn>Cost</TableColumn>
 					<TableColumn>Agent</TableColumn>
 					<TableColumn>ID</TableColumn>
 					<TableColumn className="w-20" hideHeader>
@@ -276,6 +286,11 @@ function RouteComponent() {
 									<span className="font-semibold text-xs text-default-500 ml-0.5">
 										s
 									</span>
+								</TableCell>
+								<TableCell>
+									{item.cost
+										? `$${item.cost} (${formatTokens(item.tokens ?? 0)} tokens)`
+										: "-"}
 								</TableCell>
 
 								<TableCell>{item.versions?.agents?.name || "-"}</TableCell>
