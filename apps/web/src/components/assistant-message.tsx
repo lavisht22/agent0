@@ -8,11 +8,11 @@ import {
 	DropdownMenu,
 	DropdownTrigger,
 } from "@heroui/react";
-import { defaultTheme, JsonEditor } from "json-edit-react";
 import { LucidePlus, LucideTrash2 } from "lucide-react";
 import { useMemo } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { z } from "zod";
+import { ThemedJsonEditor } from "./themed-json-editor";
 import { Variables } from "./variables";
 
 export const assistantMessageSchema = z.object({
@@ -101,18 +101,9 @@ function AssistantMessagePart({
 
 	if (value.type === "tool-call") {
 		return (
-			<div className="w-full space-y-2 bg-default-50 rounded-large">
-				<JsonEditor
+			<div className="w-full space-y-2 bg-default-50 dark:bg-default-100 rounded-large">
+				<ThemedJsonEditor
 					viewOnly={isReadOnly}
-					theme={[
-						defaultTheme,
-						{
-							container: {
-								backgroundColor: "transparent",
-								fontSize: "12px",
-							},
-						},
-					]}
 					data={value}
 					setData={(newData) => {
 						onValueChange(newData as AssistantMessageContent[number]);

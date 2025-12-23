@@ -17,7 +17,6 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { format } from "date-fns";
-import { defaultTheme, JsonEditor } from "json-edit-react";
 import {
 	AlertCircle,
 	CheckCircle2,
@@ -26,6 +25,7 @@ import {
 	LucideInfo,
 } from "lucide-react";
 import { Messages, type MessageT } from "@/components/messages";
+import { ThemedJsonEditor } from "@/components/themed-json-editor";
 import { runDataQuery, runQuery } from "@/lib/queries";
 
 export const Route = createFileRoute(
@@ -384,16 +384,12 @@ function RouteComponent() {
 				<ModalContent>
 					<ModalHeader>Raw JSON Data</ModalHeader>
 					<ModalBody className="p-6">
-						<JsonEditor
-							theme={[
-								defaultTheme,
-								{
-									container: {
-										backgroundColor: "transparent ",
-										fontSize: "14px",
-									},
+						<ThemedJsonEditor
+							theme={{
+								container: {
+									fontSize: "14px",
 								},
-							]}
+							}}
 							data={runData || { error: "Run data not available" }}
 							viewOnly
 						/>

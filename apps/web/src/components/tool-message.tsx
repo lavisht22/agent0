@@ -1,8 +1,8 @@
 import { Button, Card, CardBody, CardHeader, cn } from "@heroui/react";
-import { defaultTheme, JsonEditor } from "json-edit-react";
 import { LucideTrash2 } from "lucide-react";
 import { useMemo } from "react";
 import { z } from "zod";
+import { ThemedJsonEditor } from "./themed-json-editor";
 import { Variables } from "./variables";
 
 export const toolMessageSchema = z.object({
@@ -35,25 +35,16 @@ function ToolMessagePart({
 		return (
 			<div
 				className={cn(
-					"w-full space-y-2 bg-default-50 rounded-large",
+					"w-full space-y-2 bg-default-50 dark:bg-default-100 rounded-large",
 					(value.output as { type: string; value: unknown })?.type.startsWith(
 						"error",
 					)
-						? "bg-red-50"
+						? "bg-red-50 dark:bg-red-900/30"
 						: "",
 				)}
 			>
-				<JsonEditor
+				<ThemedJsonEditor
 					viewOnly={isReadOnly}
-					theme={[
-						defaultTheme,
-						{
-							container: {
-								backgroundColor: "transparent",
-								fontSize: "12px",
-							},
-						},
-					]}
 					data={value}
 					setData={(newData) => {
 						onValueChange(newData as ToolMessageContent[number]);
