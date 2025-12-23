@@ -53,6 +53,21 @@ export const mcpsQuery = (workspaceId: string) =>
 		enabled: !!workspaceId,
 	});
 
+export const agentsLiteQuery = (workspaceId: string) =>
+	queryOptions({
+		queryKey: ["agents-lite"],
+		queryFn: async () => {
+			const { data, error } = await supabase
+				.from("agents")
+				.select("id, name")
+				.eq("workspace_id", workspaceId);
+
+			if (error) throw error;
+
+			return data;
+		},
+	});
+
 export const agentsQuery = (workspaceId: string, page = 1, search?: string) =>
 	queryOptions({
 		queryKey: ["agents", workspaceId, page, search],
@@ -233,6 +248,7 @@ export const runDataQuery = (runId: string) =>
 		},
 		enabled: !!runId,
 	});
+
 export const workspaceUserQuery = (workspaceId: string) =>
 	queryOptions({
 		queryKey: ["workspace-user", workspaceId],

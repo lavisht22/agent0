@@ -1,7 +1,7 @@
 import { Autocomplete, AutocompleteItem } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { LucideBot } from "lucide-react";
-import { agentsQuery } from "@/lib/queries";
+import { agentsLiteQuery, agentsQuery } from "@/lib/queries";
 
 interface AgentFilterProps {
 	workspaceId: string;
@@ -14,7 +14,7 @@ export function AgentFilter({
 	value,
 	onValueChange,
 }: AgentFilterProps) {
-	const { data: agents } = useQuery(agentsQuery(workspaceId));
+	const { data: agents } = useQuery(agentsLiteQuery(workspaceId));
 
 	return (
 		<Autocomplete
