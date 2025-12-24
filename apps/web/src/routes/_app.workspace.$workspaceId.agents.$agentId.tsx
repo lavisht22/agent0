@@ -31,7 +31,6 @@ import {
 	LucideChevronDown,
 	LucideCopy,
 	LucideCornerUpLeft,
-	LucideHistory,
 	LucideListPlus,
 	LucideLoader2,
 	LucidePlay,
@@ -44,12 +43,12 @@ import { useCallback, useEffect, useState } from "react";
 import useDb from "use-db";
 import { z } from "zod";
 import type { assistantMessageSchema } from "@/components/assistant-message";
-import { HistoryDrawer } from "@/components/history-drawer";
 import { Messages, type MessageT, messageSchema } from "@/components/messages";
 import { ModelSelector } from "@/components/model-selector";
 import { ProviderOptions } from "@/components/provider-options";
 import ToolsSection from "@/components/tools-section";
 import { VariablesDrawer } from "@/components/variables-drawer";
+import { VersionHistory } from "@/components/version-history";
 import { copyToClipboard } from "@/lib/clipboard";
 import { agentQuery, agentVersionsQuery, providersQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
@@ -140,8 +139,6 @@ function RouteComponent() {
 	);
 
 	const { isOpen: isVariablesOpen, onOpenChange: onVariablesOpenChange } =
-		useDisclosure();
-	const { isOpen: isHistoryOpen, onOpenChange: onHistoryOpenChange } =
 		useDisclosure();
 
 	// Fetch agent
@@ -640,26 +637,16 @@ function RouteComponent() {
 						</Button>
 					)}
 
-					<HistoryDrawer
-						isOpen={isHistoryOpen}
-						onOpenChange={onHistoryOpenChange}
-						workspaceId={workspaceId}
-						versions={versions || []}
-						stagingVersionId={agent?.staging_version_id}
-						productionVersionId={agent?.production_version_id}
-						onSelectionChange={(v: Tables<"versions">) => {
-							setVersion(v);
-						}}
-					/>
 					{versions?.length && (
-						<Button
-							isIconOnly
-							size="sm"
-							variant="flat"
-							onPress={() => onHistoryOpenChange()}
-						>
-							<LucideHistory className="size-3.5" />
-						</Button>
+						<VersionHistory
+							workspaceId={workspaceId}
+							versions={versions || []}
+							stagingVersionId={agent?.staging_version_id}
+							productionVersionId={agent?.production_version_id}
+							onSelectionChange={(v: Tables<"versions">) => {
+								setVersion(v);
+							}}
+						/>
 					)}
 
 					<form.Subscribe selector={(state) => state.values.messages}>
