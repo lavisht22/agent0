@@ -674,14 +674,6 @@ function RouteComponent() {
 							/>
 						)}
 					</form.Subscribe>
-					<Button
-						isIconOnly
-						size="sm"
-						variant="flat"
-						onPress={() => onVariablesOpenChange()}
-					>
-						<LucideBraces className="size-4" />
-					</Button>
 
 					<form.Subscribe
 						selector={(state) => ({
@@ -938,6 +930,15 @@ function RouteComponent() {
 									</form.Subscribe>
 								</PopoverContent>
 							</Popover>
+
+							<Button
+								isIconOnly
+								size="sm"
+								variant="flat"
+								onPress={() => onVariablesOpenChange()}
+							>
+								<LucideBraces className="size-4" />
+							</Button>
 						</div>
 						<Button
 							size="sm"
