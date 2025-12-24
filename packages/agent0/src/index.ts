@@ -46,6 +46,7 @@ export class Agent0 {
 	async generate(options: RunOptions): Promise<GenerateResponse> {
 		const response = await this.fetchApi("/api/v1/run", {
 			agent_id: options.agentId,
+			environment: options.environment,
 			variables: options.variables,
 			overrides: options.overrides,
 			extra_messages: options.extraMessages,
@@ -61,6 +62,7 @@ export class Agent0 {
 	): AsyncGenerator<TextStreamPart<ToolSet>, void, unknown> {
 		const response = await this.fetchApi("/api/v1/run", {
 			agent_id: options.agentId,
+			environment: options.environment,
 			variables: options.variables,
 			overrides: options.overrides,
 			extra_messages: options.extraMessages,
@@ -142,6 +144,7 @@ export type {
 	EmbedModel,
 	EmbedOptions,
 	EmbedResponse,
+	Environment,
 	GenerateResponse,
 	ModelOverrides,
 	ProviderOptions,

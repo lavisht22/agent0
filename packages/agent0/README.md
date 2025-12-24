@@ -85,6 +85,7 @@ Execute an agent and get the complete response.
 ```typescript
 interface RunOptions {
   agentId: string;                    // The ID of the agent to run
+  environment?: 'staging' | 'production'; // Environment to run (default: 'production')
   variables?: Record<string, string>; // Variables to pass to the agent
   overrides?: ModelOverrides;         // Runtime model configuration overrides
   extraMessages?: Message[];          // Extra messages to append to the prompt
@@ -452,6 +453,32 @@ const response = await client.generate({
   }
 });
 // Prompt becomes: "Hello Sarah, let's talk about machine learning"
+```
+
+### Staging and Production Environments
+
+Agent0 supports deploying different versions of your agent to staging and production environments. This allows you to test changes before rolling them out to production.
+
+```typescript
+// Run the staging version (for testing)
+const stagingResponse = await client.generate({
+  agentId: 'agent_123',
+  environment: 'staging',
+  variables: { name: 'Test User' }
+});
+
+// Run the production version (default behavior)
+const productionResponse = await client.generate({
+  agentId: 'agent_123',
+  environment: 'production', // This is the default
+  variables: { name: 'Real User' }
+});
+
+// If environment is omitted, 'production' is used for backward compatibility
+const response = await client.generate({
+  agentId: 'agent_123',
+  variables: { name: 'User' }
+}); // Uses production environment
 ```
 
 ### Model Overrides

@@ -55,8 +55,17 @@ export interface CustomTool {
 	inputSchema?: Record<string, unknown>;
 }
 
+/**
+ * Environment to run the agent in.
+ * - 'staging': Run the staging-deployed version of the agent
+ * - 'production': Run the production-deployed version of the agent (default)
+ */
+export type Environment = "staging" | "production";
+
 export interface RunOptions {
 	agentId: string;
+	/** Environment to run ('staging' or 'production'). Defaults to 'production'. */
+	environment?: Environment;
 	variables?: Record<string, string>;
 	/** Runtime model overrides for load balancing, fallbacks, etc. */
 	overrides?: ModelOverrides;

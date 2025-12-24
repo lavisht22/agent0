@@ -3,7 +3,6 @@ import {
 	AccordionItem,
 	addToast,
 	Button,
-	ButtonGroup,
 	Dropdown,
 	DropdownItem,
 	DropdownMenu,
@@ -265,38 +264,43 @@ function RouteComponent() {
 		},
 	});
 
-	// Publish mutation
-	const publishMutation = useMutation({
-		mutationFn: async (version_id: string) => {
-			await supabase
-				.from("versions")
-				.update({ is_deployed: false })
-				.eq("agent_id", agentId)
+	// Deploy mutation - deploys a version to an environment (staging or production)
+	const deployMutation = useMutation({
+		mutationFn: async ({
+			version_id,
+			environment,
+		}: {
+			version_id: string;
+			environment: "staging" | "production";
+		}) => {
+			// Update the agent's staging or production version ID
+			const updateField =
+				environment === "staging"
+					? { staging_version_id: version_id }
+					: { production_version_id: version_id };
+
+			const { error } = await supabase
+				.from("agents")
+				.update(updateField)
+				.eq("id", agentId)
 				.throwOnError();
 
-			const { data: version, error: versionError } = await supabase
-				.from("versions")
-				.update({ is_deployed: true })
-				.eq("id", version_id)
-				.select()
-				.single();
+			if (error) throw error;
 
-			if (versionError) throw versionError;
-
-			return version;
+			return { version_id, environment };
 		},
-		onSuccess: (data) => {
+		onSuccess: (_, variables) => {
+			queryClient.invalidateQueries({ queryKey: ["agent", agentId] });
 			queryClient.invalidateQueries({ queryKey: ["agent-versions", agentId] });
-			setVersion(data);
 			addToast({
-				description: "Version published successfully.",
+				description: `Version deployed to ${variables.environment} successfully.`,
 				color: "success",
 			});
 		},
 		onError: (error) => {
 			addToast({
 				description:
-					error instanceof Error ? error.message : "Failed to publish version.",
+					error instanceof Error ? error.message : "Failed to deploy version.",
 				color: "danger",
 			});
 		},
@@ -347,15 +351,20 @@ function RouteComponent() {
 			onChange: agentFormSchema,
 		},
 		onSubmit: async ({ value, meta }) => {
-			const { publish } = meta as { publish: boolean };
+			const { deployTo } = meta as {
+				deployTo?: "staging" | "production";
+			};
 
 			if (isNewAgent) {
 				await createMutation.mutateAsync(value);
 			} else {
 				const version = await updateMutation.mutateAsync(value);
 
-				if (publish) {
-					await publishMutation.mutateAsync(version.id);
+				if (deployTo) {
+					await deployMutation.mutateAsync({
+						version_id: version.id,
+						environment: deployTo,
+					});
 				}
 			}
 		},
@@ -636,6 +645,8 @@ function RouteComponent() {
 						onOpenChange={onHistoryOpenChange}
 						workspaceId={workspaceId}
 						versions={versions || []}
+						stagingVersionId={agent?.staging_version_id}
+						productionVersionId={agent?.production_version_id}
 						onSelectionChange={(v: Tables<"versions">) => {
 							setVersion(v);
 						}}
@@ -688,57 +699,98 @@ function RouteComponent() {
 										color="primary"
 										isLoading={state.isSubmitting}
 										isDisabled={!state.canSubmit}
-										onPress={() => form.handleSubmit({ publish: false })}
+										onPress={() => form.handleSubmit({})}
 									>
 										Create
 									</Button>
 								);
 							}
 
+							const isLoading =
+								state.isSubmitting ||
+								updateMutation.isPending ||
+								deployMutation.isPending;
+
+							// Check if current version is deployed to each environment
+							const isDeployedToStaging =
+								agent?.staging_version_id === version?.id;
+							const isDeployedToProduction =
+								agent?.production_version_id === version?.id;
+
 							return (
-								<ButtonGroup size="sm">
-									<Button
-										color="primary"
-										isLoading={
-											state.isSubmitting ||
-											updateMutation.isPending ||
-											publishMutation.isPending
-										}
-										isDisabled={
-											!state.canSubmit ||
-											(!state.isDirty && version?.is_deployed)
-										}
-										onPress={async () => {
-											if (state.isDirty) {
-												form.handleSubmit({ publish: true });
-											} else {
-												if (!version) return;
-												await publishMutation.mutateAsync(version.id);
-											}
-										}}
-									>
-										Publish
-									</Button>
-									<Dropdown placement="bottom-end" isDisabled={!state.isDirty}>
+								<>
+									{/* Save button - only show when dirty */}
+									{state.isDirty && (
+										<Button
+											size="sm"
+											variant="flat"
+											isLoading={isLoading}
+											isDisabled={!state.canSubmit}
+											onPress={() => form.handleSubmit({})}
+										>
+											Save
+										</Button>
+									)}
+
+									{/* Deploy dropdown */}
+									<Dropdown placement="bottom-end">
 										<DropdownTrigger>
 											<Button
-												isIconOnly
+												size="sm"
 												color="primary"
-												isDisabled={!state.isDirty}
+												isLoading={isLoading}
+												isDisabled={!state.canSubmit || state.isDirty}
+												endContent={<LucideChevronDown className="size-4" />}
 											>
-												<LucideChevronDown className="size-4" />
+												Deploy
 											</Button>
 										</DropdownTrigger>
-										<DropdownMenu>
+										<DropdownMenu
+											aria-label="Deploy options"
+											disabledKeys={[
+												...(isDeployedToStaging ? ["staging"] : []),
+												...(isDeployedToProduction ? ["production"] : []),
+											]}
+										>
 											<DropdownItem
-												key="update-only"
-												onPress={() => form.handleSubmit({ publish: false })}
+												key="staging"
+												description={
+													isDeployedToStaging
+														? "This version is already in staging"
+														: "Deploy this version to staging"
+												}
+												onPress={async () => {
+													if (version) {
+														await deployMutation.mutateAsync({
+															version_id: version.id,
+															environment: "staging",
+														});
+													}
+												}}
 											>
-												Update Only
+												To Staging
+											</DropdownItem>
+											<DropdownItem
+												key="production"
+												description={
+													isDeployedToProduction
+														? "This version is already in production"
+														: "Deploy this version to production"
+												}
+												onPress={async () => {
+													if (version) {
+														await deployMutation.mutateAsync({
+															version_id: version.id,
+															environment: "production",
+														});
+													}
+												}}
+											>
+												To Production
 											</DropdownItem>
 										</DropdownMenu>
 									</Dropdown>
-								</ButtonGroup>
+								</>
 							);
 						}}
 					</form.Subscribe>

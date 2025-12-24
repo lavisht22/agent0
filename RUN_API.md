@@ -22,6 +22,7 @@ x-api-key: <your-api-key>
 ```json
 {
   "agent_id": "string (required)",
+  "environment": "staging" | "production" (optional, default: "production"),
   "variables": {
     "key": "value"
   },
@@ -49,6 +50,7 @@ x-api-key: <your-api-key>
 ### Parameters
 
 - **agent_id** (required): The ID of the agent to run
+- **environment** (optional): Which deployed version to run - `"staging"` or `"production"`. Defaults to `"production"` for backward compatibility
 - **variables** (optional): Key-value pairs to replace variables in the agent's messages
 - **stream** (optional): Whether to stream the response (true) or return complete messages at the end (false)
 - **overrides** (optional): Runtime configuration overrides for the model
@@ -101,7 +103,7 @@ The API performs the following checks:
 
 1. **API Key Validation**: Verifies that the API key exists in the database
 2. **Workspace Access**: Ensures the agent belongs to the same workspace as the API key
-3. **Deployed Version**: Only runs agents that have a deployed version (is_deployed = true)
+3. **Deployed Version**: Only runs agents that have a deployed version in the requested environment (defaults to production)
 
 ## Error Responses
 
@@ -168,6 +170,21 @@ curl -X POST https://your-domain.com/api/v1/run \
       "topic": "AI"
     },
     "stream": false
+  }'
+```
+
+### cURL Example (Staging Environment)
+
+```bash
+curl -X POST https://your-domain.com/api/v1/run \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: your-api-key-here" \
+  -d '{
+    "agent_id": "agent-123",
+    "environment": "staging",
+    "variables": {
+      "user_name": "John"
+    }
   }'
 ```
 

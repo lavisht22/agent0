@@ -26,6 +26,7 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 
 		const {
 			agent_id,
+			environment = "production",
 			variables = {},
 			stream = false,
 			overrides,
@@ -33,6 +34,7 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 			extra_tools,
 		} = request.body as {
 			agent_id: string;
+			environment?: "staging" | "production";
 			variables?: Record<string, string>;
 			stream?: boolean;
 			overrides?: RunOverrides;
@@ -56,12 +58,13 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 			return reply.code(401).send({ message: "API key is required" });
 		}
 
-		// Get agent and verify it belongs to the same workspace
+		// Get agent with its deployed version IDs and workspace info
 		const { data: agent, error: agentError } = await supabase
 			.from("agents")
-			.select("workspaces(id, api_keys(id, key)), versions(*)")
+			.select(
+				"staging_version_id, production_version_id, workspaces(id, api_keys(id, key))",
+			)
 			.eq("id", agent_id)
-			.eq("versions.is_deployed", true)
 			.single();
 
 		if (agentError || !agent) {
@@ -73,13 +76,31 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 			return reply.code(403).send({ message: "Access denied" });
 		}
 
-		if (agent.versions.length === 0) {
+		// Get the version ID for the requested environment
+		const versionId =
+			environment === "staging"
+				? agent.staging_version_id
+				: agent.production_version_id;
+
+		if (!versionId) {
 			return reply
 				.code(404)
-				.send({ message: "No deployed version found for this agent" });
+				.send({ message: `No ${environment} version found for this agent` });
 		}
 
-		const version = agent.versions[0];
+		// Fetch the version data
+		const { data: version, error: versionError } = await supabase
+			.from("versions")
+			.select("*")
+			.eq("id", versionId)
+			.single();
+
+		if (versionError || !version) {
+			return reply
+				.code(404)
+				.send({ message: `No ${environment} version found for this agent` });
+		}
+
 		const data = version.data as VersionData;
 
 		// Apply runtime overrides if provided

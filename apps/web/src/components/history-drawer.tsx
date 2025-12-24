@@ -20,6 +20,8 @@ interface HistoryDrawerProps {
 	onOpenChange: () => void;
 	workspaceId: string;
 	versions: Tables<"versions">[];
+	stagingVersionId?: string | null;
+	productionVersionId?: string | null;
 	onSelectionChange: (version: Tables<"versions">) => void;
 }
 
@@ -28,6 +30,8 @@ export const HistoryDrawer = ({
 	onOpenChange,
 	workspaceId,
 	versions,
+	stagingVersionId,
+	productionVersionId,
 	onSelectionChange,
 }: HistoryDrawerProps) => {
 	const { data: workspaces } = useQuery(workspacesQuery);
@@ -51,6 +55,9 @@ export const HistoryDrawer = ({
 							(user) => user.user_id === version.user_id,
 						)?.users;
 
+						const isStaging = stagingVersionId === version.id;
+						const isProduction = productionVersionId === version.id;
+
 						return (
 							<Card
 								className="shrink-0"
@@ -61,14 +68,21 @@ export const HistoryDrawer = ({
 									onOpenChange();
 								}}
 							>
-								<CardHeader className="flex items-center justify-between">
+								<CardHeader className="flex items-center justify-between gap-2">
 									<p className="text-sm text-default-500">#{version.id}</p>
 
-									{version.is_deployed && (
-										<Chip color="success" size="sm" variant="flat">
-											PUBLISHED
-										</Chip>
-									)}
+									<div className="flex gap-1">
+										{isStaging && (
+											<Chip color="warning" size="sm" variant="flat">
+												STAGING
+											</Chip>
+										)}
+										{isProduction && (
+											<Chip color="success" size="sm" variant="flat">
+												PRODUCTION
+											</Chip>
+										)}
+									</div>
 								</CardHeader>
 								<CardBody className="gap-2 flex flex-col items-start">
 									<p className="text-sm">
