@@ -10,6 +10,9 @@ import {
 	DropdownMenu,
 	DropdownTrigger,
 	Input,
+	Listbox,
+	ListboxItem,
+	ListboxSection,
 	Modal,
 	ModalBody,
 	ModalContent,
@@ -447,7 +450,7 @@ export default function ToolsSection({
 				<ModalContent>
 					<ModalHeader>Add MCP Tool</ModalHeader>
 					<ModalBody className="pb-6 pt-0">
-						<div className="sticky top-0 z-30 pb-4 bg-background">
+						<div className="sticky top-0 z-30 pb-2 bg-background">
 							<Input
 								placeholder="Search tools..."
 								value={mcpToolSearch}
@@ -457,82 +460,68 @@ export default function ToolsSection({
 								onClear={() => setMcpToolSearch("")}
 							/>
 						</div>
-						{mcps?.map((mcp) => {
-							const tools = mcp?.tools as
-								| { name: string; description: string }[]
-								| undefined;
 
-							const availableMcpTools = tools?.filter((tool) => {
-								// Check if already selected
-								const isSelected = value.some((item) => {
-									if (isMCPTool(item)) {
-										const mcpTool = item as {
-											mcp_id: string;
-											name: string;
-										};
-										return (
-											mcpTool.mcp_id === mcp.id && mcpTool.name === tool.name
-										);
+						<Listbox variant="flat">
+							{/** biome-ignore lint/complexity/noUselessFragments: <heroui problem> */}
+							<>
+								{mcps?.map((mcp) => {
+									const tools = mcp?.tools as
+										| { name: string; description: string }[]
+										| undefined;
+
+									const availableMcpTools = tools?.filter((tool) => {
+										// Check if already selected
+										const isSelected = value.some((item) => {
+											if (isMCPTool(item)) {
+												const mcpTool = item as {
+													mcp_id: string;
+													name: string;
+												};
+												return (
+													mcpTool.mcp_id === mcp.id &&
+													mcpTool.name === tool.name
+												);
+											}
+											return false;
+										});
+
+										if (isSelected) return false;
+
+										// Apply search filter
+										if (mcpToolSearch.trim()) {
+											const searchLower = mcpToolSearch.toLowerCase();
+											return (
+												tool.name.toLowerCase().includes(searchLower) ||
+												tool.description?.toLowerCase().includes(searchLower) ||
+												mcp.name.toLowerCase().includes(searchLower)
+											);
+										}
+
+										return true;
+									});
+
+									if (!availableMcpTools || availableMcpTools.length === 0) {
+										return null;
 									}
-									return false;
-								});
 
-								if (isSelected) return false;
-
-								// Apply search filter
-								if (mcpToolSearch.trim()) {
-									const searchLower = mcpToolSearch.toLowerCase();
 									return (
-										tool.name.toLowerCase().includes(searchLower) ||
-										tool.description?.toLowerCase().includes(searchLower) ||
-										mcp.name.toLowerCase().includes(searchLower)
+										<ListboxSection key={mcp.id} title={mcp.name} showDivider>
+											{availableMcpTools?.map((tool) => (
+												<ListboxItem
+													key={mcp.id + tool.name}
+													onPress={() => {
+														handleAddMCPTool(mcp.id, tool.name);
+													}}
+													title={tool.name}
+													description={tool.description}
+												/>
+											))}
+										</ListboxSection>
 									);
-								}
+								})}
+							</>
+						</Listbox>
 
-								return true;
-							});
-
-							if (!availableMcpTools || availableMcpTools.length === 0) {
-								return null;
-							}
-
-							return (
-								<div key={mcp.id} className="mb-4">
-									<div className="flex items-center justify-between mb-2">
-										<p className="text-sm font-medium flex items-center gap-2">
-											<LucideServer className="size-4 text-default-500" />
-											{mcp.name}
-										</p>
-										<Button
-											size="sm"
-											isIconOnly
-											variant="light"
-											isLoading={refreshMcpMutation.isPending}
-											onPress={() => refreshMcpMutation.mutate(mcp.id)}
-										>
-											<LucideRefreshCcw className="size-3" />
-										</Button>
-									</div>
-									<div className="space-y-1">
-										{availableMcpTools?.map((tool) => (
-											<button
-												key={tool.name}
-												type="button"
-												className="w-full text-left px-3 py-2 rounded-lg hover:bg-default-100 transition-colors border border-default-200"
-												onClick={() => {
-													handleAddMCPTool(mcp.id, tool.name);
-												}}
-											>
-												<p className="text-sm font-medium">{tool.name}</p>
-												<p className="text-xs text-default-500 line-clamp-2">
-													{tool.description}
-												</p>
-											</button>
-										))}
-									</div>
-								</div>
-							);
-						})}
 						{availableMCPTools.length === 0 && (
 							<p className="text-sm text-default-400 text-center py-4">
 								No available MCP tools. All tools have been added or no MCP
