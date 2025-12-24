@@ -719,77 +719,104 @@ function RouteComponent() {
 
 							return (
 								<>
-									{/* Save button - only show when dirty */}
-									{state.isDirty && (
+									{/* Show Save button (primary) when dirty, Deploy dropdown when saved */}
+									{state.isDirty ? (
 										<Button
 											size="sm"
-											variant="flat"
+											color="primary"
 											isLoading={isLoading}
 											isDisabled={!state.canSubmit}
 											onPress={() => form.handleSubmit({})}
 										>
 											Save
 										</Button>
+									) : (
+										<Dropdown placement="bottom-end">
+											<DropdownTrigger>
+												<Button
+													size="sm"
+													color="primary"
+													isLoading={isLoading}
+													isDisabled={
+														!state.canSubmit ||
+														(isDeployedToStaging && isDeployedToProduction)
+													}
+													endContent={<LucideChevronDown className="size-4" />}
+												>
+													Deploy
+												</Button>
+											</DropdownTrigger>
+											<DropdownMenu
+												aria-label="Deploy options"
+												disabledKeys={[
+													...(isDeployedToStaging ? ["staging"] : []),
+													...(isDeployedToProduction ? ["production"] : []),
+													...(isDeployedToStaging && isDeployedToProduction
+														? ["both"]
+														: []),
+												]}
+											>
+												<DropdownItem
+													key="staging"
+													description={
+														isDeployedToStaging
+															? "This version is already in staging"
+															: "Deploy this version to staging"
+													}
+													onPress={async () => {
+														if (version) {
+															await deployMutation.mutateAsync({
+																version_id: version.id,
+																environment: "staging",
+															});
+														}
+													}}
+												>
+													To Staging
+												</DropdownItem>
+												<DropdownItem
+													key="production"
+													description={
+														isDeployedToProduction
+															? "This version is already in production"
+															: "Deploy this version to production"
+													}
+													onPress={async () => {
+														if (version) {
+															await deployMutation.mutateAsync({
+																version_id: version.id,
+																environment: "production",
+															});
+														}
+													}}
+												>
+													To Production
+												</DropdownItem>
+												<DropdownItem
+													key="both"
+													description={
+														isDeployedToStaging && isDeployedToProduction
+															? "This version is already deployed to both"
+															: "Deploy this version to staging and production"
+													}
+													onPress={async () => {
+														if (version) {
+															await deployMutation.mutateAsync({
+																version_id: version.id,
+																environment: "staging",
+															});
+															await deployMutation.mutateAsync({
+																version_id: version.id,
+																environment: "production",
+															});
+														}
+													}}
+												>
+													To Both
+												</DropdownItem>
+											</DropdownMenu>
+										</Dropdown>
 									)}
-
-									{/* Deploy dropdown */}
-									<Dropdown placement="bottom-end">
-										<DropdownTrigger>
-											<Button
-												size="sm"
-												color="primary"
-												isLoading={isLoading}
-												isDisabled={!state.canSubmit || state.isDirty}
-												endContent={<LucideChevronDown className="size-4" />}
-											>
-												Deploy
-											</Button>
-										</DropdownTrigger>
-										<DropdownMenu
-											aria-label="Deploy options"
-											disabledKeys={[
-												...(isDeployedToStaging ? ["staging"] : []),
-												...(isDeployedToProduction ? ["production"] : []),
-											]}
-										>
-											<DropdownItem
-												key="staging"
-												description={
-													isDeployedToStaging
-														? "This version is already in staging"
-														: "Deploy this version to staging"
-												}
-												onPress={async () => {
-													if (version) {
-														await deployMutation.mutateAsync({
-															version_id: version.id,
-															environment: "staging",
-														});
-													}
-												}}
-											>
-												To Staging
-											</DropdownItem>
-											<DropdownItem
-												key="production"
-												description={
-													isDeployedToProduction
-														? "This version is already in production"
-														: "Deploy this version to production"
-												}
-												onPress={async () => {
-													if (version) {
-														await deployMutation.mutateAsync({
-															version_id: version.id,
-															environment: "production",
-														});
-													}
-												}}
-											>
-												To Production
-											</DropdownItem>
-										</DropdownMenu>
-									</Dropdown>
 								</>
 							);
 						}}
