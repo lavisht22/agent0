@@ -70,6 +70,47 @@ function RouteComponent() {
 		},
 	});
 
+	const refreshMcpMutation = useMutation({
+		mutationFn: async (mcp_id: string) => {
+			const {
+				data: { session },
+			} = await supabase.auth.getSession();
+
+			if (!session) {
+				throw new Error("You must be logged in to refresh MCP.");
+			}
+
+			const baseURL = import.meta.env.DEV ? "http://localhost:2223" : "";
+
+			const response = await fetch(`${baseURL}/api/v1/refresh-mcp`, {
+				method: "POST",
+				body: JSON.stringify({ mcp_id }),
+				headers: {
+					"Content-Type": "application/json",
+					Authorization: `Bearer ${session.access_token}`,
+				},
+			});
+
+			if (!response.ok) {
+				throw new Error("Failed to refresh MCP");
+			}
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });
+			addToast({
+				description: "MCP server tools refreshed successfully.",
+				color: "success",
+			});
+		},
+		onError: (error) => {
+			addToast({
+				title:
+					error instanceof Error ? error.message : "Failed to refresh MCP.",
+				color: "danger",
+			});
+		},
+	});
+
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
 			<div className="flex justify-between items-center h-16 border-b border-default-200 box-content px-4">
@@ -138,6 +179,12 @@ function RouteComponent() {
 											</Button>
 										</DropdownTrigger>
 										<DropdownMenu>
+											<DropdownItem
+												key="refresh"
+												onPress={() => refreshMcpMutation.mutate(item.id)}
+											>
+												Refresh
+											</DropdownItem>
 											<DropdownItem
 												key="edit"
 												onPress={() => navigate({ to: item.id })}

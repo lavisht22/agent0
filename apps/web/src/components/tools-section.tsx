@@ -21,17 +21,15 @@ import {
 	Textarea,
 	useDisclosure,
 } from "@heroui/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
 	LucidePlus,
-	LucideRefreshCcw,
 	LucideSearch,
 	LucideServer,
 	LucideWrench,
 } from "lucide-react";
 import { useState } from "react";
 import { mcpsQuery } from "@/lib/queries";
-import { supabase } from "@/lib/supabase";
 
 /**
  * MCP Tool - tool from an MCP server
@@ -97,8 +95,6 @@ export default function ToolsSection({
 	onValueChange,
 	isInvalid,
 }: ToolsSectionProps) {
-	const queryClient = useQueryClient();
-
 	// Modal state for adding custom tool
 	const {
 		isOpen: isCustomToolModalOpen,
@@ -128,43 +124,6 @@ export default function ToolsSection({
 	);
 
 	const { data: mcps } = useQuery(mcpsQuery(workspaceId));
-
-	const refreshMcpMutation = useMutation({
-		mutationFn: async (mcp_id: string) => {
-			const {
-				data: { session },
-			} = await supabase.auth.getSession();
-
-			if (!session) {
-				throw new Error("You must be logged in to refresh MCP.");
-			}
-
-			const baseURL = import.meta.env.DEV ? "http://localhost:2223" : "";
-
-			const response = await fetch(`${baseURL}/api/v1/refresh-mcp`, {
-				method: "POST",
-				body: JSON.stringify({ mcp_id }),
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${session.access_token}`,
-				},
-			});
-
-			if (!response.ok) {
-				throw new Error("Failed to refresh MCP");
-			}
-		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });
-		},
-		onError: (error) => {
-			addToast({
-				title:
-					error instanceof Error ? error.message : "Failed to refresh MCP.",
-				color: "danger",
-			});
-		},
-	});
 
 	const handleRemoveTool = (toolToRemove: ToolValue) => {
 		const normalized = normalizeTool(toolToRemove);
