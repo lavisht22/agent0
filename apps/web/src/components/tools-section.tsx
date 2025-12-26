@@ -30,25 +30,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { mcpsQuery } from "@/lib/queries";
-
-/**
- * MCP Tool - tool from an MCP server
- */
-type MCPTool = {
-	type: "mcp";
-	mcp_id: string;
-	name: string;
-};
-
-/**
- * Custom Tool - defined inline by the developer
- */
-type CustomTool = {
-	type: "custom";
-	title: string;
-	description: string;
-	inputSchema?: Record<string, unknown>;
-};
+import type { CustomTool, MCPTool } from "@/lib/types";
 
 /**
  * Union type for all tools

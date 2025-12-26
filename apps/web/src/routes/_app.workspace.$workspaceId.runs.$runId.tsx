@@ -329,16 +329,33 @@ function RouteComponent() {
 													<div className="flex flex-wrap gap-1.5">
 														{runData.request?.tools &&
 														runData.request.tools.length > 0 ? (
-															runData.request.tools.map((tool) => (
-																<Chip
-																	key={`${tool.mcp_id}-${tool.name}`}
-																	size="sm"
-																	variant="flat"
-																	color="secondary"
-																>
-																	{tool.name}
-																</Chip>
-															))
+															runData.request.tools.map((tool) => {
+																if (tool.type === "mcp") {
+																	return (
+																		<Chip
+																			key={`${tool.mcp_id}-${tool.name}`}
+																			size="sm"
+																			variant="flat"
+																		>
+																			{tool.name}
+																		</Chip>
+																	);
+																}
+
+																if (tool.type === "custom") {
+																	return (
+																		<Chip
+																			key={`custom-${tool.title}`}
+																			size="sm"
+																			variant="flat"
+																		>
+																			{tool.title}
+																		</Chip>
+																	);
+																}
+
+																return null;
+															})
 														) : (
 															<span className="text-xs text-default-400 italic">
 																No tools selected
