@@ -1,3 +1,4 @@
+import type { BedrockProviderOptions } from "@ai-sdk/amazon-bedrock";
 import type { GoogleGenerativeAIProviderOptions } from "@ai-sdk/google";
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import type { XaiProviderOptions } from "@ai-sdk/xai";
@@ -21,6 +22,8 @@ export interface ProviderOptions {
 	xai?: XaiProviderOptions;
 	/** Google/Vertex thinking configuration */
 	google?: GoogleGenerativeAIProviderOptions;
+	/** Amazon Bedrock thinking configuration */
+	bedrock?: BedrockProviderOptions;
 }
 
 /**

@@ -1,4 +1,5 @@
 import {
+	AwsIcon,
 	GeminiIcon,
 	GoogleCloudIcon,
 	MicrosoftIcon,
@@ -74,6 +75,16 @@ export const PROVIDER_TYPES = [
 			"gpt-4.1-mini",
 			"gpt-4.1-nano",
 			"o4-mini",
+		],
+	},
+	{
+		key: "bedrock",
+		icon: AwsIcon,
+		label: "Amazon Bedrock",
+		models: [
+			"global.anthropic.claude-opus-4-5-20251101-v1:0",
+			"global.anthropic.claude-haiku-4-5-20251001-v1:0",
+			"global.anthropic.claude-sonnet-4-5-20250929-v1:0",
 		],
 	},
 ];

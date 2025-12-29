@@ -71,7 +71,6 @@ function RouteComponent() {
 				id: nanoid(),
 				name: values.name,
 				type: values.type,
-				data: JSON.parse(values.data),
 				encrypted_data,
 				workspace_id: workspaceId,
 			});

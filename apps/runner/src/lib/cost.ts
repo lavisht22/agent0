@@ -126,6 +126,23 @@ const MODEL_COSTS: {
 		cacheInput: 0.03,
 		output: 1,
 	},
+
+	// Bedrock Claude
+	"global.anthropic.claude-opus-4-5-20251101-v1:0": {
+		noCacheInput: 5,
+		cacheInput: 0.5,
+		output: 25,
+	},
+	"global.anthropic.claude-haiku-4-5-20251001-v1:0": {
+		noCacheInput: 1,
+		cacheInput: 0.1,
+		output: 5,
+	},
+	"global.anthropic.claude-sonnet-4-5-20250929-v1:0": {
+		noCacheInput: 3,
+		cacheInput: 0.3,
+		output: 15,
+	},
 };
 
 export const calculateModelCost = (

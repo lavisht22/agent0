@@ -1,3 +1,7 @@
+import {
+	type AmazonBedrockProviderSettings,
+	createAmazonBedrock,
+} from "@ai-sdk/amazon-bedrock";
 import { type AzureOpenAIProviderSettings, createAzure } from "@ai-sdk/azure";
 import {
 	createGoogleGenerativeAI,
@@ -29,6 +33,10 @@ export const getAIProvider = (type: string, data: unknown) => {
 
 	if (type === "google") {
 		return createGoogleGenerativeAI(data as GoogleGenerativeAIProviderSettings);
+	}
+
+	if (type === "bedrock") {
+		return createAmazonBedrock(data as AmazonBedrockProviderSettings);
 	}
 
 	return null;
