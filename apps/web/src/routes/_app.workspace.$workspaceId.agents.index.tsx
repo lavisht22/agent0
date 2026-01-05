@@ -164,19 +164,21 @@ function RouteComponent() {
 								isClearable
 								onClear={() => setLocalSearch("")}
 							/>
-							<TagsSelect
-								workspaceId={workspaceId}
-								selectedTags={selectedTags || []}
-								onTagsChange={(tags) =>
-									navigate({
-										search: {
-											page: 1,
-											search: searchQuery,
-											tags: tags.length > 0 ? tags : undefined,
-										},
-									})
-								}
-							/>
+							<div className="w-64">
+								<TagsSelect
+									workspaceId={workspaceId}
+									selectedTags={selectedTags || []}
+									onTagsChange={(tags) =>
+										navigate({
+											search: {
+												page: 1,
+												search: searchQuery,
+												tags: tags.length > 0 ? tags : undefined,
+											},
+										})
+									}
+								/>
+							</div>
 						</div>
 						<div className="flex gap-2">
 							<Tooltip content="Previous">

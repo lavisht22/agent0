@@ -30,6 +30,9 @@ export function TagChip({ name, color, size = "sm", onRemove }: TagChipProps) {
 				backgroundColor: bgColor,
 				color: color,
 			}}
+			classNames={{
+				content: "font-medium",
+			}}
 			onClose={onRemove}
 		>
 			{name}

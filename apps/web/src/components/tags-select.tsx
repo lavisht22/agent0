@@ -110,9 +110,6 @@ export function TagsSelect({
 					) : undefined,
 				}}
 				selectionMode="multiple"
-				classNames={{
-					base: "w-64",
-				}}
 				isMultiline
 				startContent={<LucideTag className="size-3.5 text-default-500" />}
 				selectedKeys={new Set(selectedTags)}

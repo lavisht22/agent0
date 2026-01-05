@@ -29,7 +29,7 @@ import { events } from "fetch-event-stream";
 import {
 	LucideBraces,
 	LucideChevronDown,
-	LucideCopy,
+	LucideCode,
 	LucideCornerUpLeft,
 	LucideListPlus,
 	LucideLoader2,
@@ -647,15 +647,14 @@ function RouteComponent() {
 			}}
 		>
 			<div className="mt-px w-full flex items-center justify-between p-4 h-16 border-b border-default-200 shrink-0">
-				<input
-					className="w-full max-w-96 text-xl tracking-tight font-medium outline-none transition"
-					value={name}
-					onChange={(e) => setName(e.target.value)}
-					onBlur={() => updateNameMutation.mutate(name)}
-				/>
-
-				<div className="flex items-center gap-2">
-					{/* <form.Subscribe
+				<div className="flex gap-2 items-center">
+					<input
+						className="field-sizing-content text-xl tracking-tight font-medium outline-none transition"
+						value={name}
+						onChange={(e) => setName(e.target.value)}
+						onBlur={() => updateNameMutation.mutate(name)}
+					/>
+					<form.Subscribe
 						selector={(state) => ({
 							isDirty: state.isDirty,
 						})}
@@ -671,25 +670,29 @@ function RouteComponent() {
 								</p>
 							);
 						}}
-					</form.Subscribe> */}
+					</form.Subscribe>
+				</div>
 
+				<div className="flex items-center gap-2">
 					{!isNewAgent && (
-						<TagsSelect
-							workspaceId={workspaceId}
-							selectedTags={selectedTagIds}
-							onTagsChange={(tagIds) => syncTagsMutation.mutate(tagIds)}
-							allowCreate
-						/>
+						<div className="w-48">
+							<TagsSelect
+								workspaceId={workspaceId}
+								selectedTags={selectedTagIds}
+								onTagsChange={(tagIds) => syncTagsMutation.mutate(tagIds)}
+								allowCreate
+							/>
+						</div>
 					)}
 
 					{agent && (
 						<Button
 							size="sm"
 							variant="flat"
-							startContent={<LucideCopy className="size-3.5" />}
-							onPress={() => copyToClipboard(agent.id)}
+							isIconOnly
+							onPress={() => copyToClipboard(agent.id, "Copied agent ID!")}
 						>
-							{agent.id}
+							<LucideCode className="size-3.5" />
 						</Button>
 					)}
 
