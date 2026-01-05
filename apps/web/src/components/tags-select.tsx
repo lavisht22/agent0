@@ -13,7 +13,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LucidePlus, LucideTag } from "lucide-react";
 import { nanoid } from "nanoid";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { tagsQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
 import { TagChip } from "./tag-chip";
@@ -30,7 +30,17 @@ const TAG_COLORS = [
 	"#8b5cf6", // violet
 	"#d946ef", // fuchsia
 	"#ec4899", // pink
+	"#84cc16", // lime
+	"#06b6d4", // cyan
+	"#10b981", // emerald
+	"#f43f5e", // rose
+	"#f59e0b", // amber
+	"#64748b", // slate
 ];
+
+// Helper function to get a random color
+const getRandomColor = () =>
+	TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)];
 
 interface TagsSelectProps {
 	workspaceId: string;
@@ -52,7 +62,14 @@ export function TagsSelect({
 
 	// State for new tag creation
 	const [newTagName, setNewTagName] = useState("");
-	const [selectedColor, setSelectedColor] = useState(TAG_COLORS[0]);
+	const [selectedColor, setSelectedColor] = useState(getRandomColor);
+
+	// Pre-select a random color when modal opens
+	useEffect(() => {
+		if (isOpen) {
+			setSelectedColor(getRandomColor());
+		}
+	}, [isOpen]);
 
 	// Get selected tag objects for rendering
 	const selectedTagObjects = tags?.filter((tag) =>
@@ -79,7 +96,6 @@ export function TagsSelect({
 			queryClient.invalidateQueries({ queryKey: ["tags", workspaceId] });
 			onTagsChange([...selectedTags, tagId]);
 			setNewTagName("");
-			setSelectedColor(TAG_COLORS[0]);
 			onOpenChange();
 		},
 	});

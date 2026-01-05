@@ -675,7 +675,7 @@ function RouteComponent() {
 
 				<div className="flex items-center gap-2">
 					{!isNewAgent && (
-						<div className="w-48">
+						<div className="w-64">
 							<TagsSelect
 								workspaceId={workspaceId}
 								selectedTags={selectedTagIds}
