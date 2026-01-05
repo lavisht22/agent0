@@ -339,7 +339,7 @@ function RouteComponent() {
 		},
 	});
 
-	// Sync tags mutation - replaces all agent tags with new ones
+	// Sync tags mutation - replaces all agent tags with new ones (with optimistic updates)
 	const syncTagsMutation = useMutation({
 		mutationFn: async (tagIds: string[]) => {
 			// Delete existing agent tags
@@ -361,16 +361,54 @@ function RouteComponent() {
 				if (insertError) throw insertError;
 			}
 		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["agent-tags", agentId] });
-			queryClient.invalidateQueries({ queryKey: ["agents", workspaceId] });
+		onMutate: async (tagIds) => {
+			// Cancel any outgoing refetches to avoid overwriting optimistic update
+			await queryClient.cancelQueries({ queryKey: ["agent-tags", agentId] });
+
+			// Snapshot the previous value
+			const previousAgentTags = queryClient.getQueryData([
+				"agent-tags",
+				agentId,
+			]);
+
+			// Get the tags data to create proper optimistic entries
+			const tagsData = queryClient.getQueryData(["tags", workspaceId]) as
+				| { id: string; name: string; color: string; workspace_id: string }[]
+				| undefined;
+
+			// Optimistically update the cache with new tag structure
+			const optimisticAgentTags = tagIds.map((tagId) => {
+				const tag = tagsData?.find((t) => t.id === tagId);
+				return {
+					agent_id: agentId,
+					tag_id: tagId,
+					tags: tag || null,
+				};
+			});
+
+			queryClient.setQueryData(["agent-tags", agentId], optimisticAgentTags);
+
+			// Return context with the previous value for rollback
+			return { previousAgentTags };
 		},
-		onError: (error) => {
+		onError: (error, _, context) => {
+			// Rollback to previous value on error
+			if (context?.previousAgentTags) {
+				queryClient.setQueryData(
+					["agent-tags", agentId],
+					context.previousAgentTags,
+				);
+			}
 			addToast({
 				description:
 					error instanceof Error ? error.message : "Failed to update tags.",
 				color: "danger",
 			});
+		},
+		onSettled: () => {
+			// Always refetch after error or success to ensure consistency
+			queryClient.invalidateQueries({ queryKey: ["agent-tags", agentId] });
+			queryClient.invalidateQueries({ queryKey: ["agents", workspaceId] });
 		},
 	});
 
