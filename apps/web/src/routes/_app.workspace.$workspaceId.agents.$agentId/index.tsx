@@ -26,12 +26,7 @@ import { useCallback, useEffect, useState } from "react";
 import useDb from "use-db";
 
 import { Messages, type MessageT } from "@/components/messages";
-import { ModelSelector } from "@/components/model-selector";
-import { ProviderOptions } from "@/components/provider-options";
 import { TagsSelect } from "@/components/tags-select";
-import ToolsSection from "@/components/tools-section";
-import { VariablesDrawer } from "@/components/variables-drawer";
-import { VersionHistory } from "@/components/version-history";
 import { copyToClipboard } from "@/lib/clipboard";
 import {
 	agentQuery,
@@ -42,6 +37,11 @@ import {
 import { Action } from "./components/action";
 import { AddMessage } from "./components/add-message";
 import { Alerts } from "./components/alerts";
+import { ModelSelector } from "./components/model-selector";
+import { ProviderOptions } from "./components/provider-options";
+import ToolsSection from "./components/tools-section";
+import { VariablesDrawer } from "./components/variables-drawer";
+import { VersionHistory } from "./components/version-history";
 import { useAgentMutations } from "./hooks/use-agent-mutations";
 import { useAgentRunner } from "./hooks/use-agent-runner";
 import { type AgentFormValues, agentFormSchema } from "./types";
