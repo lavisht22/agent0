@@ -1,3 +1,4 @@
+import { Reorder } from "framer-motion";
 import { z } from "zod";
 import { AssistantMessage, assistantMessageSchema } from "./assistant-message";
 import { SystemMessage, systemMessageSchema } from "./system-message";
@@ -27,22 +28,22 @@ export function Messages({
 	onVariablePress,
 }: MessagesProps) {
 	return (
-		<div className="flex flex-col gap-4">
+		<Reorder.Group
+			axis="y"
+			values={value}
+			onReorder={onValueChange}
+			className="flex flex-col gap-4"
+		>
 			{value.map((message, index) => {
 				if (message.role === "system") {
 					return (
 						<SystemMessage
-							key={`${index + 1}`}
+							key={message.id}
 							isReadOnly={isReadOnly}
-							value={message.content}
-							onValueChange={(content) => {
+							value={message}
+							onValueChange={(updatedMessage) => {
 								const newMessages = [...value];
-
-								newMessages[index] = {
-									role: "system",
-									content,
-								};
-
+								newMessages[index] = updatedMessage;
 								onValueChange(newMessages);
 							}}
 							onVariablePress={onVariablePress}
@@ -53,19 +54,16 @@ export function Messages({
 				if (message.role === "user") {
 					return (
 						<UserMessage
-							key={`${index + 1}`}
+							key={message.id}
 							isReadOnly={isReadOnly}
-							value={message.content}
-							onValueChange={(content) => {
+							value={message}
+							onValueChange={(updatedMessage) => {
 								const newMessages = [...value];
 
-								if (content === null) {
+								if (updatedMessage === null) {
 									newMessages.splice(index, 1);
 								} else {
-									newMessages[index] = {
-										role: "user",
-										content,
-									};
+									newMessages[index] = updatedMessage;
 								}
 
 								onValueChange(newMessages);
@@ -78,19 +76,16 @@ export function Messages({
 				if (message.role === "assistant") {
 					return (
 						<AssistantMessage
-							key={`${index + 1}`}
+							key={message.id}
 							isReadOnly={isReadOnly}
-							value={message.content}
-							onValueChange={(content) => {
+							value={message}
+							onValueChange={(updatedMessage) => {
 								const newMessages = [...value];
 
-								if (content === null) {
+								if (updatedMessage === null) {
 									newMessages.splice(index, 1);
 								} else {
-									newMessages[index] = {
-										role: "assistant",
-										content,
-									};
+									newMessages[index] = updatedMessage;
 								}
 
 								onValueChange(newMessages);
@@ -103,19 +98,16 @@ export function Messages({
 				if (message.role === "tool") {
 					return (
 						<ToolMessage
-							key={`${index + 1}`}
+							key={message.id}
 							isReadOnly={isReadOnly}
-							value={message.content}
-							onValueChange={(content) => {
+							value={message}
+							onValueChange={(updatedMessage) => {
 								const newMessages = [...value];
 
-								if (content === null) {
+								if (updatedMessage === null) {
 									newMessages.splice(index, 1);
 								} else {
-									newMessages[index] = {
-										role: "tool",
-										content,
-									};
+									newMessages[index] = updatedMessage;
 								}
 
 								onValueChange(newMessages);
@@ -127,6 +119,6 @@ export function Messages({
 
 				return null;
 			})}
-		</div>
+		</Reorder.Group>
 	);
 }

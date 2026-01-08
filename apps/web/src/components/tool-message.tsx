@@ -1,11 +1,13 @@
 import { Button, Card, CardBody, CardHeader, cn } from "@heroui/react";
-import { LucideTrash2 } from "lucide-react";
+import { Reorder, useDragControls } from "framer-motion";
+import { LucideGripVertical, LucideTrash2 } from "lucide-react";
 import { useMemo } from "react";
 import { z } from "zod";
 import { ThemedJsonEditor } from "./themed-json-editor";
 import { Variables } from "./variables";
 
 export const toolMessageSchema = z.object({
+	id: z.string(),
 	role: z.literal("tool"),
 	content: z.array(
 		z.object({
@@ -55,6 +57,8 @@ function ToolMessagePart({
 	}
 }
 
+export type ToolMessageT = z.infer<typeof toolMessageSchema>;
+
 export function ToolMessage({
 	isReadOnly,
 	value,
@@ -62,65 +66,91 @@ export function ToolMessage({
 	onVariablePress,
 }: {
 	isReadOnly?: boolean;
-	value: ToolMessageContent;
-	onValueChange: (value: ToolMessageContent | null) => void;
+	value: ToolMessageT;
+	onValueChange: (value: ToolMessageT | null) => void;
 	onVariablePress: () => void;
 }) {
 	const variables = useMemo(() => {
-		const str = JSON.stringify(value);
+		const str = JSON.stringify(value.content);
 
 		const matches = str.matchAll(/\{\{(.*?)\}\}/g);
 		const vars = Array.from(matches).map((m) => m[1].trim());
 
 		return Array.from(new Set(vars));
-	}, [value]);
+	}, [value.content]);
+
+	const controls = useDragControls();
 
 	return (
-		<Card>
-			<CardHeader className="flex items-center justify-between pl-3 pr-1 h-10">
-				<span className="text-sm text-default-500">Tool</span>
-			</CardHeader>
-			<CardBody className="p-3 border-t border-default-200 flex flex-col gap-3">
-				{value.map((part, index) => {
-					return (
-						<div key={`${index + 1}`} className="flex">
-							<ToolMessagePart
-								isReadOnly={isReadOnly}
-								value={part}
-								onValueChange={(newPart) => {
-									const newContent = [...value];
-									newContent[index] = newPart;
-									onValueChange(newContent);
-								}}
-							/>
-							{!isReadOnly && (
-								<Button
-									className="-mr-2"
-									size="sm"
-									isIconOnly
-									variant="light"
-									onPress={() => {
-										const newContent = [...value];
-										newContent.splice(index, 1);
-
-										if (newContent.length === 0) {
-											onValueChange(null);
-											return;
-										}
-
-										onValueChange(newContent);
+		<Reorder.Item
+			key={value.id}
+			value={value}
+			dragListener={false}
+			dragControls={controls}
+		>
+			<Card>
+				<CardHeader className="flex items-center justify-between pl-1 pr-1 h-10 z-0">
+					<div className="flex items-center">
+						{!isReadOnly && (
+							<div
+								className="h-full py-3 px-2 reorder-handle cursor-grab"
+								onPointerDown={(e) => controls.start(e)}
+							>
+								<LucideGripVertical className="size-3.5 text-default-500" />
+							</div>
+						)}
+						<span
+							className={`text-sm text-default-500 ${isReadOnly ? "pl-2" : ""}`}
+						>
+							Tool
+						</span>
+					</div>
+				</CardHeader>
+				<CardBody className="p-3 border-t border-default-200 flex flex-col gap-3">
+					{value.content.map((part, index) => {
+						return (
+							<div key={`${index + 1}`} className="flex">
+								<ToolMessagePart
+									isReadOnly={isReadOnly}
+									value={part}
+									onValueChange={(newPart) => {
+										const newContent = [...value.content];
+										newContent[index] = newPart;
+										onValueChange({ ...value, content: newContent });
 									}}
-								>
-									<LucideTrash2 className="size-3.5" />
-								</Button>
-							)}
-						</div>
-					);
-				})}
-				{variables.length > 0 && (
-					<Variables variables={variables} onVariablePress={onVariablePress} />
-				)}
-			</CardBody>
-		</Card>
+								/>
+								{!isReadOnly && (
+									<Button
+										className="-mr-2"
+										size="sm"
+										isIconOnly
+										variant="light"
+										onPress={() => {
+											const newContent = [...value.content];
+											newContent.splice(index, 1);
+
+											if (newContent.length === 0) {
+												onValueChange(null);
+												return;
+											}
+
+											onValueChange({ ...value, content: newContent });
+										}}
+									>
+										<LucideTrash2 className="size-3.5" />
+									</Button>
+								)}
+							</div>
+						);
+					})}
+					{variables.length > 0 && (
+						<Variables
+							variables={variables}
+							onVariablePress={onVariablePress}
+						/>
+					)}
+				</CardBody>
+			</Card>
+		</Reorder.Item>
 	);
 }
