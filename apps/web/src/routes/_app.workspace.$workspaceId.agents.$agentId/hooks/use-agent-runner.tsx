@@ -1,6 +1,5 @@
 import { addToast } from "@heroui/react";
 import type { Tables } from "@repo/database";
-import type { ReactFormExtendedApi } from "@tanstack/react-form";
 import type { TextStreamPart, Tool } from "ai";
 import { events } from "fetch-event-stream";
 import { useCallback, useState } from "react";

@@ -28,7 +28,7 @@ import {
 import { Messages, type MessageT } from "@/components/messages";
 import { ThemedJsonEditor } from "@/components/themed-json-editor";
 import { runDataQuery, runQuery } from "@/lib/queries";
-import type { AgentFormValues } from "./_app.workspace.$workspaceId.agents.$agentId";
+import type { AgentFormValues } from "./_app.workspace.$workspaceId.agents.$agentId/types";
 
 export const Route = createFileRoute(
 	"/_app/workspace/$workspaceId/runs/$runId",

@@ -9,7 +9,7 @@ import {
 } from "@heroui/react";
 import { LucidePlay } from "lucide-react";
 import { useMemo } from "react";
-import type { MessageT } from "./messages";
+import type { MessageT } from "@/components/messages";
 
 interface VariablesDrawerProps {
 	isOpen: boolean;
