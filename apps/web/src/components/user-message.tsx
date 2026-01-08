@@ -130,17 +130,17 @@ function UserMessagePart({
 	return null;
 }
 
+export type UserMessageT = z.infer<typeof userMessageSchema>;
+
 export function UserMessage({
-	id,
 	isReadOnly,
 	value,
 	onValueChange,
 	onVariablePress,
 }: {
-	id: string;
 	isReadOnly?: boolean;
-	value: UserMessageContent;
-	onValueChange: (value: UserMessageContent | null) => void;
+	value: UserMessageT;
+	onValueChange: (value: UserMessageT | null) => void;
 	onVariablePress: () => void;
 }) {
 	const fileInputRef = useRef<HTMLInputElement>(null);
@@ -150,13 +150,13 @@ export function UserMessage({
 	const [embedMediaType, setEmbedMediaType] = useState("");
 
 	const variables = useMemo(() => {
-		const str = JSON.stringify(value);
+		const str = JSON.stringify(value.content);
 
 		const matches = str.matchAll(/\{\{(.*?)\}\}/g);
 		const vars = Array.from(matches).map((m) => m[1].trim());
 
 		return Array.from(new Set(vars));
-	}, [value]);
+	}, [value.content]);
 
 	// Convert file to base64
 	const fileToBase64 = (file: File): Promise<string> => {
@@ -182,7 +182,7 @@ export function UserMessage({
 
 		try {
 			const base64Data = await fileToBase64(file);
-			const newContent = [...value];
+			const newContent = [...value.content];
 
 			// Detect if it's an image based on MIME type
 			if (file.type.startsWith("image/")) {
@@ -199,7 +199,7 @@ export function UserMessage({
 				});
 			}
 
-			onValueChange(newContent);
+			onValueChange({ ...value, content: newContent });
 		} catch (error) {
 			console.error("Error converting file to base64:", error);
 		}
@@ -212,7 +212,7 @@ export function UserMessage({
 
 	// Handle embed modal submit
 	const handleEmbedSubmit = () => {
-		const newContent = [...value];
+		const newContent = [...value.content];
 
 		if (embedType === "image") {
 			newContent.push({
@@ -228,7 +228,7 @@ export function UserMessage({
 			});
 		}
 
-		onValueChange(newContent);
+		onValueChange({ ...value, content: newContent });
 		setIsEmbedModalOpen(false);
 		setEmbedData("");
 		setEmbedMediaType("");
@@ -239,7 +239,7 @@ export function UserMessage({
 		<>
 			<Card>
 				<CardHeader className="flex items-center justify-between pl-3 pr-1 h-10">
-					<span className="text-sm text-default-500">User | {id}</span>
+					<span className="text-sm text-default-500">User | {value.id}</span>
 					{!isReadOnly && (
 						<Dropdown>
 							<DropdownTrigger>
@@ -265,16 +265,16 @@ export function UserMessage({
 					)}
 				</CardHeader>
 				<CardBody className="p-3 border-t border-default-200 flex flex-col gap-2">
-					{value.map((part, index) => {
+					{value.content.map((part, index) => {
 						return (
 							<div key={`${index + 1}`} className="flex">
 								<UserMessagePart
 									isReadOnly={isReadOnly}
 									value={part}
 									onValueChange={(v) => {
-										const newContent = [...value];
+										const newContent = [...value.content];
 										newContent[index] = v;
-										onValueChange(newContent);
+										onValueChange({ ...value, content: newContent });
 									}}
 								/>
 
@@ -285,7 +285,7 @@ export function UserMessage({
 										isIconOnly
 										variant="light"
 										onPress={() => {
-											const newContent = [...value];
+											const newContent = [...value.content];
 											newContent.splice(index, 1);
 
 											if (newContent.length === 0) {
@@ -293,7 +293,7 @@ export function UserMessage({
 												return;
 											}
 
-											onValueChange(newContent);
+											onValueChange({ ...value, content: newContent });
 										}}
 									>
 										<LucideTrash2 className="size-3.5" />

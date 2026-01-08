@@ -11,32 +11,32 @@ export const systemMessageSchema = z.object({
 	providerOptions: z.any().optional(),
 });
 
+export type SystemMessageT = z.infer<typeof systemMessageSchema>;
+
 export function SystemMessage({
-	id,
 	isReadOnly,
 	value,
 	onValueChange,
 	onVariablePress,
 }: {
-	id: string;
 	isReadOnly?: boolean;
-	value: string;
-	onValueChange: (value: string) => void;
+	value: SystemMessageT;
+	onValueChange: (value: SystemMessageT) => void;
 	onVariablePress: () => void;
 }) {
 	const variables = useMemo(() => {
-		if (typeof value !== "string") return [];
+		if (typeof value.content !== "string") return [];
 
-		const matches = value.matchAll(/\{\{(.*?)\}\}/g);
+		const matches = value.content.matchAll(/\{\{(.*?)\}\}/g);
 		const vars = Array.from(matches).map((m) => m[1].trim());
 
 		return Array.from(new Set(vars));
-	}, [value]);
+	}, [value.content]);
 
 	return (
 		<Card>
 			<CardHeader className="flex items-center justify-between pl-3 pr-1 h-10">
-				<span className="text-sm text-default-500">System | {id}</span>
+				<span className="text-sm text-default-500">System | {value.id}</span>
 			</CardHeader>
 			<CardBody className="p-3 border-t border-default-200 gap-4">
 				<TextareaAutosize
@@ -44,8 +44,8 @@ export function SystemMessage({
 					readOnly={isReadOnly}
 					placeholder="Enter system message..."
 					maxRows={1000}
-					value={value}
-					onChange={(e) => onValueChange(e.target.value)}
+					value={value.content}
+					onChange={(e) => onValueChange({ ...value, content: e.target.value })}
 				/>
 				<Variables variables={variables} onVariablePress={onVariablePress} />
 			</CardBody>

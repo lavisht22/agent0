@@ -115,32 +115,32 @@ function AssistantMessagePart({
 	}
 }
 
+export type AssistantMessageT = z.infer<typeof assistantMessageSchema>;
+
 export function AssistantMessage({
-	id,
 	isReadOnly,
 	value,
 	onValueChange,
 	onVariablePress,
 }: {
-	id: string;
 	isReadOnly?: boolean;
-	value: AssistantMessageContent;
-	onValueChange: (value: AssistantMessageContent | null) => void;
+	value: AssistantMessageT;
+	onValueChange: (value: AssistantMessageT | null) => void;
 	onVariablePress: () => void;
 }) {
 	const variables = useMemo(() => {
-		const str = JSON.stringify(value);
+		const str = JSON.stringify(value.content);
 
 		const matches = str.matchAll(/\{\{(.*?)\}\}/g);
 		const vars = Array.from(matches).map((m) => m[1].trim());
 
 		return Array.from(new Set(vars));
-	}, [value]);
+	}, [value.content]);
 
 	return (
 		<Card>
 			<CardHeader className="flex items-center justify-between pl-3 pr-1 h-10">
-				<span className="text-sm text-default-500">Assistant | {id}</span>
+				<span className="text-sm text-default-500">Assistant | {value.id}</span>
 				{!isReadOnly && (
 					<Dropdown>
 						<DropdownTrigger>
@@ -152,13 +152,16 @@ export function AssistantMessage({
 							<DropdownItem
 								key="text"
 								onPress={() =>
-									onValueChange([
+									onValueChange({
 										...value,
-										{
-											type: "text",
-											text: "",
-										},
-									])
+										content: [
+											...value.content,
+											{
+												type: "text",
+												text: "",
+											},
+										],
+									})
 								}
 							>
 								Text Part
@@ -166,13 +169,16 @@ export function AssistantMessage({
 							<DropdownItem
 								key="reasoning"
 								onPress={() =>
-									onValueChange([
+									onValueChange({
 										...value,
-										{
-											type: "reasoning",
-											text: "",
-										},
-									])
+										content: [
+											...value.content,
+											{
+												type: "reasoning",
+												text: "",
+											},
+										],
+									})
 								}
 							>
 								Reasoning Part
@@ -180,15 +186,18 @@ export function AssistantMessage({
 							<DropdownItem
 								key="tool-call"
 								onPress={() =>
-									onValueChange([
+									onValueChange({
 										...value,
-										{
-											type: "tool-call",
-											toolCallId: "",
-											toolName: "",
-											input: {},
-										},
-									])
+										content: [
+											...value.content,
+											{
+												type: "tool-call",
+												toolCallId: "",
+												toolName: "",
+												input: {},
+											},
+										],
+									})
 								}
 							>
 								Tool Call Part
@@ -198,16 +207,16 @@ export function AssistantMessage({
 				)}
 			</CardHeader>
 			<CardBody className="p-3 border-t border-default-200 flex flex-col gap-3">
-				{value.map((part, index) => {
+				{value.content.map((part, index) => {
 					return (
 						<div key={`${index + 1}`} className="flex">
 							<AssistantMessagePart
 								isReadOnly={isReadOnly}
 								value={part}
 								onValueChange={(newPart) => {
-									const newContent = [...value];
+									const newContent = [...value.content];
 									newContent[index] = newPart;
-									onValueChange(newContent);
+									onValueChange({ ...value, content: newContent });
 								}}
 							/>
 							{!isReadOnly && (
@@ -217,7 +226,7 @@ export function AssistantMessage({
 									isIconOnly
 									variant="light"
 									onPress={() => {
-										const newContent = [...value];
+										const newContent = [...value.content];
 										newContent.splice(index, 1);
 
 										if (newContent.length === 0) {
@@ -225,7 +234,7 @@ export function AssistantMessage({
 											return;
 										}
 
-										onValueChange(newContent);
+										onValueChange({ ...value, content: newContent });
 									}}
 								>
 									<LucideTrash2 className="size-3.5" />

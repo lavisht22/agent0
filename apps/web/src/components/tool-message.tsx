@@ -56,44 +56,44 @@ function ToolMessagePart({
 	}
 }
 
+export type ToolMessageT = z.infer<typeof toolMessageSchema>;
+
 export function ToolMessage({
-	id,
 	isReadOnly,
 	value,
 	onValueChange,
 	onVariablePress,
 }: {
-	id: string;
 	isReadOnly?: boolean;
-	value: ToolMessageContent;
-	onValueChange: (value: ToolMessageContent | null) => void;
+	value: ToolMessageT;
+	onValueChange: (value: ToolMessageT | null) => void;
 	onVariablePress: () => void;
 }) {
 	const variables = useMemo(() => {
-		const str = JSON.stringify(value);
+		const str = JSON.stringify(value.content);
 
 		const matches = str.matchAll(/\{\{(.*?)\}\}/g);
 		const vars = Array.from(matches).map((m) => m[1].trim());
 
 		return Array.from(new Set(vars));
-	}, [value]);
+	}, [value.content]);
 
 	return (
 		<Card>
 			<CardHeader className="flex items-center justify-between pl-3 pr-1 h-10">
-				<span className="text-sm text-default-500">Tool | {id}</span>
+				<span className="text-sm text-default-500">Tool | {value.id}</span>
 			</CardHeader>
 			<CardBody className="p-3 border-t border-default-200 flex flex-col gap-3">
-				{value.map((part, index) => {
+				{value.content.map((part, index) => {
 					return (
 						<div key={`${index + 1}`} className="flex">
 							<ToolMessagePart
 								isReadOnly={isReadOnly}
 								value={part}
 								onValueChange={(newPart) => {
-									const newContent = [...value];
+									const newContent = [...value.content];
 									newContent[index] = newPart;
-									onValueChange(newContent);
+									onValueChange({ ...value, content: newContent });
 								}}
 							/>
 							{!isReadOnly && (
@@ -103,7 +103,7 @@ export function ToolMessage({
 									isIconOnly
 									variant="light"
 									onPress={() => {
-										const newContent = [...value];
+										const newContent = [...value.content];
 										newContent.splice(index, 1);
 
 										if (newContent.length === 0) {
@@ -111,7 +111,7 @@ export function ToolMessage({
 											return;
 										}
 
-										onValueChange(newContent);
+										onValueChange({ ...value, content: newContent });
 									}}
 								>
 									<LucideTrash2 className="size-3.5" />
