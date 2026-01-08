@@ -1,9 +1,5 @@
 import {
 	Button,
-	Dropdown,
-	DropdownItem,
-	DropdownMenu,
-	DropdownTrigger,
 	Input,
 	Popover,
 	PopoverContent,
@@ -20,7 +16,6 @@ import { createFileRoute, useLocation } from "@tanstack/react-router";
 
 import {
 	LucideBraces,
-	LucideChevronDown,
 	LucideCode,
 	LucideCornerUpLeft,
 	LucideLoader2,
@@ -44,6 +39,7 @@ import {
 	agentVersionsQuery,
 	providersQuery,
 } from "@/lib/queries";
+import { Action } from "./components/action";
 import { AddMessage } from "./components/add-message";
 import { Alerts } from "./components/alerts";
 import { useAgentMutations } from "./hooks/use-agent-mutations";
@@ -317,141 +313,28 @@ function RouteComponent() {
 						})}
 					>
 						{(state) => {
-							// New agent - show Create button
-							if (isNewAgent) {
-								return (
-									<Button
-										size="sm"
-										color="primary"
-										isLoading={state.isSubmitting}
-										isDisabled={!state.canSubmit}
-										onPress={() => form.handleSubmit({})}
-									>
-										Create
-									</Button>
-								);
-							}
-
-							const isLoading =
-								state.isSubmitting ||
-								updateMutation.isPending ||
-								deployMutation.isPending;
-
-							// Check if current version is deployed to each environment
-							const isDeployedToStaging =
-								agent?.staging_version_id === version?.id;
-							const isDeployedToProduction =
-								agent?.production_version_id === version?.id;
-
 							return (
-								<>
-									{state.isDirty && (
-										<Button
-											size="sm"
-											color="primary"
-											isLoading={isLoading}
-											isDisabled={!state.canSubmit}
-											onPress={() => form.handleSubmit({})}
-										>
-											Save
-										</Button>
-									)}
-
-									{!state.isDirty &&
-										(!isDeployedToProduction || !isDeployedToStaging) && (
-											<Dropdown placement="bottom-end">
-												<DropdownTrigger>
-													<Button
-														size="sm"
-														color="primary"
-														isLoading={isLoading}
-														isDisabled={
-															!state.canSubmit ||
-															(isDeployedToStaging && isDeployedToProduction)
-														}
-														endContent={
-															<LucideChevronDown className="size-4" />
-														}
-													>
-														Deploy
-													</Button>
-												</DropdownTrigger>
-												<DropdownMenu
-													variant="flat"
-													aria-label="Deploy options"
-													disabledKeys={[
-														...(isDeployedToStaging ? ["staging"] : []),
-														...(isDeployedToProduction ? ["production"] : []),
-														...(isDeployedToStaging && isDeployedToProduction
-															? ["both"]
-															: []),
-													]}
-												>
-													<DropdownItem
-														key="staging"
-														color="warning"
-														description={
-															isDeployedToStaging
-																? "This version is already in staging"
-																: "Deploy this version to staging"
-														}
-														onPress={async () => {
-															if (version) {
-																await deployMutation.mutateAsync({
-																	version_id: version.id,
-																	environment: "staging",
-																});
-															}
-														}}
-													>
-														To Staging
-													</DropdownItem>
-													<DropdownItem
-														key="production"
-														color="success"
-														description={
-															isDeployedToProduction
-																? "This version is already in production"
-																: "Deploy this version to production"
-														}
-														onPress={async () => {
-															if (version) {
-																await deployMutation.mutateAsync({
-																	version_id: version.id,
-																	environment: "production",
-																});
-															}
-														}}
-													>
-														To Production
-													</DropdownItem>
-													<DropdownItem
-														key="both"
-														color="primary"
-														description={
-															isDeployedToStaging && isDeployedToProduction
-																? "This version is already deployed to both"
-																: "Deploy this version to staging and production"
-														}
-														onPress={async () => {
-															if (version) {
-																await deployMutation.mutateAsync({
-																	version_id: version.id,
-																	environment: "staging",
-																});
-																await deployMutation.mutateAsync({
-																	version_id: version.id,
-																	environment: "production",
-																});
-															}
-														}}
-													>
-														To Both
-													</DropdownItem>
-												</DropdownMenu>
-											</Dropdown>
-										)}
-								</>
+								<Action
+									isNewAgent={isNewAgent}
+									canSubmit={state.canSubmit}
+									isSubmitting={state.isSubmitting}
+									isMutationPending={
+										updateMutation.isPending || deployMutation.isPending
+									}
+									isDirty={state.isDirty}
+									handleSubmit={form.handleSubmit}
+									agent={agent}
+									version={version}
+									deploy={async (
+										version_id: string,
+										environment: "staging" | "production",
+									) => {
+										await deployMutation.mutateAsync({
+											version_id,
+											environment,
+										});
+									}}
+								/>
 							);
 						}}
 					</form.Subscribe>
