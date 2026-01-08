@@ -16,6 +16,7 @@ import { ThemedJsonEditor } from "./themed-json-editor";
 import { Variables } from "./variables";
 
 export const assistantMessageSchema = z.object({
+	id: z.string(),
 	role: z.literal("assistant"),
 	content: z
 		.array(
@@ -115,11 +116,13 @@ function AssistantMessagePart({
 }
 
 export function AssistantMessage({
+	id,
 	isReadOnly,
 	value,
 	onValueChange,
 	onVariablePress,
 }: {
+	id: string;
 	isReadOnly?: boolean;
 	value: AssistantMessageContent;
 	onValueChange: (value: AssistantMessageContent | null) => void;
@@ -137,7 +140,7 @@ export function AssistantMessage({
 	return (
 		<Card>
 			<CardHeader className="flex items-center justify-between pl-3 pr-1 h-10">
-				<span className="text-sm text-default-500">Assistant</span>
+				<span className="text-sm text-default-500">Assistant | {id}</span>
 				{!isReadOnly && (
 					<Dropdown>
 						<DropdownTrigger>

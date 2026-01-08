@@ -32,13 +32,15 @@ export function Messages({
 				if (message.role === "system") {
 					return (
 						<SystemMessage
-							key={`${index + 1}`}
+							key={message.id}
+							id={message.id}
 							isReadOnly={isReadOnly}
 							value={message.content}
 							onValueChange={(content) => {
 								const newMessages = [...value];
 
 								newMessages[index] = {
+									id: message.id,
 									role: "system",
 									content,
 								};
@@ -53,7 +55,8 @@ export function Messages({
 				if (message.role === "user") {
 					return (
 						<UserMessage
-							key={`${index + 1}`}
+							id={message.id}
+							key={message.id}
 							isReadOnly={isReadOnly}
 							value={message.content}
 							onValueChange={(content) => {
@@ -63,6 +66,7 @@ export function Messages({
 									newMessages.splice(index, 1);
 								} else {
 									newMessages[index] = {
+										id: message.id,
 										role: "user",
 										content,
 									};
@@ -78,7 +82,8 @@ export function Messages({
 				if (message.role === "assistant") {
 					return (
 						<AssistantMessage
-							key={`${index + 1}`}
+							id={message.id}
+							key={message.id}
 							isReadOnly={isReadOnly}
 							value={message.content}
 							onValueChange={(content) => {
@@ -88,6 +93,7 @@ export function Messages({
 									newMessages.splice(index, 1);
 								} else {
 									newMessages[index] = {
+										id: message.id,
 										role: "assistant",
 										content,
 									};
@@ -103,7 +109,8 @@ export function Messages({
 				if (message.role === "tool") {
 					return (
 						<ToolMessage
-							key={`${index + 1}`}
+							id={message.id}
+							key={message.id}
 							isReadOnly={isReadOnly}
 							value={message.content}
 							onValueChange={(content) => {
@@ -113,6 +120,7 @@ export function Messages({
 									newMessages.splice(index, 1);
 								} else {
 									newMessages[index] = {
+										id: message.id,
 										role: "tool",
 										content,
 									};

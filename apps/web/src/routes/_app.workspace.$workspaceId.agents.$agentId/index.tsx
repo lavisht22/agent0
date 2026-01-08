@@ -22,6 +22,7 @@ import {
 	LucidePlay,
 	LucideSettings2,
 } from "lucide-react";
+import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import useDb from "use-db";
 
@@ -134,6 +135,7 @@ function RouteComponent() {
 			maxStepCount: 10,
 			messages: [
 				{
+					id: "system-init",
 					role: "system",
 					content: "",
 				},
@@ -175,10 +177,16 @@ function RouteComponent() {
 			outputFormat?: "text" | "json";
 			temperature?: number;
 			maxStepCount?: number;
-			messages?: MessageT[];
+			messages?: (Omit<MessageT, "id"> & { id?: string })[];
 			tools?: AgentFormValues["tools"];
 			providerOptions?: AgentFormValues["providerOptions"];
 		};
+
+		// Ensure all messages have IDs (for backward compatibility with old data)
+		const messagesWithIds = (data.messages || []).map((msg) => ({
+			...msg,
+			id: msg.id || nanoid(),
+		})) as MessageT[];
 
 		form.reset(
 			{
@@ -187,7 +195,7 @@ function RouteComponent() {
 				outputFormat: data.outputFormat || "text",
 				temperature: data.temperature ?? 0.7,
 				maxStepCount: data.maxStepCount || 10,
-				messages: data.messages || [],
+				messages: messagesWithIds,
 				tools: data.tools || [],
 				providerOptions: data.providerOptions || {},
 			},
@@ -205,8 +213,17 @@ function RouteComponent() {
 
 		if (!state?.replayData) return;
 
+		// Ensure all messages have IDs (for backward compatibility)
+		const replayDataWithIds = {
+			...state.replayData,
+			messages: state.replayData.messages.map((msg) => ({
+				...msg,
+				id: msg.id || nanoid(),
+			})),
+		};
+
 		setTimeout(() => {
-			form.reset(state.replayData, { keepDefaultValues: true });
+			form.reset(replayDataWithIds, { keepDefaultValues: true });
 		}, 200);
 	}, [isNewAgent, location.state, form]);
 

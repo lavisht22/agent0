@@ -6,6 +6,7 @@ import { ThemedJsonEditor } from "./themed-json-editor";
 import { Variables } from "./variables";
 
 export const toolMessageSchema = z.object({
+	id: z.string(),
 	role: z.literal("tool"),
 	content: z.array(
 		z.object({
@@ -56,11 +57,13 @@ function ToolMessagePart({
 }
 
 export function ToolMessage({
+	id,
 	isReadOnly,
 	value,
 	onValueChange,
 	onVariablePress,
 }: {
+	id: string;
 	isReadOnly?: boolean;
 	value: ToolMessageContent;
 	onValueChange: (value: ToolMessageContent | null) => void;
@@ -78,7 +81,7 @@ export function ToolMessage({
 	return (
 		<Card>
 			<CardHeader className="flex items-center justify-between pl-3 pr-1 h-10">
-				<span className="text-sm text-default-500">Tool</span>
+				<span className="text-sm text-default-500">Tool | {id}</span>
 			</CardHeader>
 			<CardBody className="p-3 border-t border-default-200 flex flex-col gap-3">
 				{value.map((part, index) => {

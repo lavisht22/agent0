@@ -23,6 +23,7 @@ import { z } from "zod";
 import { Variables } from "./variables";
 
 export const userMessageSchema = z.object({
+	id: z.string(),
 	role: z.literal("user"),
 	content: z
 		.array(
@@ -130,11 +131,13 @@ function UserMessagePart({
 }
 
 export function UserMessage({
+	id,
 	isReadOnly,
 	value,
 	onValueChange,
 	onVariablePress,
 }: {
+	id: string;
 	isReadOnly?: boolean;
 	value: UserMessageContent;
 	onValueChange: (value: UserMessageContent | null) => void;
@@ -236,7 +239,7 @@ export function UserMessage({
 		<>
 			<Card>
 				<CardHeader className="flex items-center justify-between pl-3 pr-1 h-10">
-					<span className="text-sm text-default-500">User</span>
+					<span className="text-sm text-default-500">User | {id}</span>
 					{!isReadOnly && (
 						<Dropdown>
 							<DropdownTrigger>

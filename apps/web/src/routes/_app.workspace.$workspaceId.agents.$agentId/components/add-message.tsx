@@ -6,6 +6,7 @@ import {
 	DropdownTrigger,
 } from "@heroui/react";
 import { LucideListPlus } from "lucide-react";
+import { nanoid } from "nanoid";
 import type { MessageT } from "@/components/messages";
 
 export function AddMessage({ onAdd }: { onAdd: (m: MessageT) => void }) {
@@ -25,14 +26,22 @@ export function AddMessage({ onAdd }: { onAdd: (m: MessageT) => void }) {
 					key="user"
 					title="User Message"
 					onPress={() => {
-						onAdd({ role: "user", content: [{ type: "text", text: "" }] });
+						onAdd({
+							id: nanoid(),
+							role: "user",
+							content: [{ type: "text", text: "" }],
+						});
 					}}
 				/>
 				<DropdownItem
 					key="assistant"
 					title="Assistant Message"
 					onPress={() => {
-						onAdd({ role: "assistant", content: [{ type: "text", text: "" }] });
+						onAdd({
+							id: nanoid(),
+							role: "assistant",
+							content: [{ type: "text", text: "" }],
+						});
 					}}
 				/>
 				<DropdownItem
@@ -40,6 +49,7 @@ export function AddMessage({ onAdd }: { onAdd: (m: MessageT) => void }) {
 					title="Tool Message"
 					onPress={() => {
 						onAdd({
+							id: nanoid(),
 							role: "tool",
 							content: [
 								{

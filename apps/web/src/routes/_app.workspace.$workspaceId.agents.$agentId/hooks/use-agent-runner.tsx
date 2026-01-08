@@ -2,6 +2,7 @@ import { addToast } from "@heroui/react";
 import type { Tables } from "@repo/database";
 import type { TextStreamPart, Tool } from "ai";
 import { events } from "fetch-event-stream";
+import { nanoid } from "nanoid";
 import { useCallback, useState } from "react";
 import type z from "zod";
 import type { assistantMessageSchema } from "@/components/assistant-message";
@@ -81,6 +82,7 @@ export const useAgentRunner = ({
 
 					if (parsed.type === "start-step") {
 						generatedMessageState.push({
+							id: nanoid(),
 							role: "assistant",
 							content: [],
 						});
@@ -138,6 +140,7 @@ export const useAgentRunner = ({
 
 					if (parsed.type === "tool-result") {
 						generatedMessageState.push({
+							id: nanoid(),
 							role: "tool",
 							content: [
 								{
@@ -156,6 +159,7 @@ export const useAgentRunner = ({
 
 					if (parsed.type === "tool-error") {
 						generatedMessageState.push({
+							id: nanoid(),
 							role: "tool",
 							content: [
 								{
