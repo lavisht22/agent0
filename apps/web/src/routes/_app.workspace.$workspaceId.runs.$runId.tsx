@@ -26,7 +26,7 @@ import {
 	RotateCcw,
 } from "lucide-react";
 import { Messages, type MessageT } from "@/components/messages";
-import { ThemedJsonEditor } from "@/components/themed-json-editor";
+import { MonacoJsonEditor } from "@/components/monaco-json-editor";
 import { runDataQuery, runQuery } from "@/lib/queries";
 import type { AgentFormValues } from "./_app.workspace.$workspaceId.agents.$agentId/types";
 
@@ -535,14 +535,10 @@ function RouteComponent() {
 				<ModalContent>
 					<ModalHeader>Raw JSON Data</ModalHeader>
 					<ModalBody className="p-6">
-						<ThemedJsonEditor
-							theme={{
-								container: {
-									fontSize: "14px",
-								},
-							}}
-							data={runData || { error: "Run data not available" }}
-							viewOnly
+						<MonacoJsonEditor
+							value={runData || { error: "Run data not available" }}
+							readOnly
+							minHeight={400}
 						/>
 					</ModalBody>
 				</ModalContent>

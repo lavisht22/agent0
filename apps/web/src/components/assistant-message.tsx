@@ -13,7 +13,7 @@ import { LucideGripVertical, LucidePlus, LucideTrash2 } from "lucide-react";
 import { useMemo } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { z } from "zod";
-import { ThemedJsonEditor } from "./themed-json-editor";
+import { MonacoJsonEditor } from "./monaco-json-editor";
 import { Variables } from "./variables";
 
 export const assistantMessageSchema = z.object({
@@ -104,10 +104,10 @@ function AssistantMessagePart({
 	if (value.type === "tool-call") {
 		return (
 			<div className="w-full space-y-2 bg-default-50 dark:bg-default-100 rounded-large">
-				<ThemedJsonEditor
-					viewOnly={isReadOnly}
-					data={value}
-					setData={(newData) => {
+				<MonacoJsonEditor
+					readOnly={isReadOnly}
+					value={value}
+					onChange={(newData) => {
 						onValueChange(newData as AssistantMessageContent[number]);
 					}}
 				/>

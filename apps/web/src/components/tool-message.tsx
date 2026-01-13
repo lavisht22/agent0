@@ -3,7 +3,7 @@ import { Reorder, useDragControls } from "framer-motion";
 import { LucideGripVertical, LucideTrash2 } from "lucide-react";
 import { useMemo } from "react";
 import { z } from "zod";
-import { ThemedJsonEditor } from "./themed-json-editor";
+import { MonacoJsonEditor } from "./monaco-json-editor";
 import { Variables } from "./variables";
 
 export const toolMessageSchema = z.object({
@@ -45,10 +45,10 @@ function ToolMessagePart({
 						: "",
 				)}
 			>
-				<ThemedJsonEditor
-					viewOnly={isReadOnly}
-					data={value}
-					setData={(newData) => {
+				<MonacoJsonEditor
+					readOnly={isReadOnly}
+					value={value}
+					onChange={(newData) => {
 						onValueChange(newData as ToolMessageContent[number]);
 					}}
 				/>

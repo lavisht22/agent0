@@ -127,7 +127,6 @@ export const prepareMCPServers = async (data: VersionData) => {
 		return selectedTool;
 	});
 
-	// Process custom tools - create tool definitions without execute functions
 	const selectedCustomTools = customTools.map((tool) => {
 		const customTool = tool as {
 			type: "custom";
@@ -136,11 +135,6 @@ export const prepareMCPServers = async (data: VersionData) => {
 			inputSchema?: Record<string, unknown>;
 		};
 
-		// Create a tool definition compatible with AI SDK
-		// Custom tools don't have an execute function - the model will generate tool calls
-		// but execution must be handled externally (e.g., by the caller)
-
-		console.log("REACHED", customTool);
 		const toolDefinition: Tool = {
 			title: customTool.title,
 			description: customTool.description,
