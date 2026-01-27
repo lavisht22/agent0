@@ -375,11 +375,6 @@ export const dashboardStatsQuery = (
 				: { from: dateFilter.startDate, to: dateFilter.endDate },
 		],
 		queryFn: async () => {
-			let query = supabase
-				.from("runs")
-				.select("id, is_error, cost, tokens, pre_processing_time, first_token_time, response_time")
-				.eq("workspace_id", workspaceId);
-
 			// Compute date range
 			let dateRange: { from: string; to: string } | null = null;
 			if (dateFilter.datePreset) {
@@ -388,40 +383,34 @@ export const dashboardStatsQuery = (
 				dateRange = { from: dateFilter.startDate, to: dateFilter.endDate };
 			}
 
-			if (dateRange) {
-				query = query.gte("created_at", dateRange.from);
-				query = query.lte("created_at", dateRange.to);
-			}
-
-			const { data, error } = await query;
+			// Use RPC function to calculate stats at database level (avoids 1000 row limit)
+			const { data, error } = await supabase.rpc("get_dashboard_stats", {
+				p_workspace_id: workspaceId,
+				p_start_date: dateRange?.from,
+				p_end_date: dateRange?.to,
+			});
 
 			if (error) throw error;
 
-			const totalRuns = data.length;
-			const successfulRuns = data.filter((r) => !r.is_error).length;
-			const successRate = totalRuns > 0 ? (successfulRuns / totalRuns) * 100 : 0;
-			const totalCost = data.reduce((sum, r) => sum + (r.cost || 0), 0);
-			const totalTokens = data.reduce((sum, r) => sum + (r.tokens || 0), 0);
-			const avgResponseTime =
-				totalRuns > 0
-					? data.reduce(
-							(sum, r) =>
-								sum +
-								(r.pre_processing_time || 0) +
-								(r.first_token_time || 0) +
-								(r.response_time || 0),
-							0,
-						) / totalRuns
-					: 0;
+			// Parse the response - RPC returns json object
+			const stats = data as {
+				total_runs: number;
+				successful_runs: number;
+				failed_runs: number;
+				success_rate: number;
+				total_cost: number;
+				total_tokens: number;
+				avg_response_time: number;
+			};
 
 			return {
-				totalRuns,
-				successfulRuns,
-				failedRuns: totalRuns - successfulRuns,
-				successRate,
-				totalCost,
-				totalTokens,
-				avgResponseTime,
+				totalRuns: stats.total_runs,
+				successfulRuns: stats.successful_runs,
+				failedRuns: stats.failed_runs,
+				successRate: stats.success_rate,
+				totalCost: stats.total_cost,
+				totalTokens: stats.total_tokens,
+				avgResponseTime: stats.avg_response_time,
 			};
 		},
 		enabled: !!workspaceId,
@@ -458,11 +447,6 @@ export const topAgentsQuery = (
 				: { from: dateFilter.startDate, to: dateFilter.endDate },
 		],
 		queryFn: async () => {
-			let query = supabase
-				.from("runs")
-				.select("id, is_error, cost, versions!inner(agent_id, agents:agent_id(id, name))")
-				.eq("workspace_id", workspaceId);
-
 			// Compute date range
 			let dateRange: { from: string; to: string } | null = null;
 			if (dateFilter.datePreset) {
@@ -471,44 +455,26 @@ export const topAgentsQuery = (
 				dateRange = { from: dateFilter.startDate, to: dateFilter.endDate };
 			}
 
-			if (dateRange) {
-				query = query.gte("created_at", dateRange.from);
-				query = query.lte("created_at", dateRange.to);
-			}
-
-			const { data, error } = await query;
+			// Use RPC function to aggregate at database level (avoids 1000 row limit)
+			const { data, error } = await supabase.rpc("get_top_agents", {
+				p_workspace_id: workspaceId,
+				p_start_date: dateRange?.from,
+				p_end_date: dateRange?.to,
+				p_limit: 5,
+			});
 
 			if (error) throw error;
 
-			// Aggregate by agent
-			const agentStats = new Map<
-				string,
-				{ id: string; name: string; runs: number; errors: number; cost: number }
-			>();
+			// Parse the response - RPC returns json array
+			const agents = data as Array<{
+				id: string;
+				name: string;
+				runs: number;
+				errors: number;
+				cost: number;
+			}>;
 
-			for (const run of data) {
-				const agent = run.versions?.agents;
-				if (!agent) continue;
-
-				const existing = agentStats.get(agent.id) || {
-					id: agent.id,
-					name: agent.name,
-					runs: 0,
-					errors: 0,
-					cost: 0,
-				};
-
-				existing.runs += 1;
-				if (run.is_error) existing.errors += 1;
-				existing.cost += run.cost || 0;
-
-				agentStats.set(agent.id, existing);
-			}
-
-			// Sort by runs and return top 5
-			return Array.from(agentStats.values())
-				.sort((a, b) => b.runs - a.runs)
-				.slice(0, 5);
+			return agents;
 		},
 		enabled: !!workspaceId,
 	});
