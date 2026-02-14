@@ -10,7 +10,7 @@ import {
 import { supabase } from "./db.js";
 import { decryptMessage } from "./openpgp.js";
 import { getAIProvider } from "./providers.js";
-import type { MCPConfig, VersionData } from "./types.js";
+import type { MCPConfig, MCPOptions, VersionData } from "./types.js";
 import { applyVariablesToMessages } from "./variables.js";
 
 // Helper to prepare provider and messages - shared logic between generate and stream
@@ -54,7 +54,10 @@ export const prepareProviderAndMessages = async (
 type MCPClient = Awaited<ReturnType<typeof createMCPClient>>;
 type Tools = Awaited<ReturnType<MCPClient["tools"]>>;
 
-export const prepareMCPServers = async (data: VersionData) => {
+export const prepareMCPServers = async (
+	data: VersionData,
+	mcpOptions?: Record<string, MCPOptions>,
+) => {
 	const { tools } = data;
 
 	if (!tools || tools.length === 0) {
@@ -94,6 +97,15 @@ export const prepareMCPServers = async (data: VersionData) => {
 			mcps.map(async (mcp) => {
 				const decrypted = await decryptMessage(mcp.encrypted_data as string);
 				const config: MCPConfig = JSON.parse(decrypted);
+
+				// Merge runtime custom headers from mcpOptions
+				if (mcpOptions?.[mcp.id]?.headers) {
+					config.transport.headers = {
+						...config.transport.headers,
+						...mcpOptions[mcp.id].headers,
+					};
+				}
+
 				const mcpClient = await createMCPClient(config);
 				const tools = await mcpClient.tools();
 				servers[mcp.id] = { client: mcpClient, tools };

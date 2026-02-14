@@ -36,10 +36,11 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			return reply.code(401).send({ message: "Failed to get claims" });
 		}
 
-		const { data, variables, version_id } = request.body as {
+		const { data, variables, version_id, mcp_options } = request.body as {
 			data: unknown;
 			variables: Record<string, string>;
 			version_id: string;
+			mcp_options?: Record<string, { headers?: Record<string, string> }>;
 		};
 
 		const versionData = data as VersionData;
@@ -71,7 +72,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 		const [{ model, processedMessages }, { tools, closeAll }] =
 			await Promise.all([
 				prepareProviderAndMessages(versionData, variables),
-				prepareMCPServers(versionData),
+				prepareMCPServers(versionData, mcp_options),
 			]);
 
 		runData.request = {

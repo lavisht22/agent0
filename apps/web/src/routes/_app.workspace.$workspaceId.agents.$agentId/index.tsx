@@ -33,6 +33,7 @@ import {
 	agentQuery,
 	agentTagsQuery,
 	agentVersionsQuery,
+	mcpsQuery,
 	providersQuery,
 } from "@/lib/queries";
 import { Action } from "./components/action";
@@ -66,6 +67,11 @@ function RouteComponent() {
 			defaultValue: {} as Record<string, string>,
 		},
 	);
+	const [mcpHeaderValues, setMcpHeaderValues] = useDb<
+		Record<string, Record<string, string>>
+	>(`agent-mcp-headers-${agentId}`, {
+		defaultValue: {} as Record<string, Record<string, string>>,
+	});
 
 	const { isOpen: isVariablesOpen, onOpenChange: onVariablesOpenChange } =
 		useDisclosure();
@@ -83,6 +89,9 @@ function RouteComponent() {
 
 	// Fetch available providers
 	const { data: providers } = useQuery(providersQuery(workspaceId));
+
+	// Fetch MCPs (for custom headers in the variables drawer)
+	const { data: mcps } = useQuery(mcpsQuery(workspaceId));
 
 	// Fetch existing agent versions if editing
 	const { data: versions } = useQuery({
@@ -123,7 +132,7 @@ function RouteComponent() {
 		handleRun,
 		resetRunner,
 		generatedMessages,
-	} = useAgentRunner({ variableValues, version });
+	} = useAgentRunner({ variableValues, mcpHeaderValues, version });
 
 	// Initialize TanStack Form
 	const form = useForm({
@@ -300,8 +309,13 @@ function RouteComponent() {
 						/>
 					)}
 
-					<form.Subscribe selector={(state) => state.values.messages}>
-						{(messages) => (
+					<form.Subscribe
+						selector={(state) => ({
+							messages: state.values.messages,
+							tools: state.values.tools,
+						})}
+					>
+						{({ messages, tools }) => (
 							<VariablesDrawer
 								isOpen={isVariablesOpen}
 								onOpenChange={onVariablesOpenChange}
@@ -309,6 +323,10 @@ function RouteComponent() {
 								values={variableValues}
 								onValuesChange={setVariableValues}
 								onRun={() => handleRun(form.state.values)}
+								mcps={mcps}
+								tools={tools}
+								mcpHeaderValues={mcpHeaderValues}
+								onMcpHeaderValuesChange={setMcpHeaderValues}
 							/>
 						)}
 					</form.Subscribe>
