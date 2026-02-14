@@ -1,0 +1,1 @@
+alter table "public"."mcps" add column "custom_headers" text not null default ''::text;
