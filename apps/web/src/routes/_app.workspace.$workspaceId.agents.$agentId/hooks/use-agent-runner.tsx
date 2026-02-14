@@ -11,9 +11,11 @@ import { supabase } from "@/lib/supabase";
 
 export const useAgentRunner = ({
 	variableValues,
+	mcpHeaderValues,
 	version,
 }: {
 	variableValues: Record<string, string>;
+	mcpHeaderValues: Record<string, Record<string, string>>;
 	version?: Tables<"versions">;
 }) => {
 	const [isRunning, setIsRunning] = useState(false);
@@ -57,6 +59,13 @@ export const useAgentRunner = ({
 						data,
 						variables: variableValues,
 						version_id: version?.id,
+						mcp_options: Object.fromEntries(
+							Object.entries(mcpHeaderValues)
+								.filter(([, headers]) =>
+									Object.values(headers).some((v) => v),
+								)
+								.map(([id, headers]) => [id, { headers }]),
+						),
 					}),
 				});
 
@@ -188,7 +197,7 @@ export const useAgentRunner = ({
 				setIsRunning(false);
 			}
 		},
-		[variableValues, version],
+		[variableValues, mcpHeaderValues, version],
 	);
 
 	const resetRunner = useCallback(() => {

@@ -42,7 +42,7 @@ export const mcpsQuery = (workspaceId: string) =>
 		queryFn: async () => {
 			const { data, error } = await supabase
 				.from("mcps")
-				.select("id, name, tools, created_at, updated_at")
+				.select("id, name, tools, custom_headers, created_at, updated_at")
 				.eq("workspace_id", workspaceId)
 				.order("created_at", { ascending: false });
 

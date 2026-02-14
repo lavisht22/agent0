@@ -61,6 +61,7 @@ export class Agent0 {
 			overrides: options.overrides,
 			extra_messages: options.extraMessages,
 			extra_tools: options.extraTools,
+			mcp_options: options.mcpOptions,
 			stream: false,
 		});
 
@@ -77,6 +78,7 @@ export class Agent0 {
 			overrides: options.overrides,
 			extra_messages: options.extraMessages,
 			extra_tools: options.extraTools,
+			mcp_options: options.mcpOptions,
 			stream: true,
 		});
 

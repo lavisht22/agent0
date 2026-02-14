@@ -91,6 +91,9 @@ interface RunOptions {
   overrides?: ModelOverrides;         // Runtime model configuration overrides
   extraMessages?: Message[];          // Extra messages to append to the prompt
   extraTools?: CustomTool[];          // Additional custom tools to add at runtime
+  mcpOptions?: Record<string, {      // Per-MCP server runtime options (keyed by MCP ID)
+    headers?: Record<string, string>; // Custom HTTP headers to send with MCP requests
+  }>;
 }
 
 interface CustomTool {
@@ -737,6 +740,54 @@ for await (const chunk of stream) {
   }
 }
 ```
+
+### MCP Custom Headers (`mcpOptions`)
+
+If your MCP servers require dynamic headers at runtime (e.g., authentication tokens, tenant IDs), you can pass them via `mcpOptions`. First, configure the header names on your MCP server in the Agent0 dashboard (under **Custom Headers**), then provide the values at runtime.
+
+Headers are keyed by MCP server ID:
+
+```typescript
+const response = await client.generate({
+  agentId: 'agent_123',
+  mcpOptions: {
+    'mcp-server-id-1': {
+      headers: {
+        'X-User-Token': 'bearer-token-here',
+        'X-Tenant-Id': 'tenant-456'
+      }
+    },
+    'mcp-server-id-2': {
+      headers: {
+        'Authorization': 'Bearer another-token'
+      }
+    }
+  }
+});
+```
+
+**Streaming with Custom Headers:**
+
+```typescript
+const stream = client.stream({
+  agentId: 'agent_123',
+  mcpOptions: {
+    'mcp-server-id': {
+      headers: {
+        'X-User-Token': userSession.token
+      }
+    }
+  }
+});
+
+for await (const chunk of stream) {
+  if (chunk.type === 'text-delta') {
+    process.stdout.write(chunk.textDelta);
+  }
+}
+```
+
+> ⚠️ **Note**: Only header names that are pre-configured as "Custom Headers" on the MCP server will be sent. Any extra headers not in the allowed list are ignored.
 
 ### Error Handling
 

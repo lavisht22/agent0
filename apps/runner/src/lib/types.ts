@@ -81,3 +81,7 @@ export type MCPConfig = {
 		headers?: Record<string, string>;
 	};
 };
+
+export type MCPOptions = {
+	headers?: Record<string, string>;
+};
