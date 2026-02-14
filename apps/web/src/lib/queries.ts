@@ -361,3 +361,154 @@ export const workspaceUserQuery = (workspaceId: string) =>
 		},
 		enabled: !!workspaceId,
 	});
+
+export const dashboardStatsQuery = (
+	workspaceId: string,
+	dateFilter: DateRangeValue,
+) =>
+	queryOptions({
+		queryKey: [
+			"dashboard-stats",
+			workspaceId,
+			dateFilter.datePreset
+				? { preset: dateFilter.datePreset }
+				: { from: dateFilter.startDate, to: dateFilter.endDate },
+		],
+		queryFn: async () => {
+			let query = supabase
+				.from("runs")
+				.select("id, is_error, cost, tokens, pre_processing_time, first_token_time, response_time")
+				.eq("workspace_id", workspaceId);
+
+			// Compute date range
+			let dateRange: { from: string; to: string } | null = null;
+			if (dateFilter.datePreset) {
+				dateRange = computeDateRangeFromPreset(dateFilter.datePreset);
+			} else if (dateFilter.startDate && dateFilter.endDate) {
+				dateRange = { from: dateFilter.startDate, to: dateFilter.endDate };
+			}
+
+			if (dateRange) {
+				query = query.gte("created_at", dateRange.from);
+				query = query.lte("created_at", dateRange.to);
+			}
+
+			const { data, error } = await query;
+
+			if (error) throw error;
+
+			const totalRuns = data.length;
+			const successfulRuns = data.filter((r) => !r.is_error).length;
+			const successRate = totalRuns > 0 ? (successfulRuns / totalRuns) * 100 : 0;
+			const totalCost = data.reduce((sum, r) => sum + (r.cost || 0), 0);
+			const totalTokens = data.reduce((sum, r) => sum + (r.tokens || 0), 0);
+			const avgResponseTime =
+				totalRuns > 0
+					? data.reduce(
+							(sum, r) =>
+								sum +
+								(r.pre_processing_time || 0) +
+								(r.first_token_time || 0) +
+								(r.response_time || 0),
+							0,
+						) / totalRuns
+					: 0;
+
+			return {
+				totalRuns,
+				successfulRuns,
+				failedRuns: totalRuns - successfulRuns,
+				successRate,
+				totalCost,
+				totalTokens,
+				avgResponseTime,
+			};
+		},
+		enabled: !!workspaceId,
+	});
+
+export const recentRunsQuery = (workspaceId: string) =>
+	queryOptions({
+		queryKey: ["recent-runs", workspaceId],
+		queryFn: async () => {
+			const { data, error } = await supabase
+				.from("runs")
+				.select("*, versions!inner(id, agent_id, agents:agent_id(name))")
+				.eq("workspace_id", workspaceId)
+				.order("created_at", { ascending: false })
+				.limit(5);
+
+			if (error) throw error;
+
+			return data;
+		},
+		enabled: !!workspaceId,
+	});
+
+export const topAgentsQuery = (
+	workspaceId: string,
+	dateFilter: DateRangeValue,
+) =>
+	queryOptions({
+		queryKey: [
+			"top-agents",
+			workspaceId,
+			dateFilter.datePreset
+				? { preset: dateFilter.datePreset }
+				: { from: dateFilter.startDate, to: dateFilter.endDate },
+		],
+		queryFn: async () => {
+			let query = supabase
+				.from("runs")
+				.select("id, is_error, cost, versions!inner(agent_id, agents:agent_id(id, name))")
+				.eq("workspace_id", workspaceId);
+
+			// Compute date range
+			let dateRange: { from: string; to: string } | null = null;
+			if (dateFilter.datePreset) {
+				dateRange = computeDateRangeFromPreset(dateFilter.datePreset);
+			} else if (dateFilter.startDate && dateFilter.endDate) {
+				dateRange = { from: dateFilter.startDate, to: dateFilter.endDate };
+			}
+
+			if (dateRange) {
+				query = query.gte("created_at", dateRange.from);
+				query = query.lte("created_at", dateRange.to);
+			}
+
+			const { data, error } = await query;
+
+			if (error) throw error;
+
+			// Aggregate by agent
+			const agentStats = new Map<
+				string,
+				{ id: string; name: string; runs: number; errors: number; cost: number }
+			>();
+
+			for (const run of data) {
+				const agent = run.versions?.agents;
+				if (!agent) continue;
+
+				const existing = agentStats.get(agent.id) || {
+					id: agent.id,
+					name: agent.name,
+					runs: 0,
+					errors: 0,
+					cost: 0,
+				};
+
+				existing.runs += 1;
+				if (run.is_error) existing.errors += 1;
+				existing.cost += run.cost || 0;
+
+				agentStats.set(agent.id, existing);
+			}
+
+			// Sort by runs and return top 5
+			return Array.from(agentStats.values())
+				.sort((a, b) => b.runs - a.runs)
+				.slice(0, 5);
+		},
+		enabled: !!workspaceId,
+	});
