@@ -103,6 +103,13 @@ const MODEL_COSTS: {
 		output: 0.5,
 	},
 
+	// Gemini 3.1
+	"gemini-3.1-pro-preview": {
+		noCacheInput: 2,
+		cacheInput: 0.2,
+		output: 12,
+	},
+
 	// Gemini 3
 	"gemini-3-pro-preview": {
 		noCacheInput: 2,
