@@ -81,6 +81,20 @@ export const MicrosoftIcon: React.FC<SVGProps<SVGSVGElement>> = (props) => (
 	</svg>
 );
 
+export const AnthropicIcon: React.FC<SVGProps<SVGSVGElement>> = (props) => (
+	<svg
+		xmlns="http://www.w3.org/2000/svg"
+		width={24}
+		height={24}
+		fill={"currentColor"}
+		viewBox="0 0 24 24"
+		{...props}
+	>
+		<title>Anthropic</title>
+		<path d="M13.827 3.52h3.603L24 20.48h-3.603l-6.57-16.96zm-7.258 0h3.767L16.906 20.48h-3.674l-1.343-3.461H5.017l-1.344 3.46H0l6.57-16.96zm2.327 5.099L6.22 14.958h5.352L8.896 8.619z" />
+	</svg>
+);
+
 export const AwsIcon: React.FC<SVGProps<SVGSVGElement>> = (props) => (
 	<svg
 		xmlns="http://www.w3.org/2000/svg"

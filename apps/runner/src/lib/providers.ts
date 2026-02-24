@@ -11,6 +11,10 @@ import {
 	createVertex,
 	type GoogleVertexProviderSettings,
 } from "@ai-sdk/google-vertex/edge";
+import {
+	createVertexAnthropic,
+	type GoogleVertexAnthropicProviderSettings,
+} from "@ai-sdk/google-vertex/anthropic/edge";
 import { createOpenAI, type OpenAIProviderSettings } from "@ai-sdk/openai";
 import { createXai, type XaiProviderSettings } from "@ai-sdk/xai";
 
@@ -21,6 +25,10 @@ export const getAIProvider = (type: string, data: unknown) => {
 
 	if (type === "google-vertex") {
 		return createVertex(data as GoogleVertexProviderSettings);
+	}
+
+	if (type === "anthropic-vertex") {
+		return createVertexAnthropic(data as GoogleVertexAnthropicProviderSettings);
 	}
 
 	if (type === "openai") {
