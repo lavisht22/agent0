@@ -1,4 +1,5 @@
 import {
+	AnthropicIcon,
 	AwsIcon,
 	GeminiIcon,
 	GoogleCloudIcon,
@@ -77,6 +78,15 @@ export const PROVIDER_TYPES = [
 			"gpt-4.1-mini",
 			"gpt-4.1-nano",
 			"o4-mini",
+		],
+	},
+	{
+		key: "anthropic-vertex",
+		icon: AnthropicIcon,
+		label: "Anthropic Vertex AI",
+		models: [
+			"claude-opus-4-6",
+			"claude-sonnet-4-6",
 		],
 	},
 	{

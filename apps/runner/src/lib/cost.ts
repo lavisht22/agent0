@@ -134,6 +134,17 @@ const MODEL_COSTS: {
 		output: 1,
 	},
 
+	// Vertex AI Claude
+	"claude-opus-4-6": {
+		noCacheInput: 5,
+		cacheInput: 0.5,
+		output: 25,
+	},
+	"claude-sonnet-4-6": {
+		noCacheInput: 3,
+		cacheInput: 0.3,
+		output: 15,
+	},
 	// Bedrock Claude
 	"global.anthropic.claude-opus-4-5-20251101-v1:0": {
 		noCacheInput: 5,
