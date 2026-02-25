@@ -13,6 +13,7 @@ import { useState } from "react";
 export const PROVIDER_TYPES = [
 	{ key: "xai", label: "XAI" },
 	{ key: "vertex", label: "Vertex AI" },
+	{ key: "anthropic-vertex", label: "Anthropic Vertex AI" },
 	{ key: "gemini", label: "Google Gemini" },
 	{ key: "openai", label: "OpenAI" },
 	{ key: "azure_openai", label: "Azure OpenAI" },

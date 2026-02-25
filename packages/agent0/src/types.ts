@@ -78,6 +78,11 @@ export interface RunOptions {
 	extraMessages?: ModelMessage[];
 	/** Additional custom tools to add at runtime. These are merged with any tools defined in the agent. */
 	extraTools?: CustomTool[];
+	/** Per-MCP server runtime options, keyed by MCP server ID. */
+	mcpOptions?: Record<string, {
+		/** Custom headers to send to this MCP server */
+		headers?: Record<string, string>;
+	}>;
 }
 
 export interface GenerateResponse {

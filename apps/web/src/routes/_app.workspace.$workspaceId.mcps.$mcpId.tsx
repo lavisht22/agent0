@@ -2,9 +2,10 @@ import { addToast, Button, Input } from "@heroui/react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Pencil, ShieldAlert } from "lucide-react";
 import { nanoid } from "nanoid";
 import * as openpgp from "openpgp";
+import { useState } from "react";
 import { MonacoJsonField } from "@/components/monaco-json-field";
 import { mcpsQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
@@ -28,11 +29,26 @@ function validateJsonField(value: string) {
 	}
 }
 
+const DEFAULT_CONFIG = JSON.stringify(
+	{
+		transport: {
+			type: "http",
+			url: "https://your-server.com/mcp",
+			headers: { Authorization: "Bearer my-api-key" },
+		},
+	},
+	null,
+	2,
+);
+
 function RouteComponent() {
 	const { workspaceId, mcpId } = Route.useParams();
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const isNewMcp = mcpId === "new";
+
+	// Whether the user has explicitly opted to edit the config
+	const [showConfigEditor, setShowConfigEditor] = useState(false);
 
 	// Fetch existing MCP if editing
 	const { data: mcps } = useQuery({
@@ -44,7 +60,11 @@ function RouteComponent() {
 
 	// Create mutation
 	const createMutation = useMutation({
-		mutationFn: async (values: { name: string; data: string }) => {
+		mutationFn: async (values: {
+			name: string;
+			data: string;
+			custom_headers: string;
+		}) => {
 			const publicKey = await openpgp.readKey({
 				armoredKey: import.meta.env.VITE_PUBLIC_PGP_PUBLIC_KEY,
 			});
@@ -63,13 +83,12 @@ function RouteComponent() {
 				name: values.name,
 				encrypted_data,
 				workspace_id: workspaceId,
+				custom_headers: values.custom_headers.trim() || undefined,
 			});
 
 			if (error) throw error;
 
-			return {
-				id,
-			};
+			return { id };
 		},
 		onSuccess: async ({ id }) => {
 			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });
@@ -86,9 +105,7 @@ function RouteComponent() {
 				data: { session },
 			} = await supabase.auth.getSession();
 
-			if (!session) {
-				return;
-			}
+			if (!session) return;
 
 			const baseURL = import.meta.env.DEV ? "http://localhost:2223" : "";
 
@@ -116,25 +133,35 @@ function RouteComponent() {
 
 	// Update mutation
 	const updateMutation = useMutation({
-		mutationFn: async (values: { name: string; data: string }) => {
-			const publicKey = await openpgp.readKey({
-				armoredKey: import.meta.env.VITE_PUBLIC_PGP_PUBLIC_KEY,
-			});
+		mutationFn: async (values: {
+			name: string;
+			data: string;
+			custom_headers: string;
+			updateConfig: boolean;
+		}) => {
+			const updatePayload: Record<string, unknown> = {
+				name: values.name,
+				custom_headers: values.custom_headers.trim() || undefined,
+				updated_at: new Date().toISOString(),
+			};
 
-			const encrypted_data = await openpgp.encrypt({
-				encryptionKeys: publicKey,
-				message: await openpgp.createMessage({
-					text: values.data,
-				}),
-			});
+			// Only update encrypted_data if user explicitly chose to edit config
+			if (values.updateConfig) {
+				const publicKey = await openpgp.readKey({
+					armoredKey: import.meta.env.VITE_PUBLIC_PGP_PUBLIC_KEY,
+				});
+
+				updatePayload.encrypted_data = await openpgp.encrypt({
+					encryptionKeys: publicKey,
+					message: await openpgp.createMessage({
+						text: values.data,
+					}),
+				});
+			}
 
 			const { error } = await supabase
 				.from("mcps")
-				.update({
-					name: values.name,
-					encrypted_data,
-					updated_at: new Date().toISOString(),
-				})
+				.update(updatePayload)
 				.eq("id", mcpId);
 
 			if (error) throw error;
@@ -156,9 +183,7 @@ function RouteComponent() {
 				data: { session },
 			} = await supabase.auth.getSession();
 
-			if (!session) {
-				return;
-			}
+			if (!session) return;
 
 			const baseURL = import.meta.env.DEV ? "http://localhost:2223" : "";
 
@@ -188,23 +213,17 @@ function RouteComponent() {
 	const form = useForm({
 		defaultValues: {
 			name: currentMcp?.name || "",
-			data: JSON.stringify(
-				{
-					transport: {
-						type: "http",
-						url: "https://your-server.com/mcp",
-						headers: { Authorization: "Bearer my-api-key" },
-					},
-				},
-				null,
-				2,
-			),
+			custom_headers: currentMcp?.custom_headers || "",
+			data: DEFAULT_CONFIG,
 		},
 		onSubmit: async ({ value }) => {
 			if (isNewMcp) {
 				await createMutation.mutateAsync(value);
 			} else {
-				await updateMutation.mutateAsync(value);
+				await updateMutation.mutateAsync({
+					...value,
+					updateConfig: showConfigEditor,
+				});
 			}
 		},
 	});
@@ -265,25 +284,94 @@ function RouteComponent() {
 						)}
 					</form.Field>
 
-					{/* Data Field */}
-					<form.Field
-						name="data"
-						validators={{
-							onChange: ({ value }) => validateJsonField(value),
-						}}
-					>
+					{/* Custom Headers Field */}
+					<form.Field name="custom_headers">
 						{(field) => (
-							<MonacoJsonField
-								label="Configuration (JSON)"
+							<Input
+								label="Custom Headers"
+								placeholder="e.g., X-User-Token, X-Tenant-Id"
 								value={field.state.value}
 								onValueChange={field.handleChange}
-								isRequired
-								description="MCP server configuration in JSON format. See Vercel AI SDK MCP docs for details."
-								isInvalid={field.state.meta.errors.length > 0}
-								errorMessage={field.state.meta.errors[0]}
+								variant="bordered"
+								description="Comma-separated list of header names that callers can provide at runtime."
 							/>
 						)}
 					</form.Field>
+
+					{/* Configuration Section */}
+					{isNewMcp ? (
+						// New MCP: always show the config editor
+						<form.Field
+							name="data"
+							validators={{
+								onChange: ({ value }) => validateJsonField(value),
+							}}
+						>
+							{(field) => (
+								<MonacoJsonField
+									label="Configuration (JSON)"
+									value={field.state.value}
+									onValueChange={field.handleChange}
+									isRequired
+									description="MCP server configuration in JSON format. See Vercel AI SDK MCP docs for details."
+									isInvalid={field.state.meta.errors.length > 0}
+									errorMessage={field.state.meta.errors[0]}
+								/>
+							)}
+						</form.Field>
+					) : showConfigEditor ? (
+						// Editing: user explicitly chose to edit config
+						<>
+							<div className="flex items-center gap-2 rounded-lg bg-warning-50 px-3 py-2 text-warning-700 text-sm">
+								<ShieldAlert className="size-4 shrink-0" />
+								<span>
+									You are updating the server configuration. This will
+									overwrite the existing encrypted config.
+								</span>
+							</div>
+							<form.Field
+								name="data"
+								validators={{
+									onChange: ({ value }) => validateJsonField(value),
+								}}
+							>
+								{(field) => (
+									<MonacoJsonField
+										label="New Configuration (JSON)"
+										value={field.state.value}
+										onValueChange={field.handleChange}
+										isRequired
+										description="Enter the new MCP server configuration. This will replace the existing config."
+										isInvalid={field.state.meta.errors.length > 0}
+										errorMessage={field.state.meta.errors[0]}
+									/>
+								)}
+							</form.Field>
+						</>
+					) : (
+						// Editing: config is collapsed by default
+						<div className="rounded-lg border border-default-200 p-4">
+							<div className="flex items-center justify-between">
+								<div>
+									<p className="text-sm font-medium text-default-700">
+										Server Configuration
+									</p>
+									<p className="text-xs text-default-400 mt-1">
+										The configuration is stored encrypted. Click edit to
+										replace it with a new config.
+									</p>
+								</div>
+								<Button
+									size="sm"
+									variant="flat"
+									startContent={<Pencil className="size-3" />}
+									onPress={() => setShowConfigEditor(true)}
+								>
+									Edit Config
+								</Button>
+							</div>
+						</div>
+					)}
 
 					<div className="flex justify-end gap-3">
 						<Button

@@ -32,6 +32,7 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 			overrides,
 			extra_messages,
 			extra_tools,
+			mcp_options,
 		} = request.body as {
 			agent_id: string;
 			environment?: "staging" | "production";
@@ -44,6 +45,7 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 				description: string;
 				inputSchema?: Record<string, unknown>;
 			}[];
+			mcp_options?: Record<string, { headers?: Record<string, string> }>;
 		};
 
 		// Validate request body
@@ -135,7 +137,7 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 		const [{ model, processedMessages }, { tools, closeAll }] =
 			await Promise.all([
 				prepareProviderAndMessages(data, variables),
-				prepareMCPServers(data),
+				prepareMCPServers(data, mcp_options),
 			]);
 
 		// Wrap all remaining logic in try-finally to ensure MCP clients are always closed

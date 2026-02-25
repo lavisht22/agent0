@@ -169,6 +169,7 @@ export type Database = {
       mcps: {
         Row: {
           created_at: string
+          custom_headers: string
           encrypted_data: Json
           id: string
           name: string
@@ -178,6 +179,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          custom_headers?: string
           encrypted_data: Json
           id: string
           name: string
@@ -187,6 +189,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          custom_headers?: string
           encrypted_data?: Json
           id?: string
           name?: string
