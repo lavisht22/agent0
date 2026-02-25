@@ -4,7 +4,8 @@
 	"main": "index.ts",
 	"scripts": {
 		"types": "supabase gen types typescript --linked > database.types.ts",
-		"pull": "supabase db pull"
+		"pull": "supabase db pull",
+		"push": "supabase db push"
 	},
 	"devDependencies": {
 		"supabase": "^2.76.8",

@@ -477,6 +477,23 @@ export type Database = {
     }
     Functions: {
       delete_old_runs: { Args: never; Returns: undefined }
+      get_dashboard_stats: {
+        Args: {
+          p_workspace_id: string
+          p_start_date?: string
+          p_end_date?: string
+        }
+        Returns: Json
+      }
+      get_top_agents: {
+        Args: {
+          p_workspace_id: string
+          p_start_date?: string
+          p_end_date?: string
+          p_limit?: number
+        }
+        Returns: Json
+      }
       is_workspace_admin: {
         Args: { p_user_id: string; p_workspace_id: string }
         Returns: boolean
