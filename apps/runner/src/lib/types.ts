@@ -11,6 +11,7 @@ export type ProviderOptions = {
 	openai?: OpenAIResponsesProviderOptions;
 	xai?: XaiProviderOptions;
 	google?: GoogleGenerativeAIProviderOptions;
+	vertex?: GoogleGenerativeAIProviderOptions;
 };
 
 /**

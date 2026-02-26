@@ -55,6 +55,19 @@ export const agentFormSchema = z.object({
 					.optional(),
 			})
 			.optional(),
+		vertex: z
+			.object({
+				thinkingConfig: z
+					.object({
+						thinkingBudget: z.number().optional(),
+						thinkingLevel: z
+							.enum(["minimal", "low", "medium", "high"])
+							.optional(),
+						includeThoughts: z.boolean().optional(),
+					})
+					.optional(),
+			})
+			.optional(),
 	}),
 });
 

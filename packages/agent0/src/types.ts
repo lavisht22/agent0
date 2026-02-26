@@ -20,8 +20,10 @@ export interface ProviderOptions {
 	openai?: OpenAIResponsesProviderOptions;
 	/** xAI reasoning effort options */
 	xai?: XaiProviderOptions;
-	/** Google/Vertex thinking configuration */
+	/** Google Generative AI thinking configuration */
 	google?: GoogleGenerativeAIProviderOptions;
+	/** Google Vertex AI thinking configuration */
+	vertex?: GoogleGenerativeAIProviderOptions;
 	/** Amazon Bedrock thinking configuration */
 	bedrock?: BedrockProviderOptions;
 }

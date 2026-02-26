@@ -38,7 +38,8 @@ x-api-key: <your-api-key>
     "providerOptions": {
       "openai": { "reasoningEffort": "minimal" | "low" | "medium" | "high", "reasoningSummary": "auto" | "detailed" },
       "xai": { "reasoningEffort": "low" | "medium" | "high" },
-      "google": { "thinkingConfig": { "thinkingBudget": number, "thinkingLevel": "low" | "medium" | "high", "includeThoughts": boolean } }
+      "google": { "thinkingConfig": { "thinkingBudget": number, "thinkingLevel": "low" | "medium" | "high", "includeThoughts": boolean } },
+      "vertex": { "thinkingConfig": { "thinkingBudget": number, "thinkingLevel": "low" | "medium" | "high", "includeThoughts": boolean } }
     }
   },
   "extra_messages": [
@@ -63,7 +64,8 @@ x-api-key: <your-api-key>
     - For OpenAI/Azure: `{ openai: { reasoningEffort: 'minimal' | 'low' | 'medium' | 'high', reasoningSummary: 'auto' | 'detailed' } }`
       - `reasoningSummary: 'auto'` returns a condensed summary; `'detailed'` returns comprehensive reasoning. When enabled, reasoning summaries appear in the stream as events with type `'reasoning'`.
     - For xAI: `{ xai: { reasoningEffort: 'low' | 'medium' | 'high' } }`
-    - For Google/Vertex: `{ google: { thinkingConfig: { thinkingBudget?: number, thinkingLevel?: 'low' | 'medium' | 'high', includeThoughts?: boolean } } }` (use either thinkingBudget OR thinkingLevel, not both)
+    - For Google Generative AI: `{ google: { thinkingConfig: { thinkingBudget?: number, thinkingLevel?: 'low' | 'medium' | 'high', includeThoughts?: boolean } } }` (use either thinkingBudget OR thinkingLevel, not both)
+    - For Google Vertex AI: `{ vertex: { thinkingConfig: { thinkingBudget?: number, thinkingLevel?: 'low' | 'medium' | 'high', includeThoughts?: boolean } } }` (use either thinkingBudget OR thinkingLevel, not both)
   - **extra_messages** (optional): Array of messages to append to the agent's prompt (used as-is, no variable substitution)
 
 ## Response
