@@ -128,6 +128,13 @@ interface ProviderOptions {
       includeThoughts?: boolean;
     };
   };
+  vertex?: {
+    thinkingConfig?: {
+      thinkingBudget?: number;
+      thinkingLevel?: 'low' | 'medium' | 'high';
+      includeThoughts?: boolean;
+    };
+  };
 }
 ```
 
@@ -594,7 +601,7 @@ const response = await client.generate({
   agentId: 'agent_123',
   overrides: {
     providerOptions: {
-      google: {
+      vertex: {
         thinkingConfig: {
           thinkingLevel: 'high',     // 'low' | 'medium' | 'high'
           includeThoughts: true      // Include thinking in response
@@ -609,7 +616,7 @@ const response = await client.generate({
   agentId: 'agent_123',
   overrides: {
     providerOptions: {
-      google: {
+      vertex: {
         thinkingConfig: {
           thinkingBudget: 8192,      // Number of thinking tokens
           includeThoughts: true
