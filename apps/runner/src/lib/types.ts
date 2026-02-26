@@ -12,6 +12,9 @@ export type ProviderOptions = {
 	xai?: XaiProviderOptions;
 	google?: GoogleGenerativeAIProviderOptions;
 	vertex?: GoogleGenerativeAIProviderOptions;
+	anthropic?: {
+		effort?: "low" | "medium" | "high" | "max";
+	};
 };
 
 /**
