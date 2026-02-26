@@ -446,7 +446,7 @@ function RouteComponent() {
 													field.handleChange(value as number)
 												}
 												minValue={1}
-												maxValue={10}
+												maxValue={50}
 												step={1}
 											/>
 										)}
