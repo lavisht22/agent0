@@ -68,6 +68,13 @@ export const agentFormSchema = z.object({
 					.optional(),
 			})
 			.optional(),
+		anthropic: z
+			.object({
+				effort: z
+					.enum(["low", "medium", "high", "max"])
+					.optional(),
+			})
+			.optional(),
 	}),
 });
 
