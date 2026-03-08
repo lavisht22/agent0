@@ -173,7 +173,7 @@ function RouteComponent() {
 									{format(item.updated_at, "d LLL, hh:mm a")}
 								</TableCell>
 								<TableCell className="flex justify-end">
-									<Dropdown isDisabled={user?.role !== "admin"}>
+									<Dropdown isDisabled={user?.role !== "admin" && user?.role !== "writer"}>
 										<DropdownTrigger>
 											<Button isIconOnly variant="light">
 												<LucideEllipsisVertical className="size-4" />
@@ -188,6 +188,7 @@ function RouteComponent() {
 											</DropdownItem>
 											<DropdownItem
 												key="edit"
+												isDisabled={user?.role !== "admin"}
 												onPress={() => navigate({ to: item.id })}
 											>
 												Edit
@@ -196,6 +197,7 @@ function RouteComponent() {
 												key="delete"
 												className="text-danger"
 												color="danger"
+												isDisabled={user?.role !== "admin"}
 												onPress={() => {
 													setMcpToDelete({
 														id: item.id,
