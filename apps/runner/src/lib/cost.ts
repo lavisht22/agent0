@@ -4,6 +4,16 @@ const MODEL_COSTS: {
 	[key: string]: { noCacheInput: number; cacheInput: number; output: number };
 } = {
 	// GPT-5 Series
+	"gpt-5.4": {
+		noCacheInput: 2.5,
+		cacheInput: 0.25,
+		output: 15,
+	},
+	"gpt-5.4-pro": {
+		noCacheInput: 30,
+		cacheInput: 30,
+		output: 180,
+	},
 	"gpt-5.2": {
 		noCacheInput: 1.75,
 		cacheInput: 0.175,
