@@ -44,6 +44,7 @@ export const PROVIDER_TYPES = [
 		label: "Google Vertex AI",
 		models: [
 			"gemini-3.1-pro-preview",
+			"gemini-3.1-flash-lite-preview",
 			"gemini-3-flash-preview",
 			"gemini-3-pro-preview",
 			"gemini-2.5-pro",
@@ -56,6 +57,7 @@ export const PROVIDER_TYPES = [
 		label: "Google Generative AI",
 		models: [
 			"gemini-3.1-pro-preview",
+			"gemini-3.1-flash-lite-preview",
 			"gemini-3-flash-preview",
 			"gemini-3-pro-preview",
 			"gemini-2.5-pro",

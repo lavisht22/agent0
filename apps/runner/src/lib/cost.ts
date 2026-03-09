@@ -109,6 +109,11 @@ const MODEL_COSTS: {
 		cacheInput: 0.2,
 		output: 12,
 	},
+	"gemini-3.1-flash-lite-preview": {
+		noCacheInput: 0.25,
+		cacheInput: 0.025,
+		output: 1.5,
+	},
 
 	// Gemini 3
 	"gemini-3-pro-preview": {
