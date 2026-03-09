@@ -25,6 +25,8 @@ export const PROVIDER_TYPES = [
 		icon: OpenaiIcon,
 		label: "OpenAI",
 		models: [
+			"gpt-5.4",
+			"gpt-5.4-pro",
 			"gpt-5.2",
 			"gpt-5.1",
 			"gpt-5.1-chat-latest",
@@ -69,6 +71,8 @@ export const PROVIDER_TYPES = [
 		icon: MicrosoftIcon,
 		label: "Azure OpenAI",
 		models: [
+			"gpt-5.4",
+			"gpt-5.4-pro",
 			"gpt-5.2",
 			"gpt-5.1",
 			"gpt-5.1-chat-latest",
