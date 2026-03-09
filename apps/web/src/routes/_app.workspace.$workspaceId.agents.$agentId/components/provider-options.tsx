@@ -26,6 +26,9 @@ export type ProviderOptionsValue = {
 	};
 	google?: GoogleVertexOptionsValue;
 	vertex?: GoogleVertexOptionsValue;
+	anthropic?: {
+		effort?: "low" | "medium" | "high" | "max";
+	};
 };
 
 interface ProviderOptionsProps {
@@ -170,7 +173,7 @@ export function ProviderOptions({
 }: ProviderOptionsProps) {
 	// Only show for providers with reasoning options
 	if (
-		!["openai", "xai", "azure", "google", "google-vertex"].includes(
+		!["openai", "xai", "azure", "google", "google-vertex", "anthropic-vertex"].includes(
 			providerType,
 		)
 	) {
@@ -283,6 +286,37 @@ export function ProviderOptions({
 					value={value}
 					onValueChange={onValueChange}
 				/>
+			)}
+
+			{/* Anthropic Vertex effort */}
+			{providerType === "anthropic-vertex" && (
+				<Select
+					isClearable
+					variant="bordered"
+					label="Effort"
+					placeholder="Not set"
+					description="Controls how much reasoning effort the model uses"
+					selectedKeys={
+						value?.anthropic?.effort ? [value.anthropic.effort] : []
+					}
+					onSelectionChange={(keys) => {
+						const selected = Array.from(keys)[0] as
+							| "low"
+							| "medium"
+							| "high"
+							| "max"
+							| undefined;
+						onValueChange({
+							...value,
+							anthropic: { effort: selected },
+						});
+					}}
+				>
+					<SelectItem key="low">Low</SelectItem>
+					<SelectItem key="medium">Medium</SelectItem>
+					<SelectItem key="high">High</SelectItem>
+					<SelectItem key="max">Max</SelectItem>
+				</Select>
 			)}
 		</>
 	);
