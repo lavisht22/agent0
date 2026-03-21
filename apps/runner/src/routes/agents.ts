@@ -130,6 +130,18 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 		const { workspaceId } = request;
 		const { agentId } = request.params as { agentId: string };
 
+		const {
+			page = "1",
+			limit = "20",
+		} = request.query as {
+			page?: string;
+			limit?: string;
+		};
+
+		const pageNum = Math.max(1, Number.parseInt(page, 10) || 1);
+		const limitNum = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 20));
+		const offset = (pageNum - 1) * limitNum;
+
 		// Verify agent belongs to workspace
 		const { data: agent, error: agentError } = await supabase
 			.from("agents")
@@ -146,13 +158,14 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			.from("versions")
 			.select("id, agent_id, is_deployed, user_id, created_at")
 			.eq("agent_id", agentId)
-			.order("created_at", { ascending: false });
+			.order("created_at", { ascending: false })
+			.range(offset, offset + limitNum - 1);
 
 		if (error) {
 			return reply.code(500).send({ message: "Failed to fetch versions" });
 		}
 
-		return reply.send({ data: versions });
+		return reply.send({ data: versions, page: pageNum, limit: limitNum });
 	});
 
 	// Get a single version with full content
