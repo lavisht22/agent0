@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { registerAgentRoutes } from "./agents.js";
 import { registerEmbedRoutes } from "./embed.js";
 import { registerInviteRoute } from "./invite.js";
 import { registerRefreshMCPRoute } from "./refresh-mcp.js";
@@ -11,4 +12,5 @@ export async function registerRoutes(fastify: FastifyInstance) {
 	await registerInviteRoute(fastify);
 	await registerRefreshMCPRoute(fastify);
 	await registerEmbedRoutes(fastify);
+	await registerAgentRoutes(fastify);
 }
