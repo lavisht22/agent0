@@ -1,11 +1,9 @@
 import type { FastifyInstance } from "fastify";
-import { validateApiKey } from "../lib/auth.js";
 import { supabase } from "../lib/db.js";
 
 export async function registerAgentRoutes(fastify: FastifyInstance) {
 	fastify.get("/api/v1/agents", async (request, reply) => {
-		const workspaceId = await validateApiKey(request, reply);
-		if (!workspaceId) return;
+		const { workspaceId } = request;
 
 		const {
 			search,

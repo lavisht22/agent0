@@ -53,29 +53,18 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 			return reply.code(400).send({ message: "agent_id is required" });
 		}
 
-		// Extract and validate API key from headers
-		const apiKey = request.headers["x-api-key"] as string;
+		const { workspaceId } = request;
 
-		if (!apiKey) {
-			return reply.code(401).send({ message: "API key is required" });
-		}
-
-		// Get agent with its deployed version IDs and workspace info
+		// Get agent with its deployed version IDs, scoped to the authenticated workspace
 		const { data: agent, error: agentError } = await supabase
 			.from("agents")
-			.select(
-				"staging_version_id, production_version_id, workspaces(id, api_keys(id, key))",
-			)
+			.select("staging_version_id, production_version_id, workspace_id")
 			.eq("id", agent_id)
+			.eq("workspace_id", workspaceId)
 			.single();
 
 		if (agentError || !agent) {
 			return reply.code(404).send({ message: "Agent not found" });
-		}
-
-		// Verify workspace access
-		if (!agent.workspaces.api_keys.map((ak) => ak.key).includes(apiKey)) {
-			return reply.code(403).send({ message: "Access denied" });
 		}
 
 		// Get the version ID for the requested environment
@@ -192,7 +181,7 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 						const id = nanoid();
 						await supabase.from("runs").insert({
 							id,
-							workspace_id: agent.workspaces.id,
+							workspace_id: workspaceId,
 							version_id: version.id,
 							created_at: new Date(startTime).toISOString(),
 							is_error: false,
@@ -236,7 +225,7 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 						const id = nanoid();
 						await supabase.from("runs").insert({
 							id,
-							workspace_id: agent.workspaces.id,
+							workspace_id: workspaceId,
 							version_id: version.id,
 							created_at: new Date(startTime).toISOString(),
 							is_error: true,
@@ -293,7 +282,7 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 				const id = nanoid();
 				await supabase.from("runs").insert({
 					id,
-					workspace_id: agent.workspaces.id,
+					workspace_id: workspaceId,
 					version_id: version.id,
 					created_at: new Date(startTime).toISOString(),
 					is_error: false,
@@ -328,7 +317,7 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 				const id = nanoid();
 				await supabase.from("runs").insert({
 					id,
-					workspace_id: agent.workspaces.id,
+					workspace_id: workspaceId,
 					version_id: version.id,
 					created_at: new Date(startTime).toISOString(),
 					is_error: true,

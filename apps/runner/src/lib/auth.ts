@@ -1,31 +1,39 @@
-import type { FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { supabase } from "./db.js";
 
+declare module "fastify" {
+	interface FastifyRequest {
+		workspaceId: string;
+	}
+}
+
 /**
- * Validates the x-api-key header and returns the workspace_id it belongs to.
- * Sends an error response and returns null if validation fails.
+ * Fastify plugin that validates the x-api-key header and attaches workspaceId to the request.
+ * Register API-key-authenticated routes inside this plugin's scope.
  */
-export async function validateApiKey(
-	request: FastifyRequest,
-	reply: FastifyReply,
-): Promise<string | null> {
-	const apiKey = request.headers["x-api-key"] as string;
+export async function apiKeyAuth(fastify: FastifyInstance) {
+	fastify.decorateRequest("workspaceId", "");
 
-	if (!apiKey) {
-		reply.code(401).send({ message: "API key is required" });
-		return null;
-	}
+	fastify.addHook(
+		"preHandler",
+		async (request: FastifyRequest, reply: FastifyReply) => {
+			const apiKey = request.headers["x-api-key"] as string;
 
-	const { data: apiKeyData, error } = await supabase
-		.from("api_keys")
-		.select("workspace_id")
-		.eq("key", apiKey)
-		.single();
+			if (!apiKey) {
+				return reply.code(401).send({ message: "API key is required" });
+			}
 
-	if (error || !apiKeyData) {
-		reply.code(403).send({ message: "Invalid API key" });
-		return null;
-	}
+			const { data: apiKeyData, error } = await supabase
+				.from("api_keys")
+				.select("workspace_id")
+				.eq("key", apiKey)
+				.single();
 
-	return apiKeyData.workspace_id;
+			if (error || !apiKeyData) {
+				return reply.code(403).send({ message: "Invalid API key" });
+			}
+
+			request.workspaceId = apiKeyData.workspace_id;
+		},
+	);
 }
