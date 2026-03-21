@@ -8,11 +8,12 @@ declare module "fastify" {
 }
 
 /**
- * Fastify plugin that validates the x-api-key header and attaches workspaceId to the request.
- * Register API-key-authenticated routes inside this plugin's scope.
+ * Registers API key auth on the given Fastify instance.
+ * Adds a preHandler hook that validates x-api-key and sets request.workspaceId.
+ * Call this directly on a scoped instance — not via fastify.register().
  */
-export async function apiKeyAuth(fastify: FastifyInstance) {
-	fastify.decorateRequest("workspaceId", "");
+export function addApiKeyAuth(fastify: FastifyInstance) {
+	fastify.decorateRequest("workspaceId", null as unknown as string);
 
 	fastify.addHook(
 		"preHandler",

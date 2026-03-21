@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { apiKeyAuth } from "../lib/auth.js";
+import { addApiKeyAuth } from "../lib/auth.js";
 import { registerAgentRoutes } from "./agents.js";
 import { registerEmbedRoutes } from "./embed.js";
 import { registerRefreshMCPRoute } from "./refresh-mcp.js";
@@ -13,7 +13,7 @@ export async function registerRoutes(fastify: FastifyInstance) {
 
 	// API-key-authenticated routes (middleware validates key and sets request.workspaceId)
 	await fastify.register(async (scoped) => {
-		await scoped.register(apiKeyAuth);
+		addApiKeyAuth(scoped);
 		await registerRunRoute(scoped);
 		await registerEmbedRoutes(scoped);
 		await registerAgentRoutes(scoped);
