@@ -6,7 +6,7 @@ import { decryptMessage } from '../lib/openpgp.js';
 import type { MCPConfig } from '../lib/types.js';
 
 export async function registerRefreshMCPRoute(fastify: FastifyInstance) {
-    fastify.post('/api/v1/refresh-mcp', async (request, reply) => {
+    fastify.post('/internal/refresh-mcp', async (request, reply) => {
         // Extract and validate JWT token from Authorization header
         const token = request.headers.authorization?.split('Bearer ')[1];
 
