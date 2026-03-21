@@ -51,7 +51,38 @@ async function getProvider(workspaceId: string, providerId: string) {
 
 export async function registerEmbedRoutes(fastify: FastifyInstance) {
 	// Single embedding endpoint
-	fastify.post("/api/v1/embed", async (request, reply) => {
+	fastify.post("/api/v1/embed", {
+		schema: {
+			tags: ["Embeddings"],
+			summary: "Generate a single embedding",
+			body: {
+				type: "object" as const,
+				required: ["model", "value"],
+				properties: {
+					model: {
+						type: "object" as const,
+						required: ["provider_id", "name"],
+						properties: {
+							provider_id: { type: "string" as const, description: "Provider ID for the embedding model" },
+							name: { type: "string" as const, description: "Model name" },
+						},
+					},
+					value: { type: "string" as const, description: "Text to embed" },
+				},
+			},
+			response: {
+				200: {
+					type: "object" as const,
+					properties: {
+						embedding: { type: "array" as const, items: { type: "number" as const } },
+					},
+				},
+				400: { type: "object" as const, properties: { message: { type: "string" as const } } },
+				404: { type: "object" as const, properties: { message: { type: "string" as const } } },
+				500: { type: "object" as const, properties: { message: { type: "string" as const } } },
+			},
+		},
+		handler: async (request, reply) => {
 		const body = request.body as SingleEmbedRequest;
 
 		// Validate request body
@@ -68,7 +99,7 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 		const result = await getProvider(request.workspaceId, body.model.provider_id);
 		if (result.error) {
 			return reply
-				.code(result.error.code)
+				.code(result.error.code as 404)
 				.send({ message: result.error.message });
 		}
 
@@ -100,10 +131,42 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 					error instanceof Error ? error.message : "Unknown error occurred",
 			});
 		}
+		},
 	});
 
 	// Multiple embeddings endpoint
-	fastify.post("/api/v1/embed-many", async (request, reply) => {
+	fastify.post("/api/v1/embed-many", {
+		schema: {
+			tags: ["Embeddings"],
+			summary: "Generate multiple embeddings",
+			body: {
+				type: "object" as const,
+				required: ["model", "values"],
+				properties: {
+					model: {
+						type: "object" as const,
+						required: ["provider_id", "name"],
+						properties: {
+							provider_id: { type: "string" as const, description: "Provider ID for the embedding model" },
+							name: { type: "string" as const, description: "Model name" },
+						},
+					},
+					values: { type: "array" as const, items: { type: "string" as const }, description: "Array of texts to embed" },
+				},
+			},
+			response: {
+				200: {
+					type: "object" as const,
+					properties: {
+						embeddings: { type: "array" as const, items: { type: "array" as const, items: { type: "number" as const } } },
+					},
+				},
+				400: { type: "object" as const, properties: { message: { type: "string" as const } } },
+				404: { type: "object" as const, properties: { message: { type: "string" as const } } },
+				500: { type: "object" as const, properties: { message: { type: "string" as const } } },
+			},
+		},
+		handler: async (request, reply) => {
 		const body = request.body as ManyEmbedRequest;
 
 		// Validate request body
@@ -126,7 +189,7 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 		const result = await getProvider(request.workspaceId, body.model.provider_id);
 		if (result.error) {
 			return reply
-				.code(result.error.code)
+				.code(result.error.code as 404)
 				.send({ message: result.error.message });
 		}
 
@@ -158,5 +221,6 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 					error instanceof Error ? error.message : "Unknown error occurred",
 			});
 		}
+		},
 	});
 }

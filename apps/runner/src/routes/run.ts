@@ -19,7 +19,68 @@ import {
 import type { RunData, RunOverrides, VersionData } from "../lib/types.js";
 
 export async function registerRunRoute(fastify: FastifyInstance) {
-	fastify.post("/api/v1/run", async (request, reply) => {
+	fastify.post("/api/v1/run", {
+		schema: {
+			tags: ["Run"],
+			summary: "Run an agent",
+			description: "Execute an agent with optional streaming, variable substitution, overrides, extra messages, and custom tools.",
+			body: {
+				type: "object" as const,
+				required: ["agent_id"],
+				properties: {
+					agent_id: { type: "string" as const, description: "The agent to run" },
+					environment: { type: "string" as const, enum: ["staging", "production"], default: "production", description: "Which deployed version to use" },
+					variables: { type: "object" as const, additionalProperties: { type: "string" as const }, description: "Key-value pairs for variable substitution in agent messages" },
+					stream: { type: "boolean" as const, default: false, description: "Whether to stream the response as SSE" },
+					overrides: {
+						type: "object" as const,
+						description: "Runtime overrides for model, tokens, temperature, etc.",
+						properties: {
+							model: {
+								type: "object" as const,
+								properties: {
+									provider_id: { type: "string" as const },
+									name: { type: "string" as const },
+								},
+							},
+							maxOutputTokens: { type: "number" as const },
+							temperature: { type: "number" as const },
+							maxStepCount: { type: "number" as const },
+							providerOptions: { type: "object" as const, additionalProperties: true },
+						},
+					},
+					extra_messages: { type: "array" as const, items: { type: "object" as const, additionalProperties: true }, description: "Additional messages appended after agent messages" },
+					extra_tools: {
+						type: "array" as const,
+						description: "Custom tools to add to the agent",
+						items: {
+							type: "object" as const,
+							required: ["title", "description"],
+							properties: {
+								title: { type: "string" as const },
+								description: { type: "string" as const },
+								inputSchema: { type: "object" as const, additionalProperties: true },
+							},
+						},
+					},
+					mcp_options: { type: "object" as const, additionalProperties: true, description: "Per-MCP-server options (e.g. custom headers)" },
+				},
+			},
+			response: {
+				200: {
+					description: "Non-streaming response",
+					type: "object" as const,
+					properties: {
+						text: { type: "string" as const },
+						messages: { type: "array" as const, items: { type: "object" as const, additionalProperties: true } },
+					},
+				},
+				400: { type: "object" as const, properties: { message: { type: "string" as const } } },
+				404: { type: "object" as const, properties: { message: { type: "string" as const } } },
+				500: { type: "object" as const, properties: { message: { type: "string" as const } } },
+			},
+		},
+		handler: async (request, reply) => {
 		const startTime = Date.now();
 
 		const runData: RunData = {};
@@ -339,5 +400,6 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 				closeAll();
 			}
 		}
+		},
 	});
 }

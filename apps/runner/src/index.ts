@@ -3,6 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
+import fastifySwagger from "@fastify/swagger";
+import fastifySwaggerUi from "@fastify/swagger-ui";
 import Fastify from "fastify";
 import { registerRoutes } from "./routes/index.js";
 
@@ -38,7 +40,33 @@ fastify.setNotFoundHandler((req, reply) => {
 	}
 });
 
-// 3. Register API Routes
+// 3. Register Swagger
+await fastify.register(fastifySwagger, {
+	openapi: {
+		info: {
+			title: "Agent0 API",
+			description: "API for managing and running AI agents",
+			version: "1.0.0",
+		},
+		components: {
+			securitySchemes: {
+				apiKey: {
+					type: "apiKey",
+					name: "x-api-key",
+					in: "header",
+					description: "Workspace API key",
+				},
+			},
+		},
+		security: [{ apiKey: [] }],
+	},
+});
+
+await fastify.register(fastifySwaggerUi, {
+	routePrefix: "/docs",
+});
+
+// 4. Register API Routes
 await registerRoutes(fastify);
 
 const start = async () => {
