@@ -12,7 +12,7 @@ import {
 import type { RunData, VersionData } from "../lib/types.js";
 
 export async function registerTestRoute(fastify: FastifyInstance) {
-	fastify.post("/api/v1/test", async (request, reply) => {
+	fastify.post("/internal/test", async (request, reply) => {
 		const startTime = Date.now();
 
 		const runData: RunData = {};

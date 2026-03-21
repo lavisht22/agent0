@@ -46,8 +46,8 @@ export const useAgentRunner = ({
 				}
 
 				const url = import.meta.env.DEV
-					? "http://localhost:2223/api/v1/test"
-					: "/api/v1/test";
+					? "http://localhost:2223/internal/test"
+					: "/internal/test";
 
 				const response = await fetch(url, {
 					method: "POST",

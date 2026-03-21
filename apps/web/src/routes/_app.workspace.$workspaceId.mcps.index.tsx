@@ -82,7 +82,7 @@ function RouteComponent() {
 
 			const baseURL = import.meta.env.DEV ? "http://localhost:2223" : "";
 
-			const response = await fetch(`${baseURL}/api/v1/refresh-mcp`, {
+			const response = await fetch(`${baseURL}/internal/refresh-mcp`, {
 				method: "POST",
 				body: JSON.stringify({ mcp_id }),
 				headers: {

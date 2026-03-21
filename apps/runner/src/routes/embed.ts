@@ -29,32 +29,13 @@ type ManyEmbedRequest = Omit<Parameters<typeof embedMany>[0], "model"> & {
 	model: Agent0EmbedModel;
 };
 
-// Helper to validate API key and get provider
-async function validateAndGetProvider(
-	apiKey: string | undefined,
-	providerId: string,
-) {
-	if (!apiKey) {
-		return { error: { code: 401, message: "API key is required" } };
-	}
-
-	// Validate API key against workspace
-	const { data: apiKeyData, error: apiKeyError } = await supabase
-		.from("api_keys")
-		.select("workspace_id")
-		.eq("key", apiKey)
-		.single();
-
-	if (apiKeyError || !apiKeyData) {
-		return { error: { code: 403, message: "Invalid API key" } };
-	}
-
-	// Get provider and verify it belongs to the same workspace
+// Helper to get provider scoped to the authenticated workspace
+async function getProvider(workspaceId: string, providerId: string) {
 	const { data: provider, error: providerError } = await supabase
 		.from("providers")
 		.select("*")
 		.eq("id", providerId)
-		.eq("workspace_id", apiKeyData.workspace_id)
+		.eq("workspace_id", workspaceId)
 		.single();
 
 	if (providerError || !provider) {
@@ -71,7 +52,6 @@ async function validateAndGetProvider(
 export async function registerEmbedRoutes(fastify: FastifyInstance) {
 	// Single embedding endpoint
 	fastify.post("/api/v1/embed", async (request, reply) => {
-		const apiKey = request.headers["x-api-key"] as string;
 		const body = request.body as SingleEmbedRequest;
 
 		// Validate request body
@@ -85,7 +65,7 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 			return reply.code(400).send({ message: "value is required" });
 		}
 
-		const result = await validateAndGetProvider(apiKey, body.model.provider_id);
+		const result = await getProvider(request.workspaceId, body.model.provider_id);
 		if (result.error) {
 			return reply
 				.code(result.error.code)
@@ -124,7 +104,6 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 
 	// Multiple embeddings endpoint
 	fastify.post("/api/v1/embed-many", async (request, reply) => {
-		const apiKey = request.headers["x-api-key"] as string;
 		const body = request.body as ManyEmbedRequest;
 
 		// Validate request body
@@ -144,7 +123,7 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 				.send({ message: "values is required and must be a non-empty array" });
 		}
 
-		const result = await validateAndGetProvider(apiKey, body.model.provider_id);
+		const result = await getProvider(request.workspaceId, body.model.provider_id);
 		if (result.error) {
 			return reply
 				.code(result.error.code)

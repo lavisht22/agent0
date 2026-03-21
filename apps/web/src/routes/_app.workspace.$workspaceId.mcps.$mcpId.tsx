@@ -109,7 +109,7 @@ function RouteComponent() {
 
 			const baseURL = import.meta.env.DEV ? "http://localhost:2223" : "";
 
-			await fetch(`${baseURL}/api/v1/refresh-mcp`, {
+			await fetch(`${baseURL}/internal/refresh-mcp`, {
 				method: "POST",
 				body: JSON.stringify({ mcp_id: id }),
 				headers: {
@@ -187,7 +187,7 @@ function RouteComponent() {
 
 			const baseURL = import.meta.env.DEV ? "http://localhost:2223" : "";
 
-			await fetch(`${baseURL}/api/v1/refresh-mcp`, {
+			await fetch(`${baseURL}/internal/refresh-mcp`, {
 				method: "POST",
 				body: JSON.stringify({ mcp_id: mcpId }),
 				headers: {
