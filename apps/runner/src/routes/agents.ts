@@ -2,6 +2,36 @@ import type { FastifyInstance } from "fastify";
 import { supabase } from "../lib/db.js";
 
 export async function registerAgentRoutes(fastify: FastifyInstance) {
+	fastify.get("/api/v1/agents/:agentId", async (request, reply) => {
+		const { workspaceId } = request;
+		const { agentId } = request.params as { agentId: string };
+
+		const { data: agent, error } = await supabase
+			.from("agents")
+			.select("id, name, staging_version_id, production_version_id, created_at, updated_at, agent_tags(tags(id, name))")
+			.eq("id", agentId)
+			.eq("workspace_id", workspaceId)
+			.single();
+
+		if (error || !agent) {
+			return reply.code(404).send({ message: "Agent not found" });
+		}
+
+		return reply.send({
+			data: {
+				id: agent.id,
+				name: agent.name,
+				staging_version_id: agent.staging_version_id,
+				production_version_id: agent.production_version_id,
+				tags: agent.agent_tags
+					?.map((at) => at.tags)
+					.filter(Boolean),
+				created_at: agent.created_at,
+				updated_at: agent.updated_at,
+			},
+		});
+	});
+
 	fastify.get("/api/v1/agents", async (request, reply) => {
 		const { workspaceId } = request;
 
