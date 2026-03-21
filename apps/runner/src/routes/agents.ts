@@ -124,4 +124,65 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 
 		return reply.send({ data: result, page: pageNum, limit: limitNum });
 	});
+
+	// List versions for an agent (excludes version data/content for lighter response)
+	fastify.get("/api/v1/agents/:agentId/versions", async (request, reply) => {
+		const { workspaceId } = request;
+		const { agentId } = request.params as { agentId: string };
+
+		// Verify agent belongs to workspace
+		const { data: agent, error: agentError } = await supabase
+			.from("agents")
+			.select("id")
+			.eq("id", agentId)
+			.eq("workspace_id", workspaceId)
+			.single();
+
+		if (agentError || !agent) {
+			return reply.code(404).send({ message: "Agent not found" });
+		}
+
+		const { data: versions, error } = await supabase
+			.from("versions")
+			.select("id, agent_id, is_deployed, user_id, created_at")
+			.eq("agent_id", agentId)
+			.order("created_at", { ascending: false });
+
+		if (error) {
+			return reply.code(500).send({ message: "Failed to fetch versions" });
+		}
+
+		return reply.send({ data: versions });
+	});
+
+	// Get a single version with full content
+	fastify.get("/api/v1/agents/:agentId/versions/:versionId", async (request, reply) => {
+		const { workspaceId } = request;
+		const { agentId, versionId } = request.params as { agentId: string; versionId: string };
+
+		// Verify agent belongs to workspace
+		const { data: agent, error: agentError } = await supabase
+			.from("agents")
+			.select("id")
+			.eq("id", agentId)
+			.eq("workspace_id", workspaceId)
+			.single();
+
+		if (agentError || !agent) {
+			return reply.code(404).send({ message: "Agent not found" });
+		}
+
+		const { data: version, error } = await supabase
+			.from("versions")
+			.select("*")
+			.eq("id", versionId)
+			.eq("agent_id", agentId)
+			.single();
+
+		if (error || !version) {
+			return reply.code(404).send({ message: "Version not found" });
+		}
+
+		return reply.send({ data: version });
+	});
 }
