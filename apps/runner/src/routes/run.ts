@@ -17,6 +17,7 @@ import {
 	uploadRunData,
 } from "../lib/helpers.js";
 import type { RunData, RunOverrides, VersionData } from "../lib/types.js";
+import { cachedQuery } from "../lib/cache.js";
 
 export async function registerRunRoute(fastify: FastifyInstance) {
 	fastify.post("/api/v1/run", {
@@ -117,14 +118,22 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 		const { workspaceId } = request;
 
 		// Get agent with its deployed version IDs, scoped to the authenticated workspace
-		const { data: agent, error: agentError } = await supabase
-			.from("agents")
-			.select("staging_version_id, production_version_id, workspace_id")
-			.eq("id", agent_id)
-			.eq("workspace_id", workspaceId)
-			.single();
+		const agent = await cachedQuery(
+			`agent:${agent_id}:${workspaceId}`,
+			30_000, // 30s TTL — short to pick up new deploys quickly
+			async () => {
+				const { data, error } = await supabase
+					.from("agents")
+					.select("staging_version_id, production_version_id, workspace_id")
+					.eq("id", agent_id)
+					.eq("workspace_id", workspaceId)
+					.single();
+				if (error || !data) return null;
+				return data;
+			},
+		);
 
-		if (agentError || !agent) {
+		if (!agent) {
 			return reply.code(404).send({ message: "Agent not found" });
 		}
 
@@ -140,14 +149,22 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 				.send({ message: `No ${environment} version found for this agent` });
 		}
 
-		// Fetch the version data
-		const { data: version, error: versionError } = await supabase
-			.from("versions")
-			.select("*")
-			.eq("id", versionId)
-			.single();
+		// Fetch the version data (versions are immutable, cache aggressively)
+		const version = await cachedQuery(
+			`version:${versionId}`,
+			600_000, // 10 min TTL — versions are immutable once created
+			async () => {
+				const { data, error } = await supabase
+					.from("versions")
+					.select("*")
+					.eq("id", versionId)
+					.single();
+				if (error || !data) return null;
+				return data;
+			},
+		);
 
-		if (versionError || !version) {
+		if (!version) {
 			return reply
 				.code(404)
 				.send({ message: `No ${environment} version found for this agent` });

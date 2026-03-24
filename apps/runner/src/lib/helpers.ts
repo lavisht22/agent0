@@ -11,6 +11,7 @@ import { supabase } from "./db.js";
 import { decryptMessage } from "./openpgp.js";
 import { getAIProvider } from "./providers.js";
 import type { MCPConfig, MCPOptions, VersionData } from "./types.js";
+import { cachedQuery } from "./cache.js";
 import { applyVariablesToMessages } from "./variables.js";
 
 // Helper to prepare provider and messages - shared logic between generate and stream
@@ -20,15 +21,19 @@ export const prepareProviderAndMessages = async (
 ) => {
 	const { model, messages } = data;
 
-	const { data: provider, error: providerError } = await supabase
-		.from("providers")
-		.select("*")
-		.eq("id", model.provider_id)
-		.single();
-
-	if (providerError) {
-		throw providerError;
-	}
+	const provider = await cachedQuery(
+		`provider:${model.provider_id}`,
+		300_000, // 5 min TTL — credentials change rarely
+		async () => {
+			const { data, error } = await supabase
+				.from("providers")
+				.select("*")
+				.eq("id", model.provider_id)
+				.single();
+			if (error) throw error;
+			return data;
+		},
+	);
 
 	const decrypted = await decryptMessage(provider.encrypted_data);
 
@@ -84,12 +89,27 @@ export const prepareMCPServers = async (
 
 	// Only fetch MCP servers if there are MCP tools
 	if (mcp_ids.size > 0) {
-		const { data: mcps } = await supabase
-			.from("mcps")
-			.select("*")
-			.in("id", Array.from(mcp_ids));
+		// Fetch each MCP config individually so they can be cached and deduplicated
+		const mcpIds = Array.from(mcp_ids);
+		const mcps = await Promise.all(
+			mcpIds.map((id) =>
+				cachedQuery(
+					`mcp:${id}`,
+					300_000, // 5 min TTL
+					async () => {
+						const { data, error } = await supabase
+							.from("mcps")
+							.select("*")
+							.eq("id", id)
+							.single();
+						if (error || !data) throw new Error(`Failed to fetch MCP server ${id}`);
+						return data;
+					},
+				),
+			),
+		);
 
-		if (!mcps) {
+		if (!mcps.length) {
 			throw new Error("Failed to fetch MCP servers");
 		}
 
