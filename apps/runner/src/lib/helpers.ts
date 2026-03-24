@@ -21,8 +21,9 @@ export const prepareProviderAndMessages = async (
 ) => {
 	const { model, messages } = data;
 
-	const provider = await cachedQuery(
-		`provider:${model.provider_id}`,
+	// Cache the entire provider pipeline: DB fetch + decryption + provider init
+	const { provider, aiProvider } = await cachedQuery(
+		`provider-resolved:${model.provider_id}`,
 		300_000, // 5 min TTL — credentials change rarely
 		async () => {
 			const { data, error } = await supabase
@@ -31,19 +32,18 @@ export const prepareProviderAndMessages = async (
 				.eq("id", model.provider_id)
 				.single();
 			if (error) throw error;
-			return data;
+
+			const decrypted = await decryptMessage(data.encrypted_data);
+			const config = JSON.parse(decrypted);
+			const resolved = getAIProvider(data.type, config);
+
+			if (!resolved) {
+				throw new Error(`Unsupported provider type: ${data.type}`);
+			}
+
+			return { provider: data, aiProvider: resolved };
 		},
 	);
-
-	const decrypted = await decryptMessage(provider.encrypted_data);
-
-	const config = JSON.parse(decrypted);
-
-	const aiProvider = getAIProvider(provider.type, config);
-
-	if (!aiProvider) {
-		throw new Error(`Unsupported provider type: ${provider.type}`);
-	}
 
 	const processedMessages = JSON.parse(
 		applyVariablesToMessages(JSON.stringify(messages), variables),
@@ -115,18 +115,27 @@ export const prepareMCPServers = async (
 
 		await Promise.all(
 			mcps.map(async (mcp) => {
-				const decrypted = await decryptMessage(mcp.encrypted_data as string);
-				const config: MCPConfig = JSON.parse(decrypted);
+				// Cache the decrypted MCP config (DB row is already cached, this caches decryption)
+				const config: MCPConfig = await cachedQuery(
+					`mcp-config:${mcp.id}`,
+					300_000, // 5 min TTL
+					async () => {
+						const decrypted = await decryptMessage(mcp.encrypted_data as string);
+						return JSON.parse(decrypted) as MCPConfig;
+					},
+				);
+				// Deep clone since we may mutate headers below
+				const mcpConfig: MCPConfig = JSON.parse(JSON.stringify(config));
 
 				// Merge runtime custom headers from mcpOptions
 				if (mcpOptions?.[mcp.id]?.headers) {
-					config.transport.headers = {
-						...config.transport.headers,
+					mcpConfig.transport.headers = {
+						...mcpConfig.transport.headers,
 						...mcpOptions[mcp.id].headers,
 					};
 				}
 
-				const mcpClient = await createMCPClient(config);
+				const mcpClient = await createMCPClient(mcpConfig);
 				const tools = await mcpClient.tools();
 				servers[mcp.id] = { client: mcpClient, tools };
 			}),
