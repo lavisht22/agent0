@@ -102,17 +102,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "agents_production_version_id_fkey"
+            foreignKeyName: "agents_production_agent_version_id_fkey"
             columns: ["production_version_id"]
             isOneToOne: false
-            referencedRelation: "versions"
+            referencedRelation: "agent_versions"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "agents_staging_version_id_fkey"
+            foreignKeyName: "agents_staging_agent_version_id_fkey"
             columns: ["staging_version_id"]
             isOneToOne: false
-            referencedRelation: "versions"
+            referencedRelation: "agent_versions"
             referencedColumns: ["id"]
           },
           {
@@ -290,10 +290,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "runs_version_id_fkey"
+            foreignKeyName: "runs_agent_version_id_fkey"
             columns: ["version_id"]
             isOneToOne: false
-            referencedRelation: "versions"
+            referencedRelation: "agent_versions"
             referencedColumns: ["id"]
           },
           {
@@ -358,7 +358,7 @@ export type Database = {
         }
         Relationships: []
       }
-      versions: {
+      agent_versions: {
         Row: {
           agent_id: string
           created_at: string
@@ -385,14 +385,14 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "versions_agent_id_fkey"
+            foreignKeyName: "agent_versions_agent_id_fkey"
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "agents"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "versions_user_id_fkey"
+            foreignKeyName: "agent_versions_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"

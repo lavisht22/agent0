@@ -191,7 +191,7 @@ export const agentVersionsQuery = (agentId: string) =>
 		queryKey: ["agent-versions", agentId],
 		queryFn: async () => {
 			const { data, error } = await supabase
-				.from("versions")
+				.from("agent_versions")
 				.select("*")
 				.eq("agent_id", agentId)
 				.order("created_at", { ascending: false });
@@ -243,7 +243,7 @@ export const runsQuery = (
 		queryFn: async () => {
 			let query = supabase
 				.from("runs")
-				.select("*, versions!inner(id, agent_id, agents:agent_id(name))")
+				.select("*, agent_versions!inner(id, agent_id, agents:agent_id(name))")
 				.eq("workspace_id", workspaceId);
 
 			// Compute date range at query time
@@ -263,7 +263,7 @@ export const runsQuery = (
 
 			// Apply agent filtering if provided
 			if (agentId) {
-				query = query.eq("versions.agent_id", agentId);
+				query = query.eq("agent_versions.agent_id", agentId);
 			}
 
 			// Apply status filtering if provided
@@ -292,7 +292,7 @@ export const runQuery = (runId: string) =>
 		queryFn: async () => {
 			const { data } = await supabase
 				.from("runs")
-				.select("*, versions(id, agents:agent_id(id, name))")
+				.select("*, agent_versions(id, agents:agent_id(id, name))")
 				.eq("id", runId)
 				.single()
 				.throwOnError();
@@ -422,7 +422,7 @@ export const recentRunsQuery = (workspaceId: string) =>
 		queryFn: async () => {
 			const { data, error } = await supabase
 				.from("runs")
-				.select("*, versions!inner(id, agent_id, agents:agent_id(name))")
+				.select("*, agent_versions!inner(id, agent_id, agents:agent_id(name))")
 				.eq("workspace_id", workspaceId)
 				.order("created_at", { ascending: false })
 				.limit(5);

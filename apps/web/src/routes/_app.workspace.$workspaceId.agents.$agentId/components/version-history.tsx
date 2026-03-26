@@ -19,10 +19,10 @@ import { workspacesQuery } from "@/lib/queries";
 
 interface VersionHistoryProps {
 	workspaceId: string;
-	versions: Tables<"versions">[];
+	versions: Tables<"agent_versions">[];
 	stagingVersionId?: string | null;
 	productionVersionId?: string | null;
-	onSelectionChange: (version: Tables<"versions">) => void;
+	onSelectionChange: (version: Tables<"agent_versions">) => void;
 }
 
 export const VersionHistory = ({

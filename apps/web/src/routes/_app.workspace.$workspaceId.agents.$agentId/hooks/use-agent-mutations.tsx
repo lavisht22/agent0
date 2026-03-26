@@ -16,7 +16,7 @@ export const useAgentMutations = ({
 	name: string;
 	agentId: string;
 	workspaceId: string;
-	setVersion: Dispatch<SetStateAction<Tables<"versions"> | undefined>>;
+	setVersion: Dispatch<SetStateAction<Tables<"agent_versions"> | undefined>>;
 }) => {
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
@@ -37,7 +37,7 @@ export const useAgentMutations = ({
 			if (agentError) throw agentError;
 
 			// Create first version
-			const { error: versionError } = await supabase.from("versions").insert({
+			const { error: versionError } = await supabase.from("agent_versions").insert({
 				id: newVersionId,
 				agent_id: newAgentId,
 				data: values as unknown as Json,
@@ -75,7 +75,7 @@ export const useAgentMutations = ({
 
 			// Create new version
 			const { data: version, error: versionError } = await supabase
-				.from("versions")
+				.from("agent_versions")
 				.insert({
 					id: newVersionId,
 					agent_id: agentId,

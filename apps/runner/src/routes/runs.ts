@@ -102,11 +102,11 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 			let query = supabase
 				.from("runs")
-				.select("id, version_id, is_error, is_test, is_stream, cost, tokens, response_time, first_token_time, pre_processing_time, created_at, versions!inner(id, agent_id, agents:agent_id(id, name))")
+				.select("id, version_id, is_error, is_test, is_stream, cost, tokens, response_time, first_token_time, pre_processing_time, created_at, agent_versions!inner(id, agent_id, agents:agent_id(id, name))")
 				.eq("workspace_id", workspaceId);
 
 			if (agent_id) {
-				query = query.eq("versions.agent_id", agent_id);
+				query = query.eq("agent_versions.agent_id", agent_id);
 			}
 
 			if (version_id) {
@@ -145,10 +145,10 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 			// Flatten the nested version/agent info
 			const result = runs.map((run) => {
-				const { versions, ...rest } = run;
+				const { agent_versions, ...rest } = run;
 				return {
 					...rest,
-					agent: versions?.agents,
+					agent: agent_versions?.agents,
 				};
 			});
 
@@ -184,7 +184,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 			const { data: run, error } = await supabase
 				.from("runs")
-				.select("*, versions(id, agent_id, agents:agent_id(id, name))")
+				.select("*, agent_versions(id, agent_id, agents:agent_id(id, name))")
 				.eq("id", runId)
 				.eq("workspace_id", workspaceId)
 				.single();
@@ -204,11 +204,11 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				runData = JSON.parse(text);
 			}
 
-			const { versions, ...rest } = run;
+			const { agent_versions, ...rest } = run;
 			return reply.send({
 				data: {
 					...rest,
-					agent: versions?.agents,
+					agent: agent_versions?.agents,
 					run_data: runData,
 				},
 			});

@@ -10,7 +10,7 @@ import {
 	useDisclosure,
 } from "@heroui/react";
 import type { Tables } from "@repo/database";
-import { useForm } from "@tanstack/react-form";
+import { useForm, useStore } from "@tanstack/react-form";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useLocation } from "@tanstack/react-router";
 
@@ -59,7 +59,7 @@ function RouteComponent() {
 	const location = useLocation();
 	const isNewAgent = agentId === "new";
 
-	const [version, setVersion] = useState<Tables<"versions">>();
+	const [version, setVersion] = useState<Tables<"agent_versions">>();
 	const [name, setName] = useState("New Agent");
 	const [variableValues, setVariableValues] = useDb<Record<string, string>>(
 		`agent-variables-${agentId}`,
@@ -227,6 +227,11 @@ function RouteComponent() {
 		}, 200);
 	}, [isNewAgent, location.state, form]);
 
+	// Subscribe to form values needed by VariablesDrawer directly,
+	// so they aren't trapped in a form.Subscribe memoized closure
+	const drawerMessages = useStore(form.store, (state) => state.values.messages);
+	const drawerTools = useStore(form.store, (state) => state.values.tools);
+
 	const handleAddToConversation = useCallback(() => {
 		const newMessages = form.getFieldValue("messages").slice();
 
@@ -303,33 +308,24 @@ function RouteComponent() {
 							versions={versions || []}
 							stagingVersionId={agent?.staging_version_id}
 							productionVersionId={agent?.production_version_id}
-							onSelectionChange={(v: Tables<"versions">) => {
+							onSelectionChange={(v: Tables<"agent_versions">) => {
 								setVersion(v);
 							}}
 						/>
 					)}
 
-					<form.Subscribe
-						selector={(state) => ({
-							messages: state.values.messages,
-							tools: state.values.tools,
-						})}
-					>
-						{({ messages, tools }) => (
-							<VariablesDrawer
-								isOpen={isVariablesOpen}
-								onOpenChange={onVariablesOpenChange}
-								messages={messages}
-								values={variableValues}
-								onValuesChange={setVariableValues}
-								onRun={() => handleRun(form.state.values)}
-								mcps={mcps}
-								tools={tools}
-								mcpHeaderValues={mcpHeaderValues}
-								onMcpHeaderValuesChange={setMcpHeaderValues}
-							/>
-						)}
-					</form.Subscribe>
+					<VariablesDrawer
+						isOpen={isVariablesOpen}
+						onOpenChange={onVariablesOpenChange}
+						messages={drawerMessages}
+						values={variableValues}
+						onValuesChange={setVariableValues}
+						onRun={() => handleRun(form.state.values)}
+						mcps={mcps}
+						tools={drawerTools}
+						mcpHeaderValues={mcpHeaderValues}
+						onMcpHeaderValuesChange={setMcpHeaderValues}
+					/>
 
 					<form.Subscribe
 						selector={(state) => ({

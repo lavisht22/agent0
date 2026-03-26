@@ -26,7 +26,7 @@ export function Action({
 	isDirty: boolean;
 	handleSubmit: (data: unknown) => void;
 	agent?: Tables<"agents">;
-	version?: Tables<"versions">;
+	version?: Tables<"agent_versions">;
 	deploy: (
 		version_id: string,
 		environment: "staging" | "production",

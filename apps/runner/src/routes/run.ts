@@ -155,7 +155,7 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 			600_000, // 10 min TTL — versions are immutable once created
 			async () => {
 				const { data, error } = await supabase
-					.from("versions")
+					.from("agent_versions")
 					.select("*")
 					.eq("id", versionId)
 					.single();

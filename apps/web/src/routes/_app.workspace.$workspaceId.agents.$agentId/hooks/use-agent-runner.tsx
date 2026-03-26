@@ -16,7 +16,7 @@ export const useAgentRunner = ({
 }: {
 	variableValues: Record<string, string>;
 	mcpHeaderValues: Record<string, Record<string, string>>;
-	version?: Tables<"versions">;
+	version?: Tables<"agent_versions">;
 }) => {
 	const [isRunning, setIsRunning] = useState(false);
 	const [errors, setErrors] = useState<unknown[]>([]);

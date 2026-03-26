@@ -391,7 +391,7 @@ function RouteComponent() {
 															)}
 														</div>
 													}
-													title={run.versions?.agents?.name || "Unknown Agent"}
+													title={run.agent_versions?.agents?.name || "Unknown Agent"}
 													description={format(run.created_at, "MMM d, h:mm a")}
 													endContent={
 														<div className="text-right shrink-0">

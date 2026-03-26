@@ -288,7 +288,7 @@ function RouteComponent() {
 										: "-"}
 								</TableCell>
 
-								<TableCell>{item.versions?.agents?.name || "-"}</TableCell>
+								<TableCell>{item.agent_versions?.agents?.name || "-"}</TableCell>
 								<TableCell>
 									<IDCopy id={item.id} />
 								</TableCell>

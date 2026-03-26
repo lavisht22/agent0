@@ -107,7 +107,7 @@ function RouteComponent() {
 		);
 	}
 
-	const agentName = run.versions?.agents?.name || "Unknown Agent";
+	const agentName = run.agent_versions?.agents?.name || "Unknown Agent";
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
@@ -152,7 +152,7 @@ function RouteComponent() {
 							to="/workspace/$workspaceId/agents/$agentId"
 							params={{
 								workspaceId: workspaceId,
-								agentId: run.versions?.agents?.id || "",
+								agentId: run.agent_versions?.agents?.id || "",
 							}}
 						>
 							<span>{agentName}</span>

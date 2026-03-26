@@ -286,7 +286,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			}
 
 			const { data: versions, error } = await supabase
-				.from("versions")
+				.from("agent_versions")
 				.select("id, agent_id, is_deployed, user_id, created_at")
 				.eq("agent_id", agentId)
 				.order("created_at", { ascending: false })
@@ -340,7 +340,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			}
 
 			const { data: version, error } = await supabase
-				.from("versions")
+				.from("agent_versions")
 				.select("*")
 				.eq("id", versionId)
 				.eq("agent_id", agentId)
