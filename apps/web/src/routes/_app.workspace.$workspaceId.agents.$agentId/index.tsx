@@ -398,12 +398,13 @@ function RouteComponent() {
 							<Modal.Header>
 								<Modal.Heading>Edit Agent Name</Modal.Heading>
 							</Modal.Header>
-							<Modal.Body>
+							<Modal.Body className="p-1">
 								<TextField
 									name="agent-name"
 									value={editingName}
 									onChange={setEditingName}
 									autoFocus
+									variant="secondary"
 								>
 									<Label>Name</Label>
 									<Input placeholder="Agent name" />
@@ -581,52 +582,48 @@ function RouteComponent() {
 							</Button>
 						</div>
 
-						<Select
-							className="w-32 shrink-0"
-							aria-label="Test environment"
-							value={testEnvironment}
-							onChange={(value) =>
-								setTestEnvironment(
-									(value as "staging" | "production") ?? "staging",
-								)
-							}
-						>
-							<Select.Trigger>
-								<Select.Value />
-								<Select.Indicator />
-							</Select.Trigger>
-							<Select.Popover>
-								<ListBox>
-									<ListBox.Item id="staging" textValue="Staging">
-										Staging
-									</ListBox.Item>
-									<ListBox.Item id="production" textValue="Production">
-										Production
-									</ListBox.Item>
-								</ListBox>
-							</Select.Popover>
-						</Select>
+						<div className="flex gap-2 items-center shrink-0">
+							<Button
+								size="sm"
+								variant="tertiary"
+								type="button"
+								onPress={() =>
+									setTestEnvironment(
+										testEnvironment === "staging" ? "production" : "staging",
+									)
+								}
+								aria-label={`Test environment: ${testEnvironment}. Click to switch.`}
+							>
+								<span
+									className={`size-2 rounded-full ${
+										testEnvironment === "staging"
+											? "bg-amber-500"
+											: "bg-emerald-500"
+									}`}
+								/>
+								{testEnvironment}
+							</Button>
 
-						<Button
-							size="sm"
-							variant="primary"
-							type="button"
-							className="shrink-0"
-							onPress={() => handleRun(form.state.values)}
-							isDisabled={isRunning}
-							isPending={isRunning}
-						>
-							{({ isPending }) => (
-								<>
-									{isPending ? (
-										<Spinner color="current" size="sm" />
-									) : (
-										<LucidePlay className="size-3.5" />
-									)}
-									Run
-								</>
-							)}
-						</Button>
+							<Button
+								size="sm"
+								variant="primary"
+								type="button"
+								onPress={() => handleRun(form.state.values)}
+								isDisabled={isRunning}
+								isPending={isRunning}
+							>
+								{({ isPending }) => (
+									<>
+										{isPending ? (
+											<Spinner color="current" size="sm" />
+										) : (
+											<LucidePlay className="size-3.5" />
+										)}
+										Run
+									</>
+								)}
+							</Button>
+						</div>
 					</div>
 					<div className="flex-1 overflow-y-auto p-4 space-y-4">
 						<form.Field name="tools">

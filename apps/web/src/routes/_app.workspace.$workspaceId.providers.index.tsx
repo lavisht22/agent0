@@ -90,7 +90,7 @@ function RouteComponent() {
 								<Table.Column>Type</Table.Column>
 								<Table.Column>ID</Table.Column>
 								<Table.Column>Last Updated</Table.Column>
-								<Table.Column className="w-20">Actions</Table.Column>
+								<Table.Column className="w-20">{""}</Table.Column>
 							</Table.Header>
 							<Table.Body
 								items={providers || []}
@@ -139,7 +139,7 @@ function RouteComponent() {
 												<Dropdown>
 													<Button
 														isIconOnly
-														variant="tertiary"
+														variant="ghost"
 														isDisabled={user?.role !== "admin"}
 													>
 														<LucideEllipsisVertical className="size-4" />
