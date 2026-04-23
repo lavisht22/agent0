@@ -128,15 +128,17 @@ export function TagsSelect({
 						)}
 					</ListBox>
 					{allowCreate && (
-						<Button
-							size="sm"
-							variant="tertiary"
-							className="w-full"
-							onPress={state.open}
-						>
-							<LucidePlus className="size-3.5" />
-							Create Tag
-						</Button>
+						<div className="p-4">
+							<Button
+								size="sm"
+								variant="tertiary"
+								className="w-full"
+								onPress={state.open}
+							>
+								<LucidePlus className="size-3.5" />
+								Create Tag
+							</Button>
+						</div>
 					)}
 				</Select.Popover>
 			</Select>
