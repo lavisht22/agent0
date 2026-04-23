@@ -1,10 +1,10 @@
-import { Chip, CloseButton } from "@heroui/react";
+import { Chip } from "@heroui/react";
 
 interface TagChipProps {
 	name: string;
 	color: string;
 	size?: "sm" | "md" | "lg";
-	onRemove?: () => void;
+
 	onClick?: () => void;
 }
 
@@ -19,7 +19,7 @@ function hexToRgba(hex: string, opacity: number): string {
 	return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
 
-export function TagChip({ name, color, size = "sm", onRemove }: TagChipProps) {
+export function TagChip({ name, color, size = "sm" }: TagChipProps) {
 	const bgColor = hexToRgba(color, 0.2);
 
 	return (
@@ -32,7 +32,6 @@ export function TagChip({ name, color, size = "sm", onRemove }: TagChipProps) {
 			}}
 		>
 			<Chip.Label className="font-medium">{name}</Chip.Label>
-			{onRemove && <CloseButton aria-label="Remove tag" onPress={onRemove} />}
 		</Chip>
 	);
 }

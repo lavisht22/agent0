@@ -1,6 +1,7 @@
 import {
 	Button,
 	Input,
+	InputGroup,
 	Label,
 	ListBox,
 	Modal,
@@ -70,11 +71,6 @@ export function TagsSelect({
 		}
 	}, [state.isOpen]);
 
-	// Get selected tag objects for rendering
-	const selectedTagObjects = tags?.filter((tag) =>
-		selectedTags.includes(tag.id),
-	);
-
 	// Create new tag mutation
 	const createTagMutation = useMutation({
 		mutationFn: async ({ name, color }: { name: string; color: string }) => {
@@ -116,32 +112,10 @@ export function TagsSelect({
 				}}
 				isDisabled={!tags || tags.length === 0}
 			>
-				<Select.Trigger>
-					<LucideTag className="size-3.5 text-default-500" />
-					<Select.Value>
-						{() => {
-							if (!selectedTagObjects || selectedTagObjects.length === 0) {
-								return <span className="text-default-500">Tags</span>;
-							}
+				<Select.Trigger className="flex items-center gap-2">
+					<LucideTag className="size-3.5 text-muted" />
+					<Select.Value />
 
-							return (
-								<div className="flex gap-1 flex-wrap">
-									{selectedTagObjects.map((tag) => (
-										<TagChip
-											key={tag.id}
-											name={tag.name}
-											color={tag.color}
-											onRemove={() => {
-												onTagsChange(
-													selectedTags.filter((id) => id !== tag.id),
-												);
-											}}
-										/>
-									))}
-								</div>
-							);
-						}}
-					</Select.Value>
 					<Select.Indicator />
 				</Select.Trigger>
 				<Select.Popover>

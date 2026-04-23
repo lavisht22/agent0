@@ -2,10 +2,8 @@ import {
 	Button,
 	CloseButton,
 	Dropdown,
-	Input,
 	InputGroup,
 	Label,
-	Spinner,
 	Table,
 	Tooltip,
 	toast,
@@ -115,8 +113,8 @@ function RouteComponent() {
 	});
 
 	return (
-		<div className="h-screen overflow-hidden flex flex-col">
-			<div className="flex justify-between items-center h-16 border-b border-default-200 box-content px-4">
+		<div className="h-screen flex flex-col">
+			<div className="shrink-0 flex justify-between items-center h-16 border-b border-default-200 box-content px-4">
 				<h1 className="text-xl font-medium tracking-tight">Agents</h1>
 
 				<Button
@@ -133,24 +131,26 @@ function RouteComponent() {
 				</Button>
 			</div>
 
-			<Table>
+			<div className="flex-1 p-4 flex flex-col gap-4 overflow-hidden">
 				<div className="w-full flex justify-between items-center">
 					<div className="flex items-center gap-2">
 						<InputGroup className="w-64">
 							<InputGroup.Prefix>
 								<Search className="size-3.5 text-default-400" />
 							</InputGroup.Prefix>
-							<Input
+							<InputGroup.Input
 								placeholder="Search agents..."
 								value={localSearch}
 								onChange={(e) => setLocalSearch(e.target.value)}
 							/>
-							{localSearch && (
-								<CloseButton
-									aria-label="Clear search"
-									onPress={() => setLocalSearch("")}
-								/>
-							)}
+							<InputGroup.Suffix>
+								{localSearch && (
+									<CloseButton
+										aria-label="Clear search"
+										onPress={() => setLocalSearch("")}
+									/>
+								)}
+							</InputGroup.Suffix>
 						</InputGroup>
 						<div className="w-64">
 							<TagsSelect
@@ -213,99 +213,100 @@ function RouteComponent() {
 						</Tooltip>
 					</div>
 				</div>
-				<Table.ScrollContainer className="overflow-auto flex-1 w-full">
-					<Table.Content aria-label="Agents Table">
-						<Table.Header>
-							<Table.Column id="name">Name</Table.Column>
-							<Table.Column id="tags">Tags</Table.Column>
-							<Table.Column id="id">ID</Table.Column>
-							<Table.Column id="createdAt">Created At</Table.Column>
-							<Table.Column id="actions" className="w-20">
-								Actions
-							</Table.Column>
-						</Table.Header>
-						<Table.Body
-							items={agents || []}
-							renderEmptyState={() =>
-								isLoading ? (
-									<Spinner />
-								) : (
-									<p>You haven't created any agents yet.</p>
-								)
-							}
-						>
-							{(item) => (
-								<Table.Row
-									key={item.id}
-									id={item.id}
-									className="hover:bg-default-100"
-									href={`/workspace/${workspaceId}/agents/${item.id}`}
-								>
-									<Table.Cell>{item.name}</Table.Cell>
-									<Table.Cell>
-										<div className="flex gap-1 flex-wrap">
-											{item.agent_tags?.map((at) =>
-												at.tags ? (
-													<TagChip
-														key={at.tags.id}
-														name={at.tags.name}
-														color={at.tags.color}
-													/>
-												) : null,
-											)}
-										</div>
-									</Table.Cell>
-									<Table.Cell>
-										<IDCopy id={item.id} />
-									</Table.Cell>
-									<Table.Cell>
-										{format(item.created_at, "d LLL, hh:mm a")}
-									</Table.Cell>
-									<Table.Cell className="flex justify-end">
-										<Dropdown>
-											<Button variant="tertiary">
-												<LucideEllipsisVertical className="size-4" />
-											</Button>
-											<Dropdown.Popover>
-												<Dropdown.Menu
-													onAction={(key) => {
-														if (key === "edit") {
-															navigate({
-																to: "$agentId",
-																params: {
-																	agentId: item.id,
-																},
-															});
-														} else if (key === "delete") {
-															setAgentToDelete({
-																id: item.id,
-																name: item.name,
-															});
-															deleteState.open();
-														}
-													}}
-												>
-													<Dropdown.Item id="edit" textValue="Edit">
-														<Label>Edit</Label>
-													</Dropdown.Item>
-													<Dropdown.Item
-														id="delete"
-														textValue="Delete"
-														variant="danger"
+				<Table className="flex-1 overflow-hidden">
+					<Table.ScrollContainer className="h-full overflow-auto">
+						<Table.Content aria-label="Agents Table">
+							<Table.Header className="sticky top-0 z-10">
+								<Table.Column id="name">Name</Table.Column>
+								<Table.Column id="tags">Tags</Table.Column>
+								<Table.Column id="id">ID</Table.Column>
+								<Table.Column id="createdAt">Created At</Table.Column>
+								<Table.Column id="actions" className="w-20"></Table.Column>
+							</Table.Header>
+							<Table.Body
+								items={agents || []}
+								renderEmptyState={() => (
+									<div className="flex justify-center items-center py-8">
+										<p className="text-muted">
+											{searchQuery ||
+											(selectedTags?.length && selectedTags.length > 0)
+												? "No agents found matching your criteria."
+												: "You haven't created any agents yet."}
+										</p>
+									</div>
+								)}
+							>
+								{(item) => (
+									<Table.Row
+										key={item.id}
+										id={item.id}
+										href={`/workspace/${workspaceId}/agents/${item.id}`}
+									>
+										<Table.Cell>{item.name}</Table.Cell>
+										<Table.Cell>
+											<div className="flex gap-1 flex-wrap">
+												{item.agent_tags?.map((at) =>
+													at.tags ? (
+														<TagChip
+															key={at.tags.id}
+															name={at.tags.name}
+															color={at.tags.color}
+														/>
+													) : null,
+												)}
+											</div>
+										</Table.Cell>
+										<Table.Cell>
+											<IDCopy id={item.id} />
+										</Table.Cell>
+										<Table.Cell>
+											{format(item.created_at, "d LLL, hh:mm a")}
+										</Table.Cell>
+										<Table.Cell className="flex justify-end">
+											<Dropdown>
+												<Button isIconOnly variant="ghost">
+													<LucideEllipsisVertical className="size-4" />
+												</Button>
+												<Dropdown.Popover>
+													<Dropdown.Menu
+														onAction={(key) => {
+															if (key === "edit") {
+																navigate({
+																	to: "$agentId",
+																	params: {
+																		agentId: item.id,
+																	},
+																});
+															} else if (key === "delete") {
+																setAgentToDelete({
+																	id: item.id,
+																	name: item.name,
+																});
+																deleteState.open();
+															}
+														}}
 													>
-														<Label>Delete</Label>
-													</Dropdown.Item>
-												</Dropdown.Menu>
-											</Dropdown.Popover>
-										</Dropdown>
-									</Table.Cell>
-								</Table.Row>
-							)}
-						</Table.Body>
-					</Table.Content>
-				</Table.ScrollContainer>
-			</Table>
-
+														<Dropdown.Item id="edit" textValue="Edit">
+															<Label>Edit</Label>
+														</Dropdown.Item>
+														<Dropdown.Item
+															id="delete"
+															textValue="Delete"
+															variant="danger"
+														>
+															<Label>Delete</Label>
+														</Dropdown.Item>
+													</Dropdown.Menu>
+												</Dropdown.Popover>
+											</Dropdown>
+										</Table.Cell>
+									</Table.Row>
+								)}
+							</Table.Body>
+						</Table.Content>
+					</Table.ScrollContainer>
+				</Table>
+			</div>
 			<ConfirmationModal
 				isOpen={deleteState.isOpen}
 				onOpenChange={deleteState.setOpen}

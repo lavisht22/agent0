@@ -72,14 +72,12 @@ function StatCard({
 	value,
 	subtitle,
 	icon: Icon,
-	color,
 	isLoading,
 }: {
 	title: string;
 	value: string | number;
 	subtitle?: string;
 	icon: React.ComponentType<{ className?: string }>;
-	color: "primary" | "success" | "warning" | "danger" | "secondary";
 	isLoading?: boolean;
 }) {
 	return (
