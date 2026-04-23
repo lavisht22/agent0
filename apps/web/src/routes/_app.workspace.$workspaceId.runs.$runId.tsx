@@ -43,9 +43,9 @@ function MetricCard({
 	tooltipContent: string;
 }) {
 	return (
-		<Card className="flex-1">
+		<Card className="flex-1 text-default-foreground">
 			<Card.Content>
-				<div className="flex items-center gap-1 text-xs text-default-500">
+				<div className="flex items-center gap-1 text-xs">
 					<span>{label}</span>
 					<Tooltip delay={0}>
 						<Tooltip.Trigger>
@@ -56,9 +56,7 @@ function MetricCard({
 				</div>
 				<span className="text-sm font-semibold">
 					{value}
-					{unit && (
-						<span className="text-xs text-default-400 ml-0.5">{unit}</span>
-					)}
+					{unit && <span className="text-xs ml-0.5">{unit}</span>}
 				</span>
 			</Card.Content>
 		</Card>
@@ -100,7 +98,7 @@ function RouteComponent() {
 	if (!run) {
 		return (
 			<div className="h-screen flex items-center justify-center">
-				<p className="text-default-500">Run not found</p>
+				<p>Run not found</p>
 			</div>
 		);
 	}
@@ -270,8 +268,8 @@ function RouteComponent() {
 												{/* Configuration Details */}
 												<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 													{/* Model */}
-													<Card>
-														<Card.Content className="p-3">
+													<Card className="text-default-foreground">
+														<Card.Content>
 															<span className="text-xs text-default-500 block mb-1">
 																Model
 															</span>
@@ -286,32 +284,32 @@ function RouteComponent() {
 													</Card>
 
 													{/* Parameters */}
-													<Card>
-														<Card.Content className="p-3">
+													<Card className="text-default-foreground">
+														<Card.Content>
 															<span className="text-xs text-default-500 block mb-1">
 																Parameters
 															</span>
 															<div className="flex flex-wrap gap-1.5">
 																{runData.request?.temperature !== undefined && (
-																	<Chip size="sm" variant="tertiary">
+																	<Chip size="sm">
 																		Temp: {runData.request.temperature}
 																	</Chip>
 																)}
 																{runData.request?.maxOutputTokens !==
 																	undefined && (
-																	<Chip size="sm" variant="tertiary">
+																	<Chip size="sm">
 																		Max Tokens:{" "}
 																		{runData.request.maxOutputTokens}
 																	</Chip>
 																)}
 																{runData.request?.maxStepCount !==
 																	undefined && (
-																	<Chip size="sm" variant="tertiary">
+																	<Chip size="sm">
 																		Max Steps: {runData.request.maxStepCount}
 																	</Chip>
 																)}
 																{runData.request?.outputFormat && (
-																	<Chip size="sm" variant="tertiary">
+																	<Chip size="sm">
 																		Output: {runData.request.outputFormat}
 																	</Chip>
 																)}
@@ -328,8 +326,8 @@ function RouteComponent() {
 													</Card>
 
 													{/* Tools */}
-													<Card>
-														<Card.Content className="p-3">
+													<Card className="text-default-foreground">
+														<Card.Content>
 															<span className="text-xs text-default-500 block mb-1">
 																Selected Tools
 															</span>
@@ -342,7 +340,6 @@ function RouteComponent() {
 																				<Chip
 																					key={`${tool.mcp_id}-${tool.name}`}
 																					size="sm"
-																					variant="tertiary"
 																				>
 																					{tool.name}
 																				</Chip>
@@ -354,7 +351,6 @@ function RouteComponent() {
 																				<Chip
 																					key={`custom-${tool.title}`}
 																					size="sm"
-																					variant="tertiary"
 																				>
 																					{tool.title}
 																				</Chip>
@@ -447,8 +443,8 @@ function RouteComponent() {
 												{runData.totalUsage ? (
 													<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 														{/* Input Tokens */}
-														<Card>
-															<Card.Content className="p-3 space-y-2">
+														<Card className="text-default-foreground">
+															<Card.Content className="space-y-2">
 																<div className="flex justify-between items-center">
 																	<span className="text-sm font-medium">
 																		Input Tokens
@@ -486,8 +482,8 @@ function RouteComponent() {
 														</Card>
 
 														{/* Output Tokens */}
-														<Card>
-															<Card.Content className="p-3 space-y-2">
+														<Card className="text-default-foreground">
+															<Card.Content className="space-y-3">
 																<div className="flex justify-between items-center">
 																	<span className="text-sm font-medium">
 																		Output Tokens

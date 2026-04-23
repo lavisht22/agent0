@@ -41,7 +41,7 @@ export function SystemMessage({
 			layout="position"
 			dragListener={false}
 		>
-			<Card>
+			<Card className="text-default-foreground">
 				<Card.Header className="flex flex-row items-center justify-between">
 					<span className="text-sm text-default-500">System</span>
 				</Card.Header>

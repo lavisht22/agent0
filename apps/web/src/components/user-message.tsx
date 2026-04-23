@@ -245,7 +245,7 @@ export function UserMessage({
 				dragListener={false}
 				dragControls={controls}
 			>
-				<Card>
+				<Card className="text-default-foreground">
 					<Card.Header className="flex flex-row items-center justify-between z-0">
 						<div className="flex items-center gap-2">
 							{!isReadOnly && (
