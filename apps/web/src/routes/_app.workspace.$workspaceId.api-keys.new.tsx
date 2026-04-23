@@ -13,9 +13,10 @@ import {
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Check, Copy } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { customAlphabet, nanoid } from "nanoid";
 import { useState } from "react";
+import { PageHeader } from "@/components/page-header";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute(
@@ -151,100 +152,97 @@ function RouteComponent() {
 	}
 
 	return (
-		<div>
-			<div className="flex items-center p-2">
-				<Button
-					variant="tertiary"
-					isIconOnly
-					onPress={() =>
-						navigate({
-							to: "..",
-						})
-					}
-				>
-					<ArrowLeft className="size-4" />
-				</Button>
-			</div>
+		<div className="h-screen flex flex-col">
+			<PageHeader
+				breadcrumbs={[
+					{
+						label: "API Keys",
+						to: "/workspace/$workspaceId/api-keys",
+						params: { workspaceId },
+					},
+					{ label: "Create" },
+				]}
+			/>
 
-			<div className="p-6 max-w-4xl mx-auto space-y-6">
-				<h1 className="text-xl font-medium tracking-tight">Create API Key</h1>
-
-				<form
-					onSubmit={(e) => {
-						e.preventDefault();
-						e.stopPropagation();
-						form.handleSubmit();
-					}}
-				>
-					{/* Name Field */}
-					<form.Field
-						name="name"
-						validators={{
-							onChange: ({ value }) =>
-								!value || value.trim() === ""
-									? "API key name is required"
-									: undefined,
+			<div className="flex-1 overflow-y-auto p-6">
+				<div className="max-w-4xl mx-auto space-y-6">
+					<form
+						onSubmit={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							form.handleSubmit();
 						}}
 					>
-						{(field) => (
-							<TextField
-								name="name"
-								isRequired
-								isInvalid={field.state.meta.errors.length > 0}
-							>
-								<Label>Name</Label>
-								<Input
-									placeholder="e.g., Production API Key"
-									value={field.state.value}
-									onChange={(e) => field.handleChange(e.target.value)}
-								/>
-								<Description>
-									A friendly name to identify this API key
-								</Description>
-								{field.state.meta.errors.length > 0 && (
-									<FieldError>{field.state.meta.errors[0]}</FieldError>
-								)}
-							</TextField>
-						)}
-					</form.Field>
-
-					<div className="flex justify-end gap-3 mt-6">
-						<Button
-							variant="tertiary"
-							onPress={() =>
-								navigate({
-									to: "/workspace/$workspaceId/api-keys",
-									params: { workspaceId },
-								})
-							}
-							isDisabled={isLoading}
+						{/* Name Field */}
+						<form.Field
+							name="name"
+							validators={{
+								onChange: ({ value }) =>
+									!value || value.trim() === ""
+										? "API key name is required"
+										: undefined,
+							}}
 						>
-							Cancel
-						</Button>
-						<form.Subscribe
-							selector={(state) => ({
-								canSubmit: state.canSubmit,
-								isSubmitting: state.isSubmitting,
-							})}
-						>
-							{(state) => (
-								<Button
-									type="submit"
-									variant="primary"
-									isPending={isLoading || state.isSubmitting}
-									isDisabled={!state.canSubmit || isLoading}
+							{(field) => (
+								<TextField
+									name="name"
+									isRequired
+									isInvalid={field.state.meta.errors.length > 0}
 								>
-									{({ isPending }) => (
-										<>
-											{isPending && <Spinner color="current" size="sm" />}
-											Create
-										</>
+									<Label>Name</Label>
+									<Input
+										placeholder="e.g., Production API Key"
+										value={field.state.value}
+										onChange={(e) => field.handleChange(e.target.value)}
+									/>
+									<Description>
+										A friendly name to identify this API key
+									</Description>
+									{field.state.meta.errors.length > 0 && (
+										<FieldError>{field.state.meta.errors[0]}</FieldError>
 									)}
-								</Button>
+								</TextField>
 							)}
-						</form.Subscribe>
-					</div>
-				</form>
+						</form.Field>
+
+						<div className="flex justify-end gap-3 mt-6">
+							<Button
+								variant="tertiary"
+								onPress={() =>
+									navigate({
+										to: "/workspace/$workspaceId/api-keys",
+										params: { workspaceId },
+									})
+								}
+								isDisabled={isLoading}
+							>
+								Cancel
+							</Button>
+							<form.Subscribe
+								selector={(state) => ({
+									canSubmit: state.canSubmit,
+									isSubmitting: state.isSubmitting,
+								})}
+							>
+								{(state) => (
+									<Button
+										type="submit"
+										variant="primary"
+										isPending={isLoading || state.isSubmitting}
+										isDisabled={!state.canSubmit || isLoading}
+									>
+										{({ isPending }) => (
+											<>
+												{isPending && <Spinner color="current" size="sm" />}
+												Create
+											</>
+										)}
+									</Button>
+								)}
+							</form.Subscribe>
+						</div>
+					</form>
+				</div>
 			</div>
 		</div>
 	);

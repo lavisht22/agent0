@@ -20,6 +20,8 @@ interface VersionHistoryProps {
 	versions: Tables<"agent_versions">[];
 	stagingVersionId?: string | null;
 	productionVersionId?: string | null;
+	currentVersionId?: string;
+	isDirty?: boolean;
 	onSelectionChange: (version: Tables<"agent_versions">) => void;
 }
 
@@ -28,6 +30,8 @@ export const VersionHistory = ({
 	versions,
 	stagingVersionId,
 	productionVersionId,
+	currentVersionId,
+	isDirty,
 	onSelectionChange,
 }: VersionHistoryProps) => {
 	const state = useOverlayState();
@@ -37,10 +41,19 @@ export const VersionHistory = ({
 		return workspaces?.find((workspace) => workspace.id === workspaceId);
 	}, [workspaces, workspaceId]);
 
+	const versionLabel = isDirty
+		? "Unsaved"
+		: currentVersionId
+			? `#${currentVersionId.slice(0, 7)}`
+			: undefined;
+
 	return (
 		<Popover isOpen={state.isOpen} onOpenChange={state.setOpen}>
 			<Button size="sm" variant="tertiary">
 				<LucideHistory className="size-3.5" />
+				{versionLabel && (
+					<span className="text-xs text-muted">{versionLabel}</span>
+				)}
 			</Button>
 			<Popover.Content placement="bottom end" className="max-w-[350px]">
 				<Popover.Dialog className="max-h-96 overflow-auto">

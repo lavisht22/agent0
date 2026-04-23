@@ -13,6 +13,7 @@ import { LucideEllipsisVertical, Plus } from "lucide-react";
 import { useState } from "react";
 import { ConfirmationModal } from "@/components/confirmation-modal";
 import IDCopy from "@/components/id-copy";
+import { PageHeader } from "@/components/page-header";
 import { PROVIDER_TYPES } from "@/lib/providers";
 import { providersQuery, workspaceUserQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
@@ -64,9 +65,7 @@ function RouteComponent() {
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
-			<div className="shrink-0 flex justify-between items-center h-16 border-b border-border box-content px-4">
-				<h1 className="text-xl font-medium tracking-tight">Providers</h1>
-
+			<PageHeader breadcrumbs={[{ label: "Providers" }]}>
 				{user?.role === "admin" && (
 					<Button
 						variant="primary"
@@ -81,7 +80,7 @@ function RouteComponent() {
 						Create
 					</Button>
 				)}
-			</div>
+			</PageHeader>
 			<div className="flex-1 p-4 overflow-hidden flex flex-col">
 				<Table className="flex-1 overflow-hidden">
 					<Table.ScrollContainer className="h-full overflow-auto">

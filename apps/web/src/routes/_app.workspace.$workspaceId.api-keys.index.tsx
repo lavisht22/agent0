@@ -14,6 +14,7 @@ import { LucideEllipsisVertical, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ConfirmationModal } from "@/components/confirmation-modal";
 import IDCopy from "@/components/id-copy";
+import { PageHeader } from "@/components/page-header";
 
 import { apiKeysQuery, workspacesQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
@@ -74,9 +75,7 @@ function RouteComponent() {
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
-			<div className="shrink-0 flex justify-between items-center h-16 border-b border-border box-content px-4">
-				<h1 className="text-xl font-medium tracking-tight">API Keys</h1>
-
+			<PageHeader breadcrumbs={[{ label: "API Keys" }]}>
 				<Button
 					variant="primary"
 					onPress={() =>
@@ -89,7 +88,7 @@ function RouteComponent() {
 					<Plus size={18} />
 					Create
 				</Button>
-			</div>
+			</PageHeader>
 
 			<div className="flex-1 flex flex-col overflow-hidden p-4 gap-4">
 				<Table className="flex-1 overflow-hidden">

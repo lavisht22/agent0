@@ -28,6 +28,7 @@ import {
 	DateRangePicker,
 	type DateRangeValue,
 } from "@/components/date-range-picker";
+import { PageHeader } from "@/components/page-header";
 import {
 	dashboardStatsQuery,
 	recentRunsQuery,
@@ -137,29 +138,28 @@ function RouteComponent() {
 
 	return (
 		<div className="h-screen overflow-y-auto">
-			{/* Header */}
-			<div className="flex justify-between items-center h-16 border-b border-border box-content px-4 sticky top-0 bg-background z-10">
-				<h1 className="text-xl font-medium tracking-tight">Dashboard</h1>
-				<div className="flex items-center gap-2">
-					<DateRangePicker value={dateFilter} onValueChange={setDateFilter} />
-					<Tooltip delay={0}>
-						<Tooltip.Trigger>
-							<Button
-								size="sm"
-								isIconOnly
-								variant="tertiary"
-								onPress={handleRefresh}
-								isDisabled={statsFetching}
-							>
-								<RefreshCw
-									className={`size-3.5 ${statsFetching ? "animate-spin" : ""}`}
-								/>
-							</Button>
-						</Tooltip.Trigger>
-						<Tooltip.Content>Refresh</Tooltip.Content>
-					</Tooltip>
-				</div>
-			</div>
+			<PageHeader
+				breadcrumbs={[{ label: "Dashboard" }]}
+				className="sticky top-0 bg-background z-10"
+			>
+				<DateRangePicker value={dateFilter} onValueChange={setDateFilter} />
+				<Tooltip delay={0}>
+					<Tooltip.Trigger>
+						<Button
+							size="sm"
+							isIconOnly
+							variant="tertiary"
+							onPress={handleRefresh}
+							isDisabled={statsFetching}
+						>
+							<RefreshCw
+								className={`size-3.5 ${statsFetching ? "animate-spin" : ""}`}
+							/>
+						</Button>
+					</Tooltip.Trigger>
+					<Tooltip.Content>Refresh</Tooltip.Content>
+				</Tooltip>
+			</PageHeader>
 
 			<div className="p-4 space-y-6">
 				{/* Stats Grid */}

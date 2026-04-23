@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { Trash2, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ConfirmationModal } from "@/components/confirmation-modal";
+import { PageHeader } from "@/components/page-header";
 import { workspacesQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
 
@@ -110,11 +111,7 @@ function SettingsPage() {
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
-			<div className="flex justify-between items-center h-16 border-b border-border box-content px-4">
-				<h1 className="text-xl font-medium tracking-tight">
-					Workspace Settings
-				</h1>
-			</div>
+			<PageHeader breadcrumbs={[{ label: "Workspace Settings" }]} />
 			<div className="flex-1 overflow-scroll">
 				<div className="max-w-4xl mx-auto space-y-6 p-6">
 					<div className="flex gap-2 items-end">

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Messages, type MessageT } from "@/components/messages";
 import { MonacoJsonEditor } from "@/components/monaco-json-editor";
+import { PageHeader } from "@/components/page-header";
 import { runDataQuery, runQuery } from "@/lib/queries";
 import type { AgentFormValues } from "./_app.workspace.$workspaceId.agents.$agentId/types";
 
@@ -107,10 +108,36 @@ function RouteComponent() {
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
-			<div className="flex items-center justify-between h-16 border-b border-border px-4 box-content">
-				<div className="flex flex-col">
-					<div className="flex items-center gap-2">
-						<h1 className="text-lg font-medium tracking-tight">{run.id}</h1>
+			<PageHeader
+				breadcrumbs={[
+					{
+						label: "Runs",
+						to: "/workspace/$workspaceId/runs",
+						params: { workspaceId },
+						search: { page: 1 },
+					},
+					{ label: run.id },
+				]}
+			>
+				<Button
+					variant="tertiary"
+					size="sm"
+					onPress={handleReplay}
+					isDisabled={!runData?.request}
+				>
+					<RotateCcw className="size-4" />
+					Replay
+				</Button>
+				<Button variant="tertiary" size="sm" onPress={modalState.open}>
+					<Code className="size-4" />
+					View Raw
+				</Button>
+			</PageHeader>
+
+			<div className="flex-1 overflow-y-auto p-6">
+				<div className="max-w-5xl mx-auto space-y-6">
+					{/* Metadata Strip */}
+					<div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
 						{run.is_error ? (
 							<Chip variant="soft" color="danger" size="sm">
 								<AlertCircle className="size-3" />
@@ -128,41 +155,20 @@ function RouteComponent() {
 								Test
 							</Chip>
 						)}
-					</div>
-					<div className="flex items-center gap-1 text-xs text-muted">
-						<span>{format(run.created_at, "PPpp")}</span>
-						<span>•</span>
+						<span className="text-muted">{format(run.created_at, "PPpp")}</span>
+						<span className="text-muted">•</span>
 						<Link
 							to="/workspace/$workspaceId/agents/$agentId"
 							params={{
-								workspaceId: workspaceId,
+								workspaceId,
 								agentId: run.agent_versions?.agents?.id || "",
 							}}
+							className="text-muted hover:text-foreground transition-colors"
 						>
-							<span>{agentName}</span>
+							{agentName}
 						</Link>
 					</div>
-				</div>
 
-				<div className="flex items-center gap-2">
-					<Button
-						variant="tertiary"
-						size="sm"
-						onPress={handleReplay}
-						isDisabled={!runData?.request}
-					>
-						<RotateCcw className="size-4" />
-						Replay
-					</Button>
-					<Button variant="tertiary" size="sm" onPress={modalState.open}>
-						<Code className="size-4" />
-						View Raw
-					</Button>
-				</div>
-			</div>
-
-			<div className="flex-1 overflow-y-auto p-6">
-				<div className="max-w-5xl mx-auto space-y-6">
 					{/* Metrics Row */}
 					<div className="flex flex-row items-center gap-4">
 						<MetricCard

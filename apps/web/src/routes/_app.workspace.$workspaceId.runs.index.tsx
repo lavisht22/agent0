@@ -22,6 +22,7 @@ import {
 import { AgentFilter } from "@/components/agent-filter";
 import { DateRangePicker } from "@/components/date-range-picker";
 import IDCopy from "@/components/id-copy";
+import { PageHeader } from "@/components/page-header";
 import {
 	StatusFilter,
 	type StatusFilterValue,
@@ -91,9 +92,7 @@ function RouteComponent() {
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
-			<div className="flex justify-between items-center h-16 border-b border-border box-content px-4">
-				<h1 className="text-xl font-medium tracking-tight">Runs</h1>
-			</div>
+			<PageHeader breadcrumbs={[{ label: "Runs" }]} />
 
 			<div className="flex-1 overflow-y-auto flex flex-col p-4 gap-4">
 				<div className="shrink-0 w-full flex justify-between items-center">

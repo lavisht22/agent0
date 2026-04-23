@@ -22,6 +22,7 @@ import {
 import { useEffect, useState } from "react";
 import { ConfirmationModal } from "@/components/confirmation-modal";
 import IDCopy from "@/components/id-copy";
+import { PageHeader } from "@/components/page-header";
 import { TagChip } from "@/components/tag-chip";
 import { TagsSelect } from "@/components/tags-select";
 import { agentsQuery } from "@/lib/queries";
@@ -114,9 +115,7 @@ function RouteComponent() {
 
 	return (
 		<div className="h-screen flex flex-col">
-			<div className="shrink-0 flex justify-between items-center h-16 border-b border-border box-content px-4">
-				<h1 className="text-xl font-medium tracking-tight">Agents</h1>
-
+			<PageHeader breadcrumbs={[{ label: "Agents" }]}>
 				<Button
 					variant="primary"
 					onPress={() =>
@@ -129,7 +128,7 @@ function RouteComponent() {
 					<Plus size={18} />
 					Create
 				</Button>
-			</div>
+			</PageHeader>
 
 			<div className="flex-1 p-4 flex flex-col gap-4 overflow-hidden">
 				<div className="w-full flex justify-between items-center">

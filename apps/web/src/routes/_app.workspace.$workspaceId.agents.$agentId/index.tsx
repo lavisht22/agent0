@@ -1,8 +1,10 @@
 import {
 	Button,
+	Dropdown,
 	Input,
 	Label,
 	ListBox,
+	Modal,
 	NumberField,
 	Popover,
 	Select,
@@ -20,6 +22,8 @@ import {
 	LucideBraces,
 	LucideCode,
 	LucideCornerUpLeft,
+	LucideEllipsisVertical,
+	LucidePencil,
 	LucidePlay,
 	LucideSettings2,
 } from "lucide-react";
@@ -28,6 +32,7 @@ import { useCallback, useEffect, useState } from "react";
 import useDb from "use-db";
 
 import { Messages, type MessageT } from "@/components/messages";
+import { PageHeader } from "@/components/page-header";
 import { TagsSelect } from "@/components/tags-select";
 import { copyToClipboard } from "@/lib/clipboard";
 import {
@@ -75,6 +80,8 @@ function RouteComponent() {
 	});
 
 	const variablesState = useOverlayState();
+	const editNameState = useOverlayState();
+	const [editingName, setEditingName] = useState("");
 
 	// Fetch agent
 	const { data: agent } = useQuery({
@@ -252,113 +259,167 @@ function RouteComponent() {
 				form.handleSubmit();
 			}}
 		>
-			<div className="mt-px w-full flex items-center justify-between p-4 h-16 border-b border-border shrink-0">
-				<div className="flex gap-2 items-center">
-					<input
-						className="field-sizing-content text-xl tracking-tight font-medium outline-none transition"
-						value={name}
-						onChange={(e) => setName(e.target.value)}
-						onBlur={() => updateNameMutation.mutate(name)}
-					/>
-					<form.Subscribe
-						selector={(state) => ({
-							isDirty: state.isDirty,
-						})}
-					>
-						{(state) => {
-							if (state.isDirty || isNewAgent) {
-								return <p className="text-sm text-muted">Unsaved</p>;
-							}
-
-							return (
-								<p className="text-sm text-muted">#{version?.id.slice(0, 7)}</p>
-							);
-						}}
-					</form.Subscribe>
-				</div>
-
-				<div className="flex items-center gap-2">
-					{!isNewAgent && (
-						<div className="w-64">
-							<TagsSelect
-								workspaceId={workspaceId}
-								selectedTags={selectedTagIds}
-								onTagsChange={(tagIds) => syncTagsMutation.mutate(tagIds)}
-								allowCreate
-							/>
-						</div>
-					)}
-
-					{agent && (
-						<Button
-							size="sm"
-							variant="tertiary"
-							onPress={() => copyToClipboard(agent.id, "Copied agent ID!")}
-						>
-							<LucideCode className="size-3.5" />
-						</Button>
-					)}
-
-					{versions?.length && (
-						<VersionHistory
+			<PageHeader
+				breadcrumbs={[
+					{
+						label: "Agents",
+						to: "/workspace/$workspaceId/agents",
+						params: { workspaceId },
+						search: { page: 1 },
+					},
+					{ label: name },
+				]}
+			>
+				{!isNewAgent && (
+					<div className="w-64">
+						<TagsSelect
 							workspaceId={workspaceId}
-							versions={versions || []}
-							stagingVersionId={agent?.staging_version_id}
-							productionVersionId={agent?.production_version_id}
-							onSelectionChange={(v: Tables<"agent_versions">) => {
-								setVersion(v);
-							}}
+							selectedTags={selectedTagIds}
+							onTagsChange={(tagIds) => syncTagsMutation.mutate(tagIds)}
+							allowCreate
 						/>
-					)}
+					</div>
+				)}
 
-					<VariablesDrawer
-						isOpen={variablesState.isOpen}
-						onOpenChange={() => variablesState.setOpen(!variablesState.isOpen)}
-						messages={drawerMessages}
-						values={variableValues}
-						onValuesChange={setVariableValues}
-						onRun={() => handleRun(form.state.values)}
-						mcps={mcps}
-						tools={drawerTools}
-						mcpHeaderValues={mcpHeaderValues}
-						onMcpHeaderValuesChange={setMcpHeaderValues}
-					/>
-
-					<form.Subscribe
-						selector={(state) => ({
-							canSubmit: state.canSubmit,
-							isSubmitting: state.isSubmitting,
-							isDirty: state.isDirty,
-						})}
+				{agent && (
+					<Button
+						size="sm"
+						variant="tertiary"
+						onPress={() => copyToClipboard(agent.id, "Copied agent ID!")}
 					>
-						{(state) => {
-							return (
-								<Action
-									isNewAgent={isNewAgent}
-									canSubmit={state.canSubmit}
-									isSubmitting={state.isSubmitting}
-									isMutationPending={
-										updateMutation.isPending || deployMutation.isPending
-									}
-									isDirty={state.isDirty}
-									handleSubmit={form.handleSubmit}
-									agent={agent}
-									version={version}
-									deploy={async (
-										version_id: string,
-										environment: "staging" | "production",
-									) => {
-										await deployMutation.mutateAsync({
-											version_id,
-											environment,
-										});
-									}}
-								/>
-							);
-						}}
+						<LucideCode className="size-3.5" />
+					</Button>
+				)}
+
+				{versions?.length && (
+					<form.Subscribe selector={(state) => ({ isDirty: state.isDirty })}>
+						{(state) => (
+							<VersionHistory
+								workspaceId={workspaceId}
+								versions={versions || []}
+								stagingVersionId={agent?.staging_version_id}
+								productionVersionId={agent?.production_version_id}
+								currentVersionId={version?.id}
+								isDirty={state.isDirty}
+								onSelectionChange={(v: Tables<"agent_versions">) => {
+									setVersion(v);
+								}}
+							/>
+						)}
 					</form.Subscribe>
-				</div>
-			</div>
+				)}
+
+				<VariablesDrawer
+					isOpen={variablesState.isOpen}
+					onOpenChange={() => variablesState.setOpen(!variablesState.isOpen)}
+					messages={drawerMessages}
+					values={variableValues}
+					onValuesChange={setVariableValues}
+					onRun={() => handleRun(form.state.values)}
+					mcps={mcps}
+					tools={drawerTools}
+					mcpHeaderValues={mcpHeaderValues}
+					onMcpHeaderValuesChange={setMcpHeaderValues}
+				/>
+
+				<form.Subscribe
+					selector={(state) => ({
+						canSubmit: state.canSubmit,
+						isSubmitting: state.isSubmitting,
+						isDirty: state.isDirty,
+					})}
+				>
+					{(state) => {
+						return (
+							<Action
+								isNewAgent={isNewAgent}
+								canSubmit={state.canSubmit}
+								isSubmitting={state.isSubmitting}
+								isMutationPending={
+									updateMutation.isPending || deployMutation.isPending
+								}
+								isDirty={state.isDirty}
+								handleSubmit={form.handleSubmit}
+								agent={agent}
+								version={version}
+								deploy={async (
+									version_id: string,
+									environment: "staging" | "production",
+								) => {
+									await deployMutation.mutateAsync({
+										version_id,
+										environment,
+									});
+								}}
+							/>
+						);
+					}}
+				</form.Subscribe>
+
+				{!isNewAgent && (
+					<Dropdown>
+						<Button size="sm" variant="tertiary" isIconOnly>
+							<LucideEllipsisVertical className="size-4" />
+						</Button>
+						<Dropdown.Popover placement="bottom end">
+							<Dropdown.Menu>
+								<Dropdown.Item
+									id="edit-name"
+									textValue="Edit name"
+									onAction={() => {
+										setEditingName(name);
+										editNameState.open();
+									}}
+								>
+									<LucidePencil className="size-4" />
+									<Label>Edit name</Label>
+								</Dropdown.Item>
+							</Dropdown.Menu>
+						</Dropdown.Popover>
+					</Dropdown>
+				)}
+			</PageHeader>
+
+			<Modal state={editNameState}>
+				<Modal.Backdrop>
+					<Modal.Container>
+						<Modal.Dialog>
+							<Modal.Header>
+								<Modal.Heading>Edit Agent Name</Modal.Heading>
+							</Modal.Header>
+							<Modal.Body>
+								<TextField
+									name="agent-name"
+									value={editingName}
+									onChange={setEditingName}
+									autoFocus
+								>
+									<Label>Name</Label>
+									<Input placeholder="Agent name" />
+								</TextField>
+							</Modal.Body>
+							<Modal.Footer>
+								<Button variant="tertiary" onPress={editNameState.close}>
+									Cancel
+								</Button>
+								<Button
+									variant="primary"
+									isDisabled={!editingName.trim()}
+									onPress={() => {
+										const trimmed = editingName.trim();
+										if (!trimmed) return;
+										setName(trimmed);
+										updateNameMutation.mutate(trimmed);
+										editNameState.close();
+									}}
+								>
+									Save
+								</Button>
+							</Modal.Footer>
+						</Modal.Dialog>
+					</Modal.Container>
+				</Modal.Backdrop>
+			</Modal>
 			<div className="flex flex-1 overflow-hidden">
 				<div className="basis-1/2 grow-0 shrink-0 min-w-0 flex flex-col border-r border-border min-h-0">
 					<div className="flex gap-2 justify-between items-center p-4 border-b border-border">
