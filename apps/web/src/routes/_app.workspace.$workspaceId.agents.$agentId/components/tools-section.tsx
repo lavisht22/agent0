@@ -11,7 +11,6 @@ import {
 	InputGroup,
 	Label,
 	ListBox,
-	Modal,
 	Separator,
 	TextArea,
 	TextField,
@@ -412,7 +411,7 @@ export default function ToolsSection({
 								<ListBox aria-label="Available MCP Tools">
 									{/** biome-ignore lint/complexity/noUselessFragments: <heroui problem> */}
 									<>
-										{mcps?.map((mcp, index) => {
+										{mcps?.map((mcp, _index) => {
 											const tools = mcp?.tools as
 												| { name: string; description: string }[]
 												| undefined;

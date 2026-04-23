@@ -37,7 +37,7 @@ function RouteComponent() {
 	} | null>(null);
 
 	// Fetch Providers
-	const { data: providers, isLoading } = useQuery(providersQuery(workspaceId));
+	const { data: providers } = useQuery(providersQuery(workspaceId));
 	const { data: user } = useQuery(workspaceUserQuery(workspaceId));
 
 	// Delete mutation

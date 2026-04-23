@@ -164,9 +164,7 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 								</div>
 							)}
 						</div>
-						{!collapsed && (
-							<LucideChevronsUpDown className="size-4 shrink-0" />
-						)}
+						{!collapsed && <LucideChevronsUpDown className="size-4 shrink-0" />}
 					</Dropdown.Trigger>
 					<Dropdown.Popover className="w-56">
 						<Dropdown.Menu aria-label="Workspace selection">
@@ -221,9 +219,7 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 						>
 							<Icon className="size-4 shrink-0" />
 							{!collapsed && (
-								<span className="truncate whitespace-nowrap">
-									{item.label}
-								</span>
+								<span className="truncate whitespace-nowrap">{item.label}</span>
 							)}
 						</Link>
 					);

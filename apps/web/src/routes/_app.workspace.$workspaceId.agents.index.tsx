@@ -57,7 +57,7 @@ function RouteComponent() {
 	} | null>(null);
 
 	// Fetch Agents with tag filter
-	const { data: agents, isLoading } = useQuery(
+	const { data: agents } = useQuery(
 		agentsQuery(workspaceId, page, searchQuery, selectedTags),
 	);
 

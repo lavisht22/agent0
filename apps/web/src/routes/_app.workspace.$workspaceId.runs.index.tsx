@@ -1,12 +1,4 @@
-import {
-	Button,
-	Chip,
-	Dropdown,
-	Label,
-	Spinner,
-	Table,
-	Tooltip,
-} from "@heroui/react";
+import { Button, Chip, Dropdown, Label, Table, Tooltip } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
@@ -85,7 +77,6 @@ function RouteComponent() {
 
 	const {
 		data: runs,
-		isLoading,
 		isFetching,
 		refetch,
 	} = useQuery(runsQuery(workspaceId, page, dateValues, agentId, status));

@@ -34,7 +34,7 @@ function RouteComponent() {
 	} | null>(null);
 
 	// Fetch MCPs
-	const { data: mcps, isLoading } = useQuery(mcpsQuery(workspaceId));
+	const { data: mcps } = useQuery(mcpsQuery(workspaceId));
 	const { data: user } = useQuery(workspaceUserQuery(workspaceId));
 
 	// Delete mutation

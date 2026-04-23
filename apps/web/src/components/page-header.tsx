@@ -49,7 +49,11 @@ export function PageHeader({
 							: undefined;
 
 					return (
-						<Breadcrumbs.Item key={index} href={href} className="truncate">
+						<Breadcrumbs.Item
+							key={`${item.label}-${href ?? "current"}`}
+							href={href}
+							className="truncate"
+						>
 							{item.label}
 						</Breadcrumbs.Item>
 					);
