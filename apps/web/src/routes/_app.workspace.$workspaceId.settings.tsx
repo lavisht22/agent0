@@ -110,7 +110,7 @@ function SettingsPage() {
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
-			<div className="flex justify-between items-center h-16 border-b border-default-200 box-content px-4">
+			<div className="flex justify-between items-center h-16 border-b border-border box-content px-4">
 				<h1 className="text-xl font-medium tracking-tight">
 					Workspace Settings
 				</h1>
@@ -170,7 +170,7 @@ function SettingsPage() {
 									<Table.Body
 										items={workspace?.workspace_user || []}
 										renderEmptyState={() => (
-											<p className="text-center text-default-400 p-6">
+											<p className="text-center text-muted p-6">
 												No members yet.
 											</p>
 										)}
@@ -235,7 +235,7 @@ function SettingsPage() {
 					<div className="flex items-end justify-between">
 						<div>
 							<p className="text-sm font-medium">Delete Workspace</p>
-							<p className="text-sm text-default-500">
+							<p className="text-sm text-muted">
 								Permanently delete this workspace and all of its data. This
 								action cannot be undone.
 							</p>

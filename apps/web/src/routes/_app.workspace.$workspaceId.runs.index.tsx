@@ -91,7 +91,7 @@ function RouteComponent() {
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
-			<div className="flex justify-between items-center h-16 border-b border-default-200 box-content px-4">
+			<div className="flex justify-between items-center h-16 border-b border-border box-content px-4">
 				<h1 className="text-xl font-medium tracking-tight">Runs</h1>
 			</div>
 
@@ -227,7 +227,7 @@ function RouteComponent() {
 									<Table.Row
 										key={item.id}
 										id={item.id}
-										className="hover:bg-default-100 cursor-pointer"
+										className="hover:bg-surface-hover cursor-pointer"
 										onAction={() =>
 											navigate({
 												to: "$runId",
@@ -265,7 +265,7 @@ function RouteComponent() {
 												item.first_token_time +
 												item.response_time) /
 												1000}
-											<span className="font-semibold text-xs text-default-500 ml-0.5">
+											<span className="font-semibold text-xs text-muted ml-0.5">
 												s
 											</span>
 										</Table.Cell>

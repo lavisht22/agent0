@@ -328,7 +328,7 @@ function RouteComponent() {
 					) : showConfigEditor ? (
 						// Editing: user explicitly chose to edit config
 						<>
-							<div className="flex items-center gap-2 rounded-lg bg-warning-50 px-3 py-2 text-warning-700 text-sm">
+							<div className="flex items-center gap-2 rounded-lg bg-warning-soft px-3 py-2 text-warning text-sm">
 								<ShieldAlert className="size-4 shrink-0" />
 								<span>
 									You are updating the server configuration. This will overwrite
@@ -356,13 +356,13 @@ function RouteComponent() {
 						</>
 					) : (
 						// Editing: config is collapsed by default
-						<div className="rounded-lg border border-default-200 p-4">
+						<div className="rounded-lg border border-border p-4">
 							<div className="flex items-center justify-between">
 								<div>
-									<p className="text-sm font-medium text-default-700">
+									<p className="text-sm font-medium text-foreground">
 										Server Configuration
 									</p>
-									<p className="text-xs text-default-400 mt-1">
+									<p className="text-xs text-muted mt-1">
 										The configuration is stored encrypted. Click edit to replace
 										it with a new config.
 									</p>

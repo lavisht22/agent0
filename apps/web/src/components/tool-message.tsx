@@ -37,7 +37,7 @@ function ToolMessagePart({
 		return (
 			<div
 				className={cn(
-					"border border-default-200 overflow-hidden rounded-[14px] w-full space-y-2",
+					"border border-border overflow-hidden rounded-[14px] w-full space-y-2",
 					(value.output as { type: string; value: unknown })?.type.startsWith(
 						"error",
 					)
@@ -97,10 +97,10 @@ export function ToolMessage({
 								className="reorder-handle cursor-grab"
 								onPointerDown={(e) => controls.start(e)}
 							>
-								<LucideGripVertical className="size-3.5 text-default-500" />
+								<LucideGripVertical className="size-3.5 text-muted" />
 							</div>
 						)}
-						<span className="text-sm text-default-500">Tool</span>
+						<span className="text-sm text-muted">Tool</span>
 					</div>
 				</Card.Header>
 				<Card.Content className="gap-3">

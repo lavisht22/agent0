@@ -296,7 +296,7 @@ export default function ToolsSection({
 		<>
 			<Card className={isInvalid ? "border-danger border" : ""}>
 				<Card.Header className="flex flex-row items-center justify-between">
-					<span className="text-sm text-default-500">Tools</span>
+					<span className="text-sm text-muted">Tools</span>
 					<Dropdown>
 						<Button size="sm" variant="tertiary" isIconOnly>
 							<LucidePlus className="size-3.5" />
@@ -334,7 +334,7 @@ export default function ToolsSection({
 				</Card.Header>
 				<Card.Content>
 					{value.length === 0 ? (
-						<p className="text-sm text-default-400">
+						<p className="text-sm text-muted">
 							No tools added. Click "+" to add tools to your agent. (Optional)
 						</p>
 					) : (
@@ -484,7 +484,7 @@ export default function ToolsSection({
 								</ListBox>
 
 								{availableMCPTools.length === 0 && (
-									<p className="text-sm text-default-400 text-center py-4">
+									<p className="text-sm text-muted text-center py-4">
 										No available MCP tools. All tools have been added or no MCP
 										servers are configured.
 									</p>

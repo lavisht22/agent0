@@ -111,7 +111,7 @@ export function VariablesDrawer({
 							<div className="flex flex-col gap-4">
 								{/* Prompt Variables Section */}
 								{variables.length === 0 && mcpHeaders.length === 0 && (
-									<p className="text-default-500 text-sm">
+									<p className="text-muted text-sm">
 										No variables or MCP headers found.
 									</p>
 								)}
@@ -136,12 +136,12 @@ export function VariablesDrawer({
 								{mcpHeaders.length > 0 && (
 									<>
 										{variables.length > 0 && <Separator />}
-										<p className="text-sm font-medium text-default-700">
+										<p className="text-sm font-medium text-foreground">
 											MCP Headers
 										</p>
 										{mcpHeaders.map((mcp) => (
 											<div key={mcp.id} className="flex flex-col gap-3">
-												<p className="text-xs text-default-500">{mcp.name}</p>
+												<p className="text-xs text-muted">{mcp.name}</p>
 												{mcp.headers.map((header) => (
 													<TextField key={`${mcp.id}-${header}`} name={header}>
 														<Label>{header}</Label>

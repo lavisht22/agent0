@@ -103,12 +103,12 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 	}, [workspaceId, location.pathname, user]);
 
 	return (
-		<div className={`border-r border-default-200 flex flex-col w-52`}>
-			<div className="border-b border-default-200">
+		<div className={`border-r border-border flex flex-col w-52`}>
+			<div className="border-b border-border">
 				<Dropdown>
-					<Dropdown.Trigger className="w-full flex justify-between items-center px-4 h-16 hover:bg-default-100 cursor-pointer text-left">
+					<Dropdown.Trigger className="w-full flex justify-between items-center px-4 h-16 hover:bg-surface-hover cursor-pointer text-left">
 						<div>
-							<span className="block text-[10px] text-default-500 leading-tight">
+							<span className="block text-[10px] text-muted leading-tight">
 								WORKSPACE
 							</span>
 							<span className="font-medium">
@@ -152,7 +152,7 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 				</Dropdown>
 			</div>
 
-			<nav className="flex-1 py-4 px-1.5 space-y-1 overflow-y-auto">
+			<nav className="flex-1 py-4 px-1.5 space-y-0.5 overflow-y-auto">
 				{navItems.map((item) => {
 					const Icon = item.icon;
 
@@ -161,19 +161,20 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 							key={item.label}
 							to={item.path}
 							className={cn(
-								"flex items-center gap-2 w-full justify-start px-2.5 py-1.5 rounded-md text-sm transition-colors hover:bg-default-100 hover:text-default-900",
-								!item.active && "text-default-500",
-								item.active && "bg-default-100 text-default-900",
+								"group flex items-center gap-2.5 w-full justify-start px-2.5 py-2 rounded-md text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent",
+								!item.active &&
+									"text-foreground hover:bg-surface-hover active:bg-surface-secondary",
+								item.active && "bg-accent/10 text-accent font-medium",
 							)}
 						>
-							<Icon className="size-5" />
+							<Icon className="size-4 shrink-0" />
 							{item.label}
 						</Link>
 					);
 				})}
 			</nav>
 
-			<div className="border-t border-default-200 p-4">
+			<div className="border-t border-border p-4">
 				<Dropdown>
 					<Dropdown.Trigger className="flex items-center gap-2 w-full text-left cursor-pointer">
 						<Avatar size="sm">
@@ -187,7 +188,7 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 							<span className="text-sm font-medium truncate">
 								{user?.name || ""}
 							</span>
-							<span className="text-xs text-default-500 truncate">
+							<span className="text-xs text-muted truncate">
 								{user?.email || ""}
 							</span>
 						</div>

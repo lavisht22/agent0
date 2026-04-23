@@ -83,7 +83,7 @@ function UserMessagePart({
 				: `data:${value.mediaType || "image/png"};base64,${value.image}`;
 
 		return (
-			<div className="bg-default-50 w-full rounded-[14px] p-2 flex justify-center items-center">
+			<div className="bg-surface-secondary w-full rounded-[14px] p-2 flex justify-center items-center">
 				<img
 					src={imageSrc}
 					alt="Preview"
@@ -108,17 +108,17 @@ function UserMessagePart({
 				: `${approximateSize} KB`;
 
 		return (
-			<div className="bg-default-50 w-full rounded-[14px] p-3">
+			<div className="bg-surface-secondary w-full rounded-[14px] p-3">
 				<div className="flex items-center gap-3">
-					<div className="shrink-0 w-12 h-12 bg-default-200 rounded-lg flex items-center justify-center">
-						<LucideFileText className="size-6 text-default-600" />
+					<div className="shrink-0 w-12 h-12 bg-surface-tertiary rounded-lg flex items-center justify-center">
+						<LucideFileText className="size-6 text-foreground" />
 					</div>
 					<div className="flex-1 min-w-0">
-						<p className="text-sm font-medium text-default-900 truncate">
+						<p className="text-sm font-medium text-foreground truncate">
 							{value.mediaType || "Unknown file type"}
 						</p>
 						{approximateSize > 0 && (
-							<p className="text-xs text-default-500">{sizeDisplay}</p>
+							<p className="text-xs text-muted">{sizeDisplay}</p>
 						)}
 					</div>
 				</div>
@@ -253,10 +253,10 @@ export function UserMessage({
 									className="reorder-handle cursor-grab"
 									onPointerDown={(e) => controls.start(e)}
 								>
-									<LucideGripVertical className="size-3.5 text-default-500" />
+									<LucideGripVertical className="size-3.5 text-muted" />
 								</div>
 							)}
-							<span className="text-sm text-default-500">User</span>
+							<span className="text-sm text-muted">User</span>
 						</div>
 						{!isReadOnly && (
 							<Dropdown>

@@ -77,7 +77,7 @@ function AssistantMessagePart({
 	if (value.type === "reasoning") {
 		return (
 			<TextareaAutosize
-				className="outline-none w-full resize-none text-sm scrollbar-hide text-default-500 italic"
+				className="outline-none w-full resize-none text-sm scrollbar-hide text-muted italic"
 				readOnly={isReadOnly}
 				maxRows={1000000000000}
 				placeholder="Assistant reasoning..."
@@ -94,7 +94,7 @@ function AssistantMessagePart({
 
 	if (value.type === "tool-call") {
 		return (
-			<div className="w-full space-y-2 rounded-[14px] border border-default-200 overflow-hidden">
+			<div className="w-full space-y-2 rounded-[14px] border border-border overflow-hidden">
 				<MonacoJsonEditor
 					readOnly={isReadOnly}
 					value={JSON.stringify(value, null, 2)}
@@ -147,10 +147,10 @@ export function AssistantMessage({
 								className="reorder-handle cursor-grab"
 								onPointerDown={(e) => controls.start(e)}
 							>
-								<LucideGripVertical className="size-3.5 text-default-500" />
+								<LucideGripVertical className="size-3.5 text-muted" />
 							</div>
 						)}
-						<span className="text-sm text-default-500">Assistant</span>
+						<span className="text-sm text-muted">Assistant</span>
 					</div>
 					{!isReadOnly && (
 						<Dropdown>

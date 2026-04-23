@@ -9,7 +9,7 @@ import {
 	Tooltip,
 } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
 import {
 	Activity,
@@ -85,15 +85,13 @@ function StatCard({
 			<Card.Content className="gap-2">
 				<div className="flex justify-between items-start">
 					<div className="flex-1">
-						<p className="text-sm text-default-500">{title}</p>
+						<p className="text-sm text-muted">{title}</p>
 						{isLoading ? (
 							<Skeleton className="h-8 w-20 mt-1 rounded-lg" />
 						) : (
 							<p className="text-2xl font-semibold mt-1">{value}</p>
 						)}
-						{subtitle && (
-							<p className="text-xs text-default-400 mt-1">{subtitle}</p>
-						)}
+						{subtitle && <p className="text-xs text-muted mt-1">{subtitle}</p>}
 					</div>
 					<div className="p-2 rounded-lg text-muted">
 						<Icon className="size-5" />
@@ -140,7 +138,7 @@ function RouteComponent() {
 	return (
 		<div className="h-screen overflow-y-auto">
 			{/* Header */}
-			<div className="flex justify-between items-center h-16 border-b border-default-200 box-content px-4 sticky top-0 bg-background z-10">
+			<div className="flex justify-between items-center h-16 border-b border-border box-content px-4 sticky top-0 bg-background z-10">
 				<h1 className="text-xl font-medium tracking-tight">Dashboard</h1>
 				<div className="flex items-center gap-2">
 					<DateRangePicker value={dateFilter} onValueChange={setDateFilter} />
@@ -205,18 +203,22 @@ function RouteComponent() {
 					<Card className="lg:col-span-2">
 						<Card.Header className="flex flex-row w-full items-center justify-between">
 							<div className="flex items-center gap-2">
-								<Bot className="size-5 text-default-500" />
+								<Bot className="size-5 text-muted" />
 								<span className="font-medium">Top Agents</span>
 							</div>
-							<Link
-								to="/workspace/$workspaceId/agents"
-								params={{ workspaceId }}
-								search={{ page: 1 }}
+							<Button
+								size="sm"
+								variant="tertiary"
+								onPress={() =>
+									navigate({
+										to: "/workspace/$workspaceId/agents",
+										params: { workspaceId },
+										search: { page: 1 },
+									})
+								}
 							>
-								<Button size="sm" variant="tertiary">
-									View All
-								</Button>
-							</Link>
+								View All
+							</Button>
 						</Card.Header>
 						<Separator />
 						<Card.Content className="p-0">
@@ -225,7 +227,7 @@ function RouteComponent() {
 									<Spinner size="sm" />
 								</div>
 							) : !topAgents || topAgents.length === 0 ? (
-								<div className="flex flex-col items-center justify-center py-8 text-default-400">
+								<div className="flex flex-col items-center justify-center py-8 text-muted">
 									<Bot className="size-8 mb-2" />
 									<p className="text-sm">No agent activity</p>
 									<p className="text-xs">Create and run an agent to start</p>
@@ -249,7 +251,7 @@ function RouteComponent() {
 													<span className="text-sm font-medium truncate">
 														{agent.name}
 													</span>
-													<span className="text-xs text-default-500 truncate">
+													<span className="text-xs text-muted truncate">
 														{`${agent.runs} runs • ${
 															agent.runs > 0
 																? (
@@ -263,7 +265,7 @@ function RouteComponent() {
 												<div className="text-right shrink-0">
 													<p className="text-sm">{formatCost(agent.cost)}</p>
 													{agent.errors > 0 && (
-														<p className="text-xs text-danger-500">
+														<p className="text-xs text-danger">
 															{agent.errors} errors
 														</p>
 													)}
@@ -280,18 +282,22 @@ function RouteComponent() {
 					<Card className="lg:col-span-2">
 						<Card.Header className="flex flex-row w-full items-center justify-between">
 							<div className="flex items-center gap-2">
-								<PlayCircle className="size-5 text-default-500" />
+								<PlayCircle className="size-5 text-muted" />
 								<span className="font-medium">Recent Runs</span>
 							</div>
-							<Link
-								to="/workspace/$workspaceId/runs"
-								params={{ workspaceId }}
-								search={{ page: 1 }}
+							<Button
+								size="sm"
+								variant="tertiary"
+								onPress={() =>
+									navigate({
+										to: "/workspace/$workspaceId/runs",
+										params: { workspaceId },
+										search: { page: 1 },
+									})
+								}
 							>
-								<Button size="sm" variant="tertiary">
-									View All
-								</Button>
-							</Link>
+								View All
+							</Button>
 						</Card.Header>
 						<Separator />
 						<Card.Content className="p-0">
@@ -300,7 +306,7 @@ function RouteComponent() {
 									<Spinner size="sm" />
 								</div>
 							) : !recentRuns || recentRuns.length === 0 ? (
-								<div className="flex flex-col items-center justify-center py-8 text-default-400">
+								<div className="flex flex-col items-center justify-center py-8 text-muted">
 									<PlayCircle className="size-8 mb-2" />
 									<p className="text-sm">No runs yet</p>
 									<p className="text-xs">Run an agent to see activity here</p>
@@ -345,7 +351,7 @@ function RouteComponent() {
 															{run.agent_versions?.agents?.name ||
 																"Unknown Agent"}
 														</span>
-														<span className="text-xs text-default-500 truncate">
+														<span className="text-xs text-muted truncate">
 															{format(run.created_at, "MMM d, h:mm a")}
 														</span>
 													</div>
@@ -354,7 +360,7 @@ function RouteComponent() {
 													<p className="text-sm">
 														{run.cost ? formatCost(run.cost) : "-"}
 													</p>
-													<p className="text-xs text-default-400">
+													<p className="text-xs text-muted">
 														{formatTime(
 															(run.pre_processing_time || 0) +
 																(run.first_token_time || 0) +

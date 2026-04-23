@@ -114,7 +114,7 @@ function RouteComponent() {
 
 	return (
 		<div className="h-screen flex flex-col">
-			<div className="shrink-0 flex justify-between items-center h-16 border-b border-default-200 box-content px-4">
+			<div className="shrink-0 flex justify-between items-center h-16 border-b border-border box-content px-4">
 				<h1 className="text-xl font-medium tracking-tight">Agents</h1>
 
 				<Button
@@ -136,7 +136,7 @@ function RouteComponent() {
 					<div className="flex items-center gap-2">
 						<InputGroup className="w-64">
 							<InputGroup.Prefix>
-								<Search className="size-3.5 text-default-400" />
+								<Search className="size-3.5 text-muted" />
 							</InputGroup.Prefix>
 							<InputGroup.Input
 								placeholder="Search agents..."

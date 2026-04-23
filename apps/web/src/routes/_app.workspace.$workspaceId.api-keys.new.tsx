@@ -115,7 +115,7 @@ function RouteComponent() {
 							<Modal.Body>
 								<div className="space-y-4">
 									<div>
-										<p className="text-sm text-default-500 mb-2">
+										<p className="text-sm text-muted mb-2">
 											Keep it safe. This API Key can be used to call the run API
 											for your workspace.
 										</p>

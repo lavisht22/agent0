@@ -107,7 +107,7 @@ function RouteComponent() {
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
-			<div className="flex items-center justify-between h-16 border-b border-default-200 px-4 box-content">
+			<div className="flex items-center justify-between h-16 border-b border-border px-4 box-content">
 				<div className="flex flex-col">
 					<div className="flex items-center gap-2">
 						<h1 className="text-lg font-medium tracking-tight">{run.id}</h1>
@@ -129,7 +129,7 @@ function RouteComponent() {
 							</Chip>
 						)}
 					</div>
-					<div className="flex items-center gap-1 text-xs text-default-500">
+					<div className="flex items-center gap-1 text-xs text-muted">
 						<span>{format(run.created_at, "PPpp")}</span>
 						<span>•</span>
 						<Link
@@ -175,7 +175,7 @@ function RouteComponent() {
 							value={run.tokens || 0}
 							tooltipContent="Total tokens used in the run."
 						/>
-						<div className="w-px h-12 bg-default-200" />
+						<div className="w-px h-12 bg-surface-tertiary" />
 						<MetricCard
 							label="Pre-processing"
 							value={run.pre_processing_time / 1000}
@@ -270,13 +270,13 @@ function RouteComponent() {
 													{/* Model */}
 													<Card className="text-default-foreground">
 														<Card.Content>
-															<span className="text-xs text-default-500 block mb-1">
+															<span className="text-xs text-muted block mb-1">
 																Model
 															</span>
 															<span className="text-sm font-medium">
 																{runData.request?.model?.name || "Unknown"}
 															</span>
-															<span className="text-xs text-default-400 block">
+															<span className="text-xs text-muted block">
 																{runData.request?.model?.provider_id ||
 																	"Unknown Provider"}
 															</span>
@@ -286,7 +286,7 @@ function RouteComponent() {
 													{/* Parameters */}
 													<Card className="text-default-foreground">
 														<Card.Content>
-															<span className="text-xs text-default-500 block mb-1">
+															<span className="text-xs text-muted block mb-1">
 																Parameters
 															</span>
 															<div className="flex flex-wrap gap-1.5">
@@ -317,7 +317,7 @@ function RouteComponent() {
 																	!runData.request?.maxOutputTokens &&
 																	!runData.request?.maxStepCount &&
 																	!runData.request?.outputFormat && (
-																		<span className="text-xs text-default-400 italic">
+																		<span className="text-xs text-muted italic">
 																			Default
 																		</span>
 																	)}
@@ -328,7 +328,7 @@ function RouteComponent() {
 													{/* Tools */}
 													<Card className="text-default-foreground">
 														<Card.Content>
-															<span className="text-xs text-default-500 block mb-1">
+															<span className="text-xs text-muted block mb-1">
 																Selected Tools
 															</span>
 															<div className="flex flex-wrap gap-1.5">
@@ -360,7 +360,7 @@ function RouteComponent() {
 																		return null;
 																	})
 																) : (
-																	<span className="text-xs text-default-400 italic">
+																	<span className="text-xs text-muted italic">
 																		No tools selected
 																	</span>
 																)}
@@ -379,7 +379,7 @@ function RouteComponent() {
 														onVariablePress={() => {}}
 													/>
 												) : (
-													<p className="text-default-400 text-sm italic">
+													<p className="text-muted text-sm italic">
 														No request messages available
 													</p>
 												)}
@@ -414,7 +414,7 @@ function RouteComponent() {
 														onVariablePress={() => {}}
 													/>
 												) : (
-													<p className="text-default-400 text-sm italic px-4">
+													<p className="text-muted text-sm italic px-4">
 														No response steps available
 													</p>
 												)}
@@ -454,22 +454,22 @@ function RouteComponent() {
 																	</span>
 																</div>
 																{runData.totalUsage.inputTokenDetails && (
-																	<div className="space-y-1 pl-2 border-l-2 border-default-200">
-																		<div className="flex justify-between text-xs text-default-500">
+																	<div className="space-y-1 pl-2 border-l-2 border-border">
+																		<div className="flex justify-between text-xs text-muted">
 																			<span>Non-cached</span>
 																			<span>
 																				{runData.totalUsage.inputTokenDetails
 																					.noCacheTokens ?? "-"}
 																			</span>
 																		</div>
-																		<div className="flex justify-between text-xs text-default-500">
+																		<div className="flex justify-between text-xs text-muted">
 																			<span>Cached Read</span>
 																			<span>
 																				{runData.totalUsage.inputTokenDetails
 																					.cacheReadTokens ?? "-"}
 																			</span>
 																		</div>
-																		<div className="flex justify-between text-xs text-default-500">
+																		<div className="flex justify-between text-xs text-muted">
 																			<span>Cached Write</span>
 																			<span>
 																				{runData.totalUsage.inputTokenDetails
@@ -493,15 +493,15 @@ function RouteComponent() {
 																	</span>
 																</div>
 																{runData.totalUsage.outputTokenDetails && (
-																	<div className="space-y-1 pl-2 border-l-2 border-default-200">
-																		<div className="flex justify-between text-xs text-default-500">
+																	<div className="space-y-1 pl-2 border-l-2 border-border">
+																		<div className="flex justify-between text-xs text-muted">
 																			<span>Text</span>
 																			<span>
 																				{runData.totalUsage.outputTokenDetails
 																					.textTokens ?? "-"}
 																			</span>
 																		</div>
-																		<div className="flex justify-between text-xs text-default-500">
+																		<div className="flex justify-between text-xs text-muted">
 																			<span>Reasoning</span>
 																			<span>
 																				{runData.totalUsage.outputTokenDetails
@@ -514,7 +514,7 @@ function RouteComponent() {
 														</Card>
 													</div>
 												) : (
-													<p className="text-default-400 text-sm italic">
+													<p className="text-muted text-sm italic">
 														No token usage data available
 													</p>
 												)}

@@ -87,7 +87,7 @@ function RouteComponent() {
 					<h1 className="text-3xl font-medium tracking-tight">
 						{step === "email" ? "Welcome back" : "Check your email"}
 					</h1>
-					<p className="text-default-500">
+					<p className="text-muted">
 						{step === "email"
 							? "Enter your email to sign in to your account"
 							: `We've sent a code to ${email}`}

@@ -130,7 +130,7 @@ function GoogleVertexOptions({
 						/>
 					</TextField>
 				</div>
-				<p className="text-xs text-default-500">
+				<p className="text-xs text-muted">
 					Use Thinking Level with 3 series and Thinking Budget with 2.5 series
 					models
 				</p>

@@ -94,7 +94,7 @@ function RouteComponent() {
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
-			<div className="flex justify-between items-center h-16 border-b border-default-200 box-content px-4">
+			<div className="flex justify-between items-center h-16 border-b border-border box-content px-4">
 				<h1 className="text-xl font-medium tracking-tight">MCP Servers</h1>
 
 				{user?.role === "admin" && (
@@ -126,7 +126,7 @@ function RouteComponent() {
 							<Table.Body
 								items={mcps || []}
 								renderEmptyState={() => (
-									<p className="text-center text-default-400 p-6">
+									<p className="text-center text-muted p-6">
 										You haven't added any MCP servers yet.
 									</p>
 								)}
@@ -135,7 +135,7 @@ function RouteComponent() {
 									<Table.Row
 										key={item.id}
 										id={item.id}
-										className="hover:bg-default-100 cursor-pointer"
+										className="hover:bg-surface-hover cursor-pointer"
 										onAction={
 											user?.role === "admin"
 												? () =>

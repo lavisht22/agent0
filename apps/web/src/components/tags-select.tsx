@@ -184,9 +184,7 @@ export function TagsSelect({
 												</div>
 												{newTagName && (
 													<div className="flex items-center gap-2">
-														<span className="text-sm text-default-500">
-															Preview:
-														</span>
+														<span className="text-sm text-muted">Preview:</span>
 														<TagChip name={newTagName} color={selectedColor} />
 													</div>
 												)}

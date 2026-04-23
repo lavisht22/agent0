@@ -64,7 +64,7 @@ function RouteComponent() {
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
-			<div className="shrink-0 flex justify-between items-center h-16 border-b border-default-200 box-content px-4">
+			<div className="shrink-0 flex justify-between items-center h-16 border-b border-border box-content px-4">
 				<h1 className="text-xl font-medium tracking-tight">Providers</h1>
 
 				{user?.role === "admin" && (
@@ -110,7 +110,7 @@ function RouteComponent() {
 										<Table.Row
 											key={item.id}
 											id={item.id}
-											className="hover:bg-default-100 cursor-pointer"
+											className="hover:bg-surface-hover cursor-pointer"
 											onAction={
 												user?.role === "admin"
 													? () =>

@@ -16,12 +16,12 @@ export function Alerts({
 						<Accordion.Item
 							key={`${index + 1}`}
 							id={`${index + 1}`}
-							className="bg-warning-50"
+							className="bg-warning-soft"
 						>
 							<Accordion.Heading>
 								<Accordion.Trigger>
-									<LucideShieldAlert className="size-4 text-warning-600" />
-									<span className="text-warning-600 font-medium">Warning</span>
+									<LucideShieldAlert className="size-4 text-warning" />
+									<span className="text-warning font-medium">Warning</span>
 									<Accordion.Indicator />
 								</Accordion.Trigger>
 							</Accordion.Heading>
@@ -42,12 +42,12 @@ export function Alerts({
 						<Accordion.Item
 							key={`${index + 1}`}
 							id={`${index + 1}`}
-							className="bg-danger-50"
+							className="bg-danger-soft"
 						>
 							<Accordion.Heading>
 								<Accordion.Trigger>
-									<LucideShieldX className="size-4 text-danger-600" />
-									<span className="text-danger-600 font-medium">Error</span>
+									<LucideShieldX className="size-4 text-danger" />
+									<span className="text-danger font-medium">Error</span>
 									<Accordion.Indicator />
 								</Accordion.Trigger>
 							</Accordion.Heading>

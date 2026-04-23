@@ -252,7 +252,7 @@ function RouteComponent() {
 				form.handleSubmit();
 			}}
 		>
-			<div className="mt-px w-full flex items-center justify-between p-4 h-16 border-b border-default-200 shrink-0">
+			<div className="mt-px w-full flex items-center justify-between p-4 h-16 border-b border-border shrink-0">
 				<div className="flex gap-2 items-center">
 					<input
 						className="field-sizing-content text-xl tracking-tight font-medium outline-none transition"
@@ -267,13 +267,11 @@ function RouteComponent() {
 					>
 						{(state) => {
 							if (state.isDirty || isNewAgent) {
-								return <p className="text-sm text-default-500">Unsaved</p>;
+								return <p className="text-sm text-muted">Unsaved</p>;
 							}
 
 							return (
-								<p className="text-sm text-default-500">
-									#{version?.id.slice(0, 7)}
-								</p>
+								<p className="text-sm text-muted">#{version?.id.slice(0, 7)}</p>
 							);
 						}}
 					</form.Subscribe>
@@ -362,8 +360,8 @@ function RouteComponent() {
 				</div>
 			</div>
 			<div className="flex flex-1 overflow-hidden">
-				<div className="flex-1 flex flex-col border-r border-default-200 min-h-0">
-					<div className="flex gap-2 justify-between items-center p-4 border-b border-default-200">
+				<div className="flex-1 flex flex-col border-r border-border min-h-0">
+					<div className="flex gap-2 justify-between items-center p-4 border-b border-border">
 						<div className="flex gap-2">
 							<form.Field name="model">
 								{(field) => (
@@ -571,7 +569,7 @@ function RouteComponent() {
 					<Alerts warnings={warnings} errors={errors} />
 
 					{!isRunning && generatedMessages.length === 0 && (
-						<p className="text-sm text-default-500 my-auto text-center">
+						<p className="text-sm text-muted my-auto text-center">
 							Run your agent to see the generated response here.
 						</p>
 					)}

@@ -74,7 +74,7 @@ function RouteComponent() {
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
-			<div className="shrink-0 flex justify-between items-center h-16 border-b border-default-200 box-content px-4">
+			<div className="shrink-0 flex justify-between items-center h-16 border-b border-border box-content px-4">
 				<h1 className="text-xl font-medium tracking-tight">API Keys</h1>
 
 				<Button
@@ -106,11 +106,9 @@ function RouteComponent() {
 								items={apiKeys || []}
 								renderEmptyState={() =>
 									isLoading ? (
-										<p className="text-center text-default-400 p-6">
-											Loading...
-										</p>
+										<p className="text-center text-muted p-6">Loading...</p>
 									) : (
-										<p className="text-center text-default-400 p-6">
+										<p className="text-center text-muted p-6">
 											You haven't created any API keys yet.
 										</p>
 									)
