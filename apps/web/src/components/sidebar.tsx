@@ -106,10 +106,7 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 		<div className={`border-r border-default-200 flex flex-col w-52`}>
 			<div className="border-b border-default-200">
 				<Dropdown>
-					<button
-						type="button"
-						className="w-full flex justify-between items-center px-4 h-16 hover:bg-default-100 cursor-pointer text-left"
-					>
+					<Dropdown.Trigger className="w-full flex justify-between items-center px-4 h-16 hover:bg-default-100 cursor-pointer text-left">
 						<div>
 							<span className="block text-[10px] text-default-500 leading-tight">
 								WORKSPACE
@@ -119,7 +116,7 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 							</span>
 						</div>
 						<LucideChevronsUpDown className="size-4" />
-					</button>
+					</Dropdown.Trigger>
 					<Dropdown.Popover className="w-56">
 						<Dropdown.Menu aria-label="Workspace selection">
 							<Dropdown.Section>
@@ -178,10 +175,7 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 
 			<div className="border-t border-default-200 p-4">
 				<Dropdown>
-					<button
-						type="button"
-						className="flex items-center gap-2 w-full text-left cursor-pointer"
-					>
+					<Dropdown.Trigger className="flex items-center gap-2 w-full text-left cursor-pointer">
 						<Avatar size="sm">
 							<Avatar.Image
 								src={`https://api.dicebear.com/9.x/initials/svg?seed=${user?.name}`}
@@ -197,7 +191,7 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 								{user?.email || ""}
 							</span>
 						</div>
-					</button>
+					</Dropdown.Trigger>
 					<Dropdown.Popover className="w-64" placement="top start">
 						<Dropdown.Menu>
 							<Dropdown.Item
