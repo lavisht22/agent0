@@ -13,10 +13,12 @@ export const useAgentRunner = ({
 	variableValues,
 	mcpHeaderValues,
 	version,
+	environment,
 }: {
 	variableValues: Record<string, string>;
 	mcpHeaderValues: Record<string, Record<string, string>>;
 	version?: Tables<"agent_versions">;
+	environment: "staging" | "production";
 }) => {
 	const [isRunning, setIsRunning] = useState(false);
 	const [errors, setErrors] = useState<unknown[]>([]);
@@ -56,6 +58,7 @@ export const useAgentRunner = ({
 						data,
 						variables: variableValues,
 						version_id: version?.id,
+						environment,
 						mcp_options: Object.fromEntries(
 							Object.entries(mcpHeaderValues)
 								.filter(([, headers]) => Object.values(headers).some((v) => v))
@@ -190,7 +193,7 @@ export const useAgentRunner = ({
 				setIsRunning(false);
 			}
 		},
-		[variableValues, mcpHeaderValues, version],
+		[variableValues, mcpHeaderValues, version, environment],
 	);
 
 	const resetRunner = useCallback(() => {

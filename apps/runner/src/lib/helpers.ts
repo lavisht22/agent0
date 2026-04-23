@@ -10,20 +10,33 @@ import {
 import { supabase } from "./db.js";
 import { decryptMessage } from "./openpgp.js";
 import { getAIProvider } from "./providers.js";
-import type { MCPConfig, MCPOptions, VersionData } from "./types.js";
+import type { Environment, MCPConfig, MCPOptions, VersionData } from "./types.js";
 import { cachedQuery } from "./cache.js";
 import { applyVariablesToMessages } from "./variables.js";
+
+// Pick the encrypted blob for the requested environment, falling back to
+// production when no staging override is configured.
+const pickEncrypted = (
+	row: { encrypted_data_production: unknown; encrypted_data_staging: unknown },
+	environment: Environment,
+): string => {
+	if (environment === "staging" && row.encrypted_data_staging) {
+		return row.encrypted_data_staging as string;
+	}
+	return row.encrypted_data_production as string;
+};
 
 // Helper to prepare provider and messages - shared logic between generate and stream
 export const prepareProviderAndMessages = async (
 	data: VersionData,
 	variables: Record<string, string>,
+	environment: Environment,
 ) => {
 	const { model, messages } = data;
 
 	// Cache the entire provider pipeline: DB fetch + decryption + provider init
 	const { provider, aiProvider } = await cachedQuery(
-		`provider-resolved:${model.provider_id}`,
+		`provider-resolved:${model.provider_id}:${environment}`,
 		300_000, // 5 min TTL — credentials change rarely
 		async () => {
 			const { data, error } = await supabase
@@ -33,7 +46,7 @@ export const prepareProviderAndMessages = async (
 				.single();
 			if (error) throw error;
 
-			const decrypted = await decryptMessage(data.encrypted_data);
+			const decrypted = await decryptMessage(pickEncrypted(data, environment));
 			const config = JSON.parse(decrypted);
 			const resolved = getAIProvider(data.type, config);
 
@@ -61,6 +74,7 @@ type Tools = Awaited<ReturnType<MCPClient["tools"]>>;
 
 export const prepareMCPServers = async (
 	data: VersionData,
+	environment: Environment,
 	mcpOptions?: Record<string, MCPOptions>,
 ) => {
 	const { tools } = data;
@@ -117,10 +131,10 @@ export const prepareMCPServers = async (
 			mcps.map(async (mcp) => {
 				// Cache the decrypted MCP config (DB row is already cached, this caches decryption)
 				const config: MCPConfig = await cachedQuery(
-					`mcp-config:${mcp.id}`,
+					`mcp-config:${mcp.id}:${environment}`,
 					300_000, // 5 min TTL
 					async () => {
-						const decrypted = await decryptMessage(mcp.encrypted_data as string);
+						const decrypted = await decryptMessage(pickEncrypted(mcp, environment));
 						return JSON.parse(decrypted) as MCPConfig;
 					},
 				);

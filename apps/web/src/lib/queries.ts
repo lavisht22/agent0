@@ -25,13 +25,18 @@ export const providersQuery = (workspaceId: string) =>
 		queryFn: async () => {
 			const { data, error } = await supabase
 				.from("providers")
-				.select("id, name, type, created_at, updated_at")
+				.select(
+					"id, name, type, created_at, updated_at, encrypted_data_staging",
+				)
 				.eq("workspace_id", workspaceId)
 				.order("created_at", { ascending: false });
 
 			if (error) throw error;
 
-			return data;
+			return data.map(({ encrypted_data_staging, ...rest }) => ({
+				...rest,
+				has_staging_config: !!encrypted_data_staging,
+			}));
 		},
 		enabled: !!workspaceId,
 	});
@@ -42,13 +47,18 @@ export const mcpsQuery = (workspaceId: string) =>
 		queryFn: async () => {
 			const { data, error } = await supabase
 				.from("mcps")
-				.select("id, name, tools, custom_headers, created_at, updated_at")
+				.select(
+					"id, name, tools, custom_headers, created_at, updated_at, encrypted_data_staging",
+				)
 				.eq("workspace_id", workspaceId)
 				.order("created_at", { ascending: false });
 
 			if (error) throw error;
 
-			return data;
+			return data.map(({ encrypted_data_staging, ...rest }) => ({
+				...rest,
+				has_staging_config: !!encrypted_data_staging,
+			}));
 		},
 		enabled: !!workspaceId,
 	});

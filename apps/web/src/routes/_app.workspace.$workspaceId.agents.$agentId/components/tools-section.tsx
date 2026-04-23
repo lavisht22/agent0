@@ -43,7 +43,31 @@ interface ToolsSectionProps {
 	value: ToolValue[];
 	onValueChange: (value: ToolValue[]) => void;
 	isInvalid?: boolean;
+	environment: "staging" | "production";
 }
+
+type ToolEntry = { name: string; description: string };
+
+// Read the tools list for the requested environment, accommodating both the
+// new per-env shape `{ production, staging }` and any legacy flat-array rows
+// that pre-date the migration backfill.
+const getToolsForEnv = (
+	rawTools: unknown,
+	environment: "staging" | "production",
+): ToolEntry[] | undefined => {
+	if (!rawTools) return undefined;
+
+	if (Array.isArray(rawTools)) {
+		// Legacy shape — treat as production-only.
+		return environment === "production" ? (rawTools as ToolEntry[]) : undefined;
+	}
+
+	const byEnv = rawTools as {
+		production?: ToolEntry[];
+		staging?: ToolEntry[] | null;
+	};
+	return byEnv[environment] ?? byEnv.production;
+};
 
 // Helper to normalize tool to new format
 const normalizeTool = (tool: ToolValue): ToolDefinition => {
@@ -73,6 +97,7 @@ export default function ToolsSection({
 	value,
 	onValueChange,
 	isInvalid,
+	environment,
 }: ToolsSectionProps) {
 	// Modal state for adding custom tool
 	const customToolModalState = useOverlayState();
@@ -257,9 +282,7 @@ export default function ToolsSection({
 		}[] = [];
 
 		mcps?.forEach((mcp) => {
-			const tools = mcp?.tools as
-				| { name: string; description: string }[]
-				| undefined;
+			const tools = getToolsForEnv(mcp?.tools, environment);
 
 			tools?.forEach((tool) => {
 				const isSelected = value.some((item) => {
@@ -412,9 +435,7 @@ export default function ToolsSection({
 									{/** biome-ignore lint/complexity/noUselessFragments: <heroui problem> */}
 									<>
 										{mcps?.map((mcp, _index) => {
-											const tools = mcp?.tools as
-												| { name: string; description: string }[]
-												| undefined;
+											const tools = getToolsForEnv(mcp?.tools, environment);
 
 											const availableMcpTools = tools?.filter((tool) => {
 												// Check if already selected

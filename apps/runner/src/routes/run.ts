@@ -203,8 +203,8 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 
 		const [{ model, processedMessages }, { tools, closeAll }] =
 			await Promise.all([
-				prepareProviderAndMessages(data, variables),
-				prepareMCPServers(data, mcp_options),
+				prepareProviderAndMessages(data, variables, environment),
+				prepareMCPServers(data, environment, mcp_options),
 			]);
 
 		// Wrap all remaining logic in try-finally to ensure MCP clients are always closed
