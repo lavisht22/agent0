@@ -5,6 +5,26 @@ import { supabase } from '../lib/db.js';
 import { decryptMessage } from '../lib/openpgp.js';
 import type { MCPConfig } from '../lib/types.js';
 
+type Environment = "production" | "staging";
+type ToolEntry = { name: string; description: string | undefined };
+type ToolsByEnv = { production?: ToolEntry[]; staging?: ToolEntry[] | null };
+
+async function fetchToolsForEnv(encrypted: string): Promise<ToolEntry[]> {
+    const decrypted = await decryptMessage(encrypted);
+    const config: MCPConfig = JSON.parse(decrypted);
+
+    const client = await createMCPClient(config);
+    try {
+        const tools = await client.tools();
+        return Object.entries(tools).map(([name, tool]) => ({
+            name,
+            description: tool.description,
+        }));
+    } finally {
+        await client.close();
+    }
+}
+
 export async function registerRefreshMCPRoute(fastify: FastifyInstance) {
     fastify.post('/internal/refresh-mcp', async (request, reply) => {
         // Extract and validate JWT token from Authorization header
@@ -47,55 +67,77 @@ export async function registerRefreshMCPRoute(fastify: FastifyInstance) {
             return reply.code(403).send({ message: 'Access denied' });
         }
 
-        let mcpClient: Awaited<ReturnType<typeof createMCPClient>> | null = null;
-
-        try {
-            // Decrypt the MCP configuration
-            // The encrypted_data is stored as a string (armored PGP message)
-            const decrypted = await decryptMessage(mcp.encrypted_data as string);
-            const config: MCPConfig = JSON.parse(decrypted);
-
-            // Create MCP client using the decrypted configuration
-            mcpClient = await createMCPClient(config);
-
-            // Get tools from the MCP server
-            const tools = await mcpClient.tools();
-
-            // Convert tools to a serializable format for storage
-            // Using plain objects that are compatible with the Json type
-            const toolsList = Object.entries(tools).map(([name, tool]) => ({
-                name,
-                description: tool.description,
-            }));
-
-            // Update the MCP server with the fetched tools
-            const { error: updateError } = await supabase
-                .from("mcps")
-                .update({
-                    tools: toolsList as unknown as Json,
-                    updated_at: new Date().toISOString(),
-                })
-                .eq("id", mcp_id);
-
-            if (updateError) {
-                throw updateError;
-            }
-
-            return reply.code(200).send({
-                tools: toolsList,
+        // Refresh every environment that has a config. Production always exists;
+        // staging only when the user has enabled per-env config.
+        const envsToRefresh: { env: Environment; encrypted: string }[] = [
+            { env: "production", encrypted: mcp.encrypted_data_production as string },
+        ];
+        if (mcp.encrypted_data_staging) {
+            envsToRefresh.push({
+                env: "staging",
+                encrypted: mcp.encrypted_data_staging as string,
             });
-        } catch (error) {
-            console.error('Error refreshing MCP tools:', error);
+        }
 
+        const results = await Promise.allSettled(
+            envsToRefresh.map(({ encrypted }) => fetchToolsForEnv(encrypted)),
+        );
+
+        // Start from existing tools so a per-env failure preserves the prior
+        // tools list for that env instead of wiping it.
+        const previous = (mcp.tools as ToolsByEnv | null) ?? {};
+        const newTools: ToolsByEnv = { ...previous };
+
+        const errors: { env: Environment; message: string }[] = [];
+        let anySuccess = false;
+
+        results.forEach((result, idx) => {
+            const env = envsToRefresh[idx].env;
+            if (result.status === "fulfilled") {
+                newTools[env] = result.value;
+                anySuccess = true;
+            } else {
+                errors.push({
+                    env,
+                    message:
+                        result.reason instanceof Error
+                            ? result.reason.message
+                            : String(result.reason),
+                });
+            }
+        });
+
+        // Staging config was removed — drop the staging tools entry so it
+        // doesn't show up in the UI as a stale list.
+        if (!mcp.encrypted_data_staging) {
+            newTools.staging = null;
+        }
+
+        if (!anySuccess) {
             return reply.code(500).send({
                 message: 'Failed to refresh tools',
-                error: error instanceof Error ? error.message : 'Unknown error',
+                errors,
             });
-        } finally {
-            // Close the MCP client connection
-            if (mcpClient) {
-                await mcpClient.close();
-            }
         }
+
+        const { error: updateError } = await supabase
+            .from("mcps")
+            .update({
+                tools: newTools as unknown as Json,
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", mcp_id);
+
+        if (updateError) {
+            return reply.code(500).send({
+                message: 'Failed to persist refreshed tools',
+                error: updateError.message,
+            });
+        }
+
+        return reply.code(200).send({
+            tools: newTools,
+            errors: errors.length > 0 ? errors : undefined,
+        });
     });
 }

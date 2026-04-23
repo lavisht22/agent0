@@ -30,7 +30,11 @@ type ManyEmbedRequest = Omit<Parameters<typeof embedMany>[0], "model"> & {
 };
 
 // Helper to get provider scoped to the authenticated workspace
-async function getProvider(workspaceId: string, providerId: string) {
+async function getProvider(
+	workspaceId: string,
+	providerId: string,
+	environment: "staging" | "production",
+) {
 	const { data: provider, error: providerError } = await supabase
 		.from("providers")
 		.select("*")
@@ -42,7 +46,12 @@ async function getProvider(workspaceId: string, providerId: string) {
 		return { error: { code: 404, message: "Provider not found" } };
 	}
 
-	const decrypted = await decryptMessage(provider.encrypted_data);
+	const encrypted =
+		environment === "staging" && provider.encrypted_data_staging
+			? provider.encrypted_data_staging
+			: provider.encrypted_data_production;
+
+	const decrypted = await decryptMessage(encrypted);
 	const config = JSON.parse(decrypted);
 	const aiProvider = getAIProvider(provider.type, config);
 
@@ -68,6 +77,7 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 						},
 					},
 					value: { type: "string" as const, description: "Text to embed" },
+					environment: { type: "string" as const, enum: ["staging", "production"], default: "production", description: "Which provider config to use" },
 				},
 			},
 			response: {
@@ -83,7 +93,9 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-		const body = request.body as SingleEmbedRequest;
+		const body = request.body as SingleEmbedRequest & {
+			environment?: "staging" | "production";
+		};
 
 		// Validate request body
 		if (!body.model?.provider_id || !body.model?.name) {
@@ -96,7 +108,11 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 			return reply.code(400).send({ message: "value is required" });
 		}
 
-		const result = await getProvider(request.workspaceId, body.model.provider_id);
+		const result = await getProvider(
+			request.workspaceId,
+			body.model.provider_id,
+			body.environment ?? "production",
+		);
 		if (result.error) {
 			return reply
 				.code(result.error.code as 404)
@@ -152,6 +168,7 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 						},
 					},
 					values: { type: "array" as const, items: { type: "string" as const }, description: "Array of texts to embed" },
+					environment: { type: "string" as const, enum: ["staging", "production"], default: "production", description: "Which provider config to use" },
 				},
 			},
 			response: {
@@ -167,7 +184,9 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-		const body = request.body as ManyEmbedRequest;
+		const body = request.body as ManyEmbedRequest & {
+			environment?: "staging" | "production";
+		};
 
 		// Validate request body
 		if (!body.model?.provider_id || !body.model?.name) {
@@ -186,7 +205,11 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 				.send({ message: "values is required and must be a non-empty array" });
 		}
 
-		const result = await getProvider(request.workspaceId, body.model.provider_id);
+		const result = await getProvider(
+			request.workspaceId,
+			body.model.provider_id,
+			body.environment ?? "production",
+		);
 		if (result.error) {
 			return reply
 				.code(result.error.code as 404)

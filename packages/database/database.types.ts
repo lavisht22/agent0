@@ -170,7 +170,8 @@ export type Database = {
         Row: {
           created_at: string
           custom_headers: string
-          encrypted_data: Json
+          encrypted_data_production: Json
+          encrypted_data_staging: Json | null
           id: string
           name: string
           tools: Json | null
@@ -180,7 +181,8 @@ export type Database = {
         Insert: {
           created_at?: string
           custom_headers?: string
-          encrypted_data: Json
+          encrypted_data_production: Json
+          encrypted_data_staging?: Json | null
           id: string
           name: string
           tools?: Json | null
@@ -190,7 +192,8 @@ export type Database = {
         Update: {
           created_at?: string
           custom_headers?: string
-          encrypted_data?: Json
+          encrypted_data_production?: Json
+          encrypted_data_staging?: Json | null
           id?: string
           name?: string
           tools?: Json | null
@@ -210,7 +213,8 @@ export type Database = {
       providers: {
         Row: {
           created_at: string
-          encrypted_data: string
+          encrypted_data_production: string
+          encrypted_data_staging: string | null
           id: string
           name: string
           type: string
@@ -219,7 +223,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          encrypted_data: string
+          encrypted_data_production: string
+          encrypted_data_staging?: string | null
           id: string
           name: string
           type: string
@@ -228,7 +233,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          encrypted_data?: string
+          encrypted_data_production?: string
+          encrypted_data_staging?: string | null
           id?: string
           name?: string
           type?: string

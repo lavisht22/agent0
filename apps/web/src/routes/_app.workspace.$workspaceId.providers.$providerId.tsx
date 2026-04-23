@@ -7,14 +7,17 @@ import {
 	ListBox,
 	Select,
 	Spinner,
+	Switch,
 	TextField,
 	toast,
 } from "@heroui/react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Pencil, ShieldAlert } from "lucide-react";
 import { nanoid } from "nanoid";
 import * as openpgp from "openpgp";
+import { useState } from "react";
 import { MonacoJsonField } from "@/components/monaco-json-field";
 import { PageHeader } from "@/components/page-header";
 import { PROVIDER_TYPES } from "@/lib/providers";
@@ -26,6 +29,14 @@ export const Route = createFileRoute(
 )({
 	component: RouteComponent,
 });
+
+const DEFAULT_CONFIG = JSON.stringify(
+	{
+		apiKey: "your-api-key",
+	},
+	null,
+	2,
+);
 
 // Validate JSON helper
 function validateJsonField(value: string) {
@@ -40,43 +51,71 @@ function validateJsonField(value: string) {
 	}
 }
 
+async function encryptConfig(value: string) {
+	const publicKey = await openpgp.readKey({
+		armoredKey: import.meta.env.VITE_PUBLIC_PGP_PUBLIC_KEY,
+	});
+	return openpgp.encrypt({
+		encryptionKeys: publicKey,
+		message: await openpgp.createMessage({ text: value }),
+	});
+}
+
 function RouteComponent() {
 	const { workspaceId, providerId } = Route.useParams();
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const isNewProvider = providerId === "new";
 
-	// Fetch existing provider if editing
 	const { data: providers } = useQuery({
 		...providersQuery(workspaceId),
 		enabled: !isNewProvider,
 	});
 
 	const currentProvider = providers?.find((p) => p.id === providerId);
+	const hasExistingStaging = !!currentProvider?.has_staging_config;
 
-	// Create mutation
+	// Per-environment toggle. ON when the provider already has a staging override.
+	const [usePerEnvConfig, setUsePerEnvConfig] = useState(hasExistingStaging);
+
+	// Reveal flags for the collapsed Edit Config UX (existing providers only).
+	// New providers always show editors; existing providers start collapsed.
+	const [showProductionEditor, setShowProductionEditor] =
+		useState(isNewProvider);
+	const [showStagingEditor, setShowStagingEditor] = useState(
+		isNewProvider || (usePerEnvConfig && !hasExistingStaging),
+	);
+
+	const handleTogglePerEnv = (checked: boolean) => {
+		setUsePerEnvConfig(checked);
+		// When freshly enabling per-env on an existing provider with no staging
+		// config, reveal the staging editor since the user must provide a value.
+		if (checked && !isNewProvider && !hasExistingStaging) {
+			setShowStagingEditor(true);
+		}
+	};
+
 	const createMutation = useMutation({
 		mutationFn: async (values: {
 			name: string;
 			type: string;
-			data: string;
+			data_production: string;
+			data_staging: string;
+			usePerEnvConfig: boolean;
 		}) => {
-			const publicKey = await openpgp.readKey({
-				armoredKey: import.meta.env.VITE_PUBLIC_PGP_PUBLIC_KEY,
-			});
-
-			const encrypted_data = await openpgp.encrypt({
-				encryptionKeys: publicKey,
-				message: await openpgp.createMessage({
-					text: values.data,
-				}),
-			});
+			const encrypted_data_production = await encryptConfig(
+				values.data_production,
+			);
+			const encrypted_data_staging = values.usePerEnvConfig
+				? await encryptConfig(values.data_staging)
+				: null;
 
 			const { error } = await supabase.from("providers").insert({
 				id: nanoid(),
 				name: values.name,
 				type: values.type,
-				encrypted_data,
+				encrypted_data_production,
+				encrypted_data_staging,
 				workspace_id: workspaceId,
 			});
 
@@ -97,33 +136,42 @@ function RouteComponent() {
 		},
 	});
 
-	// Update mutation
 	const updateMutation = useMutation({
 		mutationFn: async (values: {
 			name: string;
 			type: string;
-			data: string;
+			data_production: string;
+			data_staging: string;
+			usePerEnvConfig: boolean;
+			updateProduction: boolean;
+			updateStaging: boolean;
 		}) => {
-			const publicKey = await openpgp.readKey({
-				armoredKey: import.meta.env.VITE_PUBLIC_PGP_PUBLIC_KEY,
-			});
+			const updatePayload: Record<string, unknown> = {
+				name: values.name,
+				type: values.type,
+				updated_at: new Date().toISOString(),
+			};
 
-			const encrypted_data = await openpgp.encrypt({
-				encryptionKeys: publicKey,
-				message: await openpgp.createMessage({
-					text: values.data,
-				}),
-			});
+			if (values.updateProduction) {
+				updatePayload.encrypted_data_production = await encryptConfig(
+					values.data_production,
+				);
+			}
+
+			if (values.usePerEnvConfig) {
+				if (values.updateStaging) {
+					updatePayload.encrypted_data_staging = await encryptConfig(
+						values.data_staging,
+					);
+				}
+			} else {
+				// Per-env toggle is OFF: clear any existing staging override.
+				updatePayload.encrypted_data_staging = null;
+			}
 
 			const { error } = await supabase
 				.from("providers")
-				.update({
-					name: values.name,
-					type: values.type,
-					data: JSON.parse(values.data),
-					encrypted_data,
-					updated_at: new Date().toISOString(),
-				})
+				.update(updatePayload)
 				.eq("id", providerId);
 
 			if (error) throw error;
@@ -143,24 +191,26 @@ function RouteComponent() {
 		},
 	});
 
-	// Initialize TanStack Form
 	const form = useForm({
 		defaultValues: {
 			name: currentProvider?.name || "",
 			type: currentProvider?.type || "",
-			data: JSON.stringify(
-				{
-					apiKey: "your-api-key",
-				},
-				null,
-				2,
-			),
+			data_production: DEFAULT_CONFIG,
+			data_staging: DEFAULT_CONFIG,
 		},
 		onSubmit: async ({ value }) => {
 			if (isNewProvider) {
-				await createMutation.mutateAsync(value);
+				await createMutation.mutateAsync({
+					...value,
+					usePerEnvConfig,
+				});
 			} else {
-				await updateMutation.mutateAsync(value);
+				await updateMutation.mutateAsync({
+					...value,
+					usePerEnvConfig,
+					updateProduction: showProductionEditor,
+					updateStaging: showStagingEditor,
+				});
 			}
 		},
 	});
@@ -273,26 +323,103 @@ function RouteComponent() {
 							)}
 						</form.Field>
 
-						{/* Data Field */}
-						<form.Field
-							name="data"
-							validators={{
-								onChange: ({ value }) => validateJsonField(value),
-							}}
+						{/* Per-environment toggle */}
+						<div className="flex items-start justify-between rounded-lg border border-border p-4">
+							<div className="pr-4">
+								<p className="text-sm font-medium text-foreground">
+									Use different config for staging
+								</p>
+								<p className="text-xs text-muted mt-1">
+									When enabled, you can provide a separate configuration that
+									the runner will use for staging requests. Otherwise the
+									production config is used for both environments.
+								</p>
+							</div>
+							<Switch
+								isSelected={usePerEnvConfig}
+								onChange={handleTogglePerEnv}
+							>
+								<Switch.Control>
+									<Switch.Thumb />
+								</Switch.Control>
+							</Switch>
+						</div>
+
+						{/* Production Config */}
+						<ConfigSection
+							title={
+								usePerEnvConfig ? "Production Configuration" : "Configuration"
+							}
+							isNew={isNewProvider}
+							isExpanded={showProductionEditor}
+							onEdit={() => setShowProductionEditor(true)}
+							helpText={
+								usePerEnvConfig
+									? "Used by the runner for production requests."
+									: "Used by the runner for both production and staging requests."
+							}
 						>
-							{(field) => (
-								<MonacoJsonField
-									label="Configuration (JSON)"
-									isRequired
-									description="Provider-specific configuration in JSON format. This will override any existing configuration."
-									isInvalid={field.state.meta.errors.length > 0}
-									errorMessage={field.state.meta.errors[0]}
-									value={field.state.value}
-									onValueChange={field.handleChange}
-									editorMinHeight={200}
-								/>
-							)}
-						</form.Field>
+							<form.Field
+								name="data_production"
+								validators={{
+									onChange: ({ value }) =>
+										showProductionEditor ? validateJsonField(value) : undefined,
+								}}
+							>
+								{(field) => (
+									<MonacoJsonField
+										label={
+											isNewProvider
+												? "Configuration (JSON)"
+												: "New Configuration (JSON)"
+										}
+										isRequired
+										description="Provider-specific configuration in JSON format."
+										isInvalid={field.state.meta.errors.length > 0}
+										errorMessage={field.state.meta.errors[0]}
+										value={field.state.value}
+										onValueChange={field.handleChange}
+										editorMinHeight={200}
+									/>
+								)}
+							</form.Field>
+						</ConfigSection>
+
+						{/* Staging Config */}
+						{usePerEnvConfig && (
+							<ConfigSection
+								title="Staging Configuration"
+								isNew={isNewProvider || !hasExistingStaging}
+								isExpanded={showStagingEditor}
+								onEdit={() => setShowStagingEditor(true)}
+								helpText="Used by the runner for staging requests."
+							>
+								<form.Field
+									name="data_staging"
+									validators={{
+										onChange: ({ value }) =>
+											showStagingEditor ? validateJsonField(value) : undefined,
+									}}
+								>
+									{(field) => (
+										<MonacoJsonField
+											label={
+												isNewProvider || !hasExistingStaging
+													? "Staging Configuration (JSON)"
+													: "New Staging Configuration (JSON)"
+											}
+											isRequired
+											description="Provider-specific configuration in JSON format."
+											isInvalid={field.state.meta.errors.length > 0}
+											errorMessage={field.state.meta.errors[0]}
+											value={field.state.value}
+											onValueChange={field.handleChange}
+											editorMinHeight={200}
+										/>
+									)}
+								</form.Field>
+							</ConfigSection>
+						)}
 
 						<div className="flex justify-end gap-3">
 							<Button
@@ -332,6 +459,67 @@ function RouteComponent() {
 						</div>
 					</form>
 				</div>
+			</div>
+		</div>
+	);
+}
+
+interface ConfigSectionProps {
+	title: string;
+	isNew: boolean;
+	isExpanded: boolean;
+	onEdit: () => void;
+	helpText: string;
+	children: React.ReactNode;
+}
+
+function ConfigSection({
+	title,
+	isNew,
+	isExpanded,
+	onEdit,
+	helpText,
+	children,
+}: ConfigSectionProps) {
+	if (isNew) {
+		return (
+			<div className="space-y-2">
+				<p className="text-sm font-medium text-foreground">{title}</p>
+				{children}
+			</div>
+		);
+	}
+
+	if (isExpanded) {
+		return (
+			<div className="space-y-3">
+				<p className="text-sm font-medium text-foreground">{title}</p>
+				<div className="flex items-center gap-2 rounded-lg bg-warning-soft px-3 py-2 text-warning text-sm">
+					<ShieldAlert className="size-4 shrink-0" />
+					<span>
+						You are updating this configuration. This will overwrite the
+						existing encrypted config.
+					</span>
+				</div>
+				{children}
+			</div>
+		);
+	}
+
+	return (
+		<div className="rounded-lg border border-border p-4">
+			<div className="flex items-center justify-between">
+				<div>
+					<p className="text-sm font-medium text-foreground">{title}</p>
+					<p className="text-xs text-muted mt-1">
+						{helpText} The configuration is stored encrypted. Click edit to
+						replace it with a new config.
+					</p>
+				</div>
+				<Button size="sm" variant="tertiary" onPress={onEdit}>
+					<Pencil className="size-3" />
+					Edit Config
+				</Button>
 			</div>
 		</div>
 	);

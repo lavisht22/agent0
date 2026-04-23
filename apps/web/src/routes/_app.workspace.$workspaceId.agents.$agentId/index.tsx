@@ -83,6 +83,12 @@ function RouteComponent() {
 	const editNameState = useOverlayState();
 	const [editingName, setEditingName] = useState("");
 
+	// Test environment selector — controls which provider/MCP credentials the
+	// /internal/test endpoint uses, and which env's MCP tools the picker shows.
+	const [testEnvironment, setTestEnvironment] = useState<
+		"staging" | "production"
+	>("staging");
+
 	// Fetch agent
 	const { data: agent } = useQuery({
 		...agentQuery(agentId),
@@ -139,7 +145,12 @@ function RouteComponent() {
 		handleRun,
 		resetRunner,
 		generatedMessages,
-	} = useAgentRunner({ variableValues, mcpHeaderValues, version });
+	} = useAgentRunner({
+		variableValues,
+		mcpHeaderValues,
+		version,
+		environment: testEnvironment,
+	});
 
 	// Initialize TanStack Form
 	const form = useForm({
@@ -570,6 +581,32 @@ function RouteComponent() {
 							</Button>
 						</div>
 
+						<Select
+							className="w-32 shrink-0"
+							aria-label="Test environment"
+							value={testEnvironment}
+							onChange={(value) =>
+								setTestEnvironment(
+									(value as "staging" | "production") ?? "staging",
+								)
+							}
+						>
+							<Select.Trigger>
+								<Select.Value />
+								<Select.Indicator />
+							</Select.Trigger>
+							<Select.Popover>
+								<ListBox>
+									<ListBox.Item id="staging" textValue="Staging">
+										Staging
+									</ListBox.Item>
+									<ListBox.Item id="production" textValue="Production">
+										Production
+									</ListBox.Item>
+								</ListBox>
+							</Select.Popover>
+						</Select>
+
 						<Button
 							size="sm"
 							variant="primary"
@@ -599,6 +636,7 @@ function RouteComponent() {
 									value={field.state.value}
 									onValueChange={field.handleChange}
 									isInvalid={field.state.meta.errors.length > 0}
+									environment={testEnvironment}
 								/>
 							)}
 						</form.Field>

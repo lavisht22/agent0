@@ -86,3 +86,5 @@ export type MCPConfig = {
 export type MCPOptions = {
 	headers?: Record<string, string>;
 };
+
+export type Environment = "staging" | "production";
