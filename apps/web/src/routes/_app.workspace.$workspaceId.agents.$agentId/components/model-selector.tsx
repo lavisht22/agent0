@@ -48,11 +48,17 @@ export function ModelSelector({
 
 	return (
 		<Popover isOpen={state.isOpen} onOpenChange={state.setOpen}>
-			<Button size="sm" variant={isInvalid ? "danger-soft" : "tertiary"}>
-				<LucideServer className="size-3.5" />
-				{value.name === ""
-					? "Select Model"
-					: `@${providers.find((p) => p.id === value.provider_id)?.name}/${value.name}`}
+			<Button
+				size="sm"
+				variant={isInvalid ? "danger-soft" : "tertiary"}
+				className="min-w-0"
+			>
+				<LucideServer className="size-3.5 shrink-0" />
+				<span className="truncate max-w-64 min-w-0">
+					{value.name === ""
+						? "Select Model"
+						: `@${providers.find((p) => p.id === value.provider_id)?.name}/${value.name}`}
+				</span>
 			</Button>
 			<Popover.Content placement="bottom start">
 				<Popover.Dialog className="p-2 flex flex-row items-start">

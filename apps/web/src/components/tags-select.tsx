@@ -1,7 +1,7 @@
 import {
 	Button,
+	ColorSwatchPicker,
 	Input,
-	InputGroup,
 	Label,
 	ListBox,
 	Modal,
@@ -155,32 +155,31 @@ export function TagsSelect({
 											<Modal.Heading>Create Tag</Modal.Heading>
 										</Modal.Header>
 										<Modal.Body>
-											<div className="flex flex-col gap-4">
+											<div className="flex flex-col gap-4 p-1">
 												<TextField
 													value={newTagName}
 													onChange={setNewTagName}
 													autoFocus
+													variant="secondary"
 												>
 													<Label>Tag Name</Label>
 													<Input placeholder="e.g., Production, ChatBot, Support" />
 												</TextField>
 												<div className="flex flex-col gap-2">
-													<span className="text-sm font-medium">Color</span>
-													<div className="flex flex-wrap gap-2">
+													<Label>Color</Label>
+													<ColorSwatchPicker
+														value={selectedColor}
+														onChange={(color) =>
+															setSelectedColor(color.toString("hex"))
+														}
+													>
 														{TAG_COLORS.map((color) => (
-															<button
-																key={color}
-																type="button"
-																className={`w-8 h-8 rounded-full border-2 transition-all ${
-																	selectedColor === color
-																		? "border-foreground scale-110"
-																		: "border-transparent hover:scale-105"
-																}`}
-																style={{ backgroundColor: color }}
-																onClick={() => setSelectedColor(color)}
-															/>
+															<ColorSwatchPicker.Item key={color} color={color}>
+																<ColorSwatchPicker.Swatch />
+																<ColorSwatchPicker.Indicator />
+															</ColorSwatchPicker.Item>
 														))}
-													</div>
+													</ColorSwatchPicker>
 												</div>
 												{newTagName && (
 													<div className="flex items-center gap-2">

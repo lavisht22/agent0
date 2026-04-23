@@ -360,9 +360,9 @@ function RouteComponent() {
 				</div>
 			</div>
 			<div className="flex flex-1 overflow-hidden">
-				<div className="flex-1 flex flex-col border-r border-border min-h-0">
+				<div className="basis-1/2 grow-0 shrink-0 min-w-0 flex flex-col border-r border-border min-h-0">
 					<div className="flex gap-2 justify-between items-center p-4 border-b border-border">
-						<div className="flex gap-2">
+						<div className="flex gap-2 min-w-0">
 							<form.Field name="model">
 								{(field) => (
 									<ModelSelector
@@ -513,6 +513,7 @@ function RouteComponent() {
 							size="sm"
 							variant="primary"
 							type="button"
+							className="shrink-0"
 							onPress={() => handleRun(form.state.values)}
 							isDisabled={isRunning}
 							isPending={isRunning}
@@ -565,7 +566,7 @@ function RouteComponent() {
 					</div>
 				</div>
 
-				<div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
+				<div className="basis-1/2 grow-0 shrink-0 min-w-0 flex flex-col p-4 gap-4 overflow-y-auto">
 					<Alerts warnings={warnings} errors={errors} />
 
 					{!isRunning && generatedMessages.length === 0 && (

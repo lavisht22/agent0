@@ -1,4 +1,13 @@
-import { Avatar, Chip, cn, Dropdown, Label, Separator } from "@heroui/react";
+import {
+	Avatar,
+	Button,
+	Chip,
+	cn,
+	Dropdown,
+	Label,
+	Separator,
+	Tooltip,
+} from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
@@ -8,13 +17,15 @@ import {
 	LucideChevronsUpDown,
 	LucideLogOut,
 	LucidePalette,
+	LucidePanelLeftClose,
+	LucidePanelLeftOpen,
 	LucidePlusSquare,
 	PlayCircle,
 	Plug,
 	Server,
 	Settings,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { workspacesQuery, workspaceUserQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/lib/use-theme";
@@ -22,6 +33,8 @@ import { useTheme } from "@/lib/use-theme";
 interface SidebarProps {
 	workspaceId: string;
 }
+
+const COLLAPSED_STORAGE_KEY = "sidebar-collapsed";
 
 function getInitials(name: string | undefined | null): string {
 	if (!name) return "?";
@@ -35,12 +48,34 @@ function getInitials(name: string | undefined | null): string {
 	);
 }
 
+function readInitialCollapsed(): boolean {
+	if (typeof window === "undefined") return false;
+	return window.localStorage.getItem(COLLAPSED_STORAGE_KEY) === "1";
+}
+
 export function Sidebar({ workspaceId }: SidebarProps) {
 	const { theme, setTheme } = useTheme();
 
 	const { data: workspaces } = useQuery(workspacesQuery);
 	const navigate = useNavigate();
 	const location = useLocation();
+
+	const [collapsed, setCollapsed] = useState<boolean>(readInitialCollapsed);
+
+	useEffect(() => {
+		window.localStorage.setItem(COLLAPSED_STORAGE_KEY, collapsed ? "1" : "0");
+	}, [collapsed]);
+
+	useEffect(() => {
+		function onKeyDown(e: KeyboardEvent) {
+			if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
+				e.preventDefault();
+				setCollapsed((c) => !c);
+			}
+		}
+		window.addEventListener("keydown", onKeyDown);
+		return () => window.removeEventListener("keydown", onKeyDown);
+	}, []);
 
 	const currentWorkspace = useMemo(() => {
 		return workspaces?.find((workspace) => workspace.id === workspaceId);
@@ -103,19 +138,35 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 	}, [workspaceId, location.pathname, user]);
 
 	return (
-		<div className={`border-r border-border flex flex-col w-52`}>
+		<div
+			className={cn(
+				"group/sidebar relative border-r border-border flex flex-col transition-[width] duration-200 ease-out",
+				collapsed ? "w-16" : "w-52",
+			)}
+		>
 			<div className="border-b border-border">
 				<Dropdown>
-					<Dropdown.Trigger className="w-full flex justify-between items-center px-4 h-16 hover:bg-surface-hover cursor-pointer text-left">
-						<div>
-							<span className="block text-[10px] text-muted leading-tight">
-								WORKSPACE
-							</span>
-							<span className="font-medium">
-								{currentWorkspace?.name || ""}
-							</span>
+					<Dropdown.Trigger className="w-full flex items-center justify-between gap-2 h-16 px-4 hover:bg-surface-hover cursor-pointer text-left overflow-hidden">
+						<div className="flex items-center gap-2 min-w-0">
+							<Avatar size="sm">
+								<Avatar.Fallback>
+									{getInitials(currentWorkspace?.name)}
+								</Avatar.Fallback>
+							</Avatar>
+							{!collapsed && (
+								<div className="min-w-0">
+									<span className="block text-[10px] text-muted leading-tight">
+										WORKSPACE
+									</span>
+									<span className="font-medium block truncate whitespace-nowrap">
+										{currentWorkspace?.name || ""}
+									</span>
+								</div>
+							)}
 						</div>
-						<LucideChevronsUpDown className="size-4" />
+						{!collapsed && (
+							<LucideChevronsUpDown className="size-4 shrink-0" />
+						)}
 					</Dropdown.Trigger>
 					<Dropdown.Popover className="w-56">
 						<Dropdown.Menu aria-label="Workspace selection">
@@ -152,7 +203,7 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 				</Dropdown>
 			</div>
 
-			<nav className="flex-1 py-4 px-1.5 space-y-0.5 overflow-y-auto">
+			<nav className="flex-1 py-4 px-2 space-y-0.5 overflow-y-auto overflow-x-hidden">
 				{navItems.map((item) => {
 					const Icon = item.icon;
 
@@ -160,21 +211,26 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 						<Link
 							key={item.label}
 							to={item.path}
+							aria-label={collapsed ? item.label : undefined}
 							className={cn(
-								"group flex items-center gap-2.5 w-full justify-start px-2.5 py-2 rounded-md text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent",
+								"group flex items-center w-full h-10 pl-4 pr-2 gap-2.5 rounded-md text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent overflow-hidden",
 								!item.active &&
 									"text-foreground hover:bg-surface-hover active:bg-surface-secondary",
 								item.active && "bg-accent/10 text-accent font-medium",
 							)}
 						>
 							<Icon className="size-4 shrink-0" />
-							{item.label}
+							{!collapsed && (
+								<span className="truncate whitespace-nowrap">
+									{item.label}
+								</span>
+							)}
 						</Link>
 					);
 				})}
 			</nav>
 
-			<div className="border-t border-border p-4">
+			<div className="border-t border-border p-4 overflow-hidden">
 				<Dropdown>
 					<Dropdown.Trigger className="flex items-center gap-2 w-full text-left cursor-pointer">
 						<Avatar size="sm">
@@ -184,14 +240,16 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 							/>
 							<Avatar.Fallback>{getInitials(user?.name)}</Avatar.Fallback>
 						</Avatar>
-						<div className="flex flex-col min-w-0">
-							<span className="text-sm font-medium truncate">
-								{user?.name || ""}
-							</span>
-							<span className="text-xs text-muted truncate">
-								{user?.email || ""}
-							</span>
-						</div>
+						{!collapsed && (
+							<div className="flex flex-col min-w-0">
+								<span className="text-sm font-medium truncate whitespace-nowrap">
+									{user?.name || ""}
+								</span>
+								<span className="text-xs text-muted truncate whitespace-nowrap">
+									{user?.email || ""}
+								</span>
+							</div>
+						)}
 					</Dropdown.Trigger>
 					<Dropdown.Popover className="w-64" placement="top start">
 						<Dropdown.Menu>
@@ -233,6 +291,32 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 					</Dropdown.Popover>
 				</Dropdown>
 			</div>
+
+			<Tooltip delay={300}>
+				<Tooltip.Trigger>
+					<Button
+						isIconOnly
+						size="sm"
+						variant="tertiary"
+						aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+						onPress={() => setCollapsed((c) => !c)}
+						className={cn(
+							"absolute top-1/2 -right-3 -translate-y-1/2 z-10",
+							"h-6 w-6 min-w-0 rounded-full bg-surface border border-border shadow-sm",
+							"opacity-0 group-hover/sidebar:opacity-100 focus-visible:opacity-100 transition-opacity",
+						)}
+					>
+						{collapsed ? (
+							<LucidePanelLeftOpen className="size-3.5" />
+						) : (
+							<LucidePanelLeftClose className="size-3.5" />
+						)}
+					</Button>
+				</Tooltip.Trigger>
+				<Tooltip.Content placement="right">
+					{collapsed ? "Expand sidebar" : "Collapse sidebar"} (⌘B)
+				</Tooltip.Content>
+			</Tooltip>
 		</div>
 	);
 }
