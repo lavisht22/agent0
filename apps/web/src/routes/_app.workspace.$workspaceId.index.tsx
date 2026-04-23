@@ -82,14 +82,6 @@ function StatCard({
 	color: "primary" | "success" | "warning" | "danger" | "secondary";
 	isLoading?: boolean;
 }) {
-	const colorClasses = {
-		primary: "bg-accent-soft text-accent",
-		success: "bg-success-100 text-success-600",
-		warning: "bg-warning-100 text-warning-600",
-		danger: "bg-danger-100 text-danger-600",
-		secondary: "bg-default-100 text-default-600",
-	};
-
 	return (
 		<Card>
 			<Card.Content className="gap-2">
@@ -105,7 +97,7 @@ function StatCard({
 							<p className="text-xs text-default-400 mt-1">{subtitle}</p>
 						)}
 					</div>
-					<div className={`p-2 rounded-lg ${colorClasses[color]}`}>
+					<div className="p-2 rounded-lg text-muted">
 						<Icon className="size-5" />
 					</div>
 				</div>
@@ -181,7 +173,6 @@ function RouteComponent() {
 						value={stats?.totalRuns ?? 0}
 						subtitle={`${stats?.successfulRuns ?? 0} successful, ${stats?.failedRuns ?? 0} failed`}
 						icon={Activity}
-						color="primary"
 						isLoading={statsLoading}
 					/>
 					<StatCard
@@ -193,13 +184,6 @@ function RouteComponent() {
 								: "No runs yet"
 						}
 						icon={TrendingUp}
-						color={
-							(stats?.successRate ?? 0) >= 90
-								? "success"
-								: (stats?.successRate ?? 0) >= 70
-									? "warning"
-									: "danger"
-						}
 						isLoading={statsLoading}
 					/>
 					<StatCard
@@ -207,7 +191,6 @@ function RouteComponent() {
 						value={formatCost(stats?.totalCost ?? 0)}
 						subtitle={`${formatTokens(stats?.totalTokens ?? 0)} tokens used`}
 						icon={DollarSign}
-						color="warning"
 						isLoading={statsLoading}
 					/>
 					<StatCard
@@ -215,7 +198,6 @@ function RouteComponent() {
 						value={formatTime(stats?.avgResponseTime ?? 0)}
 						subtitle="End-to-end latency"
 						icon={Clock}
-						color="secondary"
 						isLoading={statsLoading}
 					/>
 				</div>
@@ -223,7 +205,7 @@ function RouteComponent() {
 				<div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
 					{/* Top Agents */}
 					<Card className="lg:col-span-2">
-						<Card.Header className="flex justify-between items-center">
+						<Card.Header className="flex flex-row w-full items-center justify-between">
 							<div className="flex items-center gap-2">
 								<Bot className="size-5 text-default-500" />
 								<span className="font-medium">Top Agents</span>
@@ -298,7 +280,7 @@ function RouteComponent() {
 
 					{/* Recent Runs */}
 					<Card className="lg:col-span-2">
-						<Card.Header className="flex justify-between items-center">
+						<Card.Header className="flex flex-row w-full items-center justify-between">
 							<div className="flex items-center gap-2">
 								<PlayCircle className="size-5 text-default-500" />
 								<span className="font-medium">Recent Runs</span>
