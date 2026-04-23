@@ -116,30 +116,21 @@ export function VariablesDrawer({
 									</p>
 								)}
 
-								{variables.length > 0 && (
-									<>
-										{mcpHeaders.length > 0 && (
-											<p className="text-sm font-medium text-default-700">
-												Variables
-											</p>
-										)}
-										{variables.map((variable) => (
-											<TextField key={variable} name={variable}>
-												<Label>{variable}</Label>
-												<TextArea
-													placeholder={`Value for ${variable}`}
-													value={values[variable] || ""}
-													onChange={(e) =>
-														onValuesChange({
-															...values,
-															[variable]: e.target.value,
-														})
-													}
-												/>
-											</TextField>
-										))}
-									</>
-								)}
+								{variables.map((variable) => (
+									<TextField key={variable} name={variable} variant="secondary">
+										<Label>{variable}</Label>
+										<TextArea
+											placeholder={`Value for ${variable}`}
+											value={values[variable] || ""}
+											onChange={(e) =>
+												onValuesChange({
+													...values,
+													[variable]: e.target.value,
+												})
+											}
+										/>
+									</TextField>
+								))}
 
 								{/* MCP Headers Section */}
 								{mcpHeaders.length > 0 && (
@@ -166,6 +157,7 @@ export function VariablesDrawer({
 																	},
 																})
 															}
+															variant="secondary"
 														/>
 													</TextField>
 												))}

@@ -14,7 +14,7 @@ export function Variables({
 				<Button
 					size="sm"
 					key={variable}
-					className="gap-1 h-6 px-2 text-warning bg-warning/10 hover:bg-warning/20"
+					className="gap-1 h-6 px-2 text-warning bg-warning-soft hover:bg-warning-soft-hover"
 					variant="tertiary"
 					onPress={() => onVariablePress()}
 				>

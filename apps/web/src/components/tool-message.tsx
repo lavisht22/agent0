@@ -90,7 +90,7 @@ export function ToolMessage({
 			dragControls={controls}
 		>
 			<Card>
-				<Card.Header className="flex flex-row items-center justify-between pb-3 border-b border-default-200 z-0">
+				<Card.Header className="flex flex-row items-center justify-between z-0">
 					<div className="flex items-center gap-2">
 						{!isReadOnly && (
 							<div

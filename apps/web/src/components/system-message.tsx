@@ -42,7 +42,7 @@ export function SystemMessage({
 			dragListener={false}
 		>
 			<Card>
-				<Card.Header className="flex flex-row items-center justify-between pb-3 border-b border-default-200">
+				<Card.Header className="flex flex-row items-center justify-between">
 					<span className="text-sm text-default-500">System</span>
 				</Card.Header>
 				<Card.Content className="gap-4">

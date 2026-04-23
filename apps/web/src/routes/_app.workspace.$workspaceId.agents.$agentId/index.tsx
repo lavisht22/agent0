@@ -3,6 +3,7 @@ import {
 	Input,
 	Label,
 	ListBox,
+	NumberField,
 	Popover,
 	Select,
 	Slider,
@@ -384,16 +385,23 @@ function RouteComponent() {
 									<Popover.Dialog className="p-4 flex flex-col items-start gap-4 w-96">
 										<form.Field name="maxOutputTokens">
 											{(field) => (
-												<TextField className="w-full">
-													<Label>Max Output Tokens</Label>
-													<Input
-														type="number"
-														value={field.state.value.toString()}
-														onChange={(e) =>
-															field.handleChange(parseInt(e.target.value, 10))
-														}
-													/>
-												</TextField>
+												<>
+													<NumberField
+														minValue={0}
+														name="Max Output Tokens"
+														value={field.state.value}
+														onChange={field.handleChange}
+														variant="secondary"
+														fullWidth
+													>
+														<Label>Max Output Tokens</Label>
+														<NumberField.Group>
+															<NumberField.DecrementButton />
+															<NumberField.Input />
+															<NumberField.IncrementButton />
+														</NumberField.Group>
+													</NumberField>
+												</>
 											)}
 										</form.Field>
 										<form.Field name="outputFormat">
@@ -404,6 +412,7 @@ function RouteComponent() {
 													onChange={(value) => {
 														field.handleChange(value as "text" | "json");
 													}}
+													variant="secondary"
 												>
 													<Label>Output Format</Label>
 													<Select.Trigger>

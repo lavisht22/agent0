@@ -59,7 +59,7 @@ export function ModelSelector({
 					<ListBox
 						aria-label="Providers"
 						selectionMode="single"
-						className="w-48 max-h-64 overflow-y-auto"
+						className="w-52 max-h-64 overflow-y-auto"
 						selectedKeys={selectedProvider ? [selectedProvider] : []}
 						onSelectionChange={(keys) => {
 							const selected = Array.from(keys)[0] as string;
@@ -84,7 +84,8 @@ export function ModelSelector({
 									{providerType?.icon && (
 										<providerType.icon className="size-5" />
 									)}
-									<Label>{provider.name}</Label>
+									<Label className="line-clamp-1">{provider.name}</Label>
+									<ListBox.ItemIndicator />
 								</ListBox.Item>
 							);
 						})}
@@ -113,6 +114,7 @@ export function ModelSelector({
 						{availableModels.map((model) => (
 							<ListBox.Item key={model} id={model} textValue={model}>
 								<Label>{model}</Label>
+								<ListBox.ItemIndicator />
 							</ListBox.Item>
 						))}
 					</ListBox>

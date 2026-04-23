@@ -80,6 +80,7 @@ function GoogleVertexOptions({
 								},
 							});
 						}}
+						variant="secondary"
 					>
 						<Label>Thinking Level</Label>
 						<Select.Trigger>
@@ -106,6 +107,7 @@ function GoogleVertexOptions({
 					<TextField
 						className="flex-1"
 						isDisabled={!!opts?.thinkingConfig?.thinkingLevel}
+						variant="secondary"
 					>
 						<Label>Thinking Budget</Label>
 						<Input
@@ -166,6 +168,8 @@ function GoogleVertexOptions({
 							| undefined,
 					});
 				}}
+				variant="secondary"
+				fullWidth
 			>
 				<Label>Media Resolution</Label>
 				<Select.Trigger>
@@ -241,6 +245,7 @@ export function ProviderOptions({
 								},
 							});
 						}}
+						variant="secondary"
 					>
 						<Label>Reasoning Effort</Label>
 						<Select.Trigger>
@@ -276,6 +281,7 @@ export function ProviderOptions({
 								},
 							});
 						}}
+						variant="secondary"
 					>
 						<Label>Reasoning Summary</Label>
 						<Select.Trigger>
@@ -319,6 +325,7 @@ export function ProviderOptions({
 							},
 						});
 					}}
+					variant="secondary"
 				>
 					<Label>Reasoning Effort</Label>
 					<Select.Trigger>

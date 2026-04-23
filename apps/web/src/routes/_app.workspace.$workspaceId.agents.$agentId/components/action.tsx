@@ -88,7 +88,7 @@ export function Action({
 							</>
 						)}
 					</Button>
-					<Dropdown.Popover>
+					<Dropdown.Popover placement="bottom end">
 						<Dropdown.Menu
 							aria-label="Deploy options"
 							disabledKeys={[
@@ -110,29 +110,53 @@ export function Action({
 								}
 							}}
 						>
-							<Dropdown.Item id="staging" textValue="To Staging">
-								<Label>To Staging</Label>
-								<Description>
-									{isDeployedToStaging
-										? "This version is already in staging"
-										: "Deploy this version to staging"}
-								</Description>
+							<Dropdown.Item
+								id="staging"
+								textValue="To Staging"
+								isDisabled={isDeployedToStaging}
+							>
+								<div className="size-3 rounded-full bg-warning" />
+								<div className="flex flex-col">
+									<Label>To Staging</Label>
+									<Description>
+										{isDeployedToStaging
+											? "This version is already in staging"
+											: "Deploy this version to staging"}
+									</Description>
+								</div>
 							</Dropdown.Item>
-							<Dropdown.Item id="production" textValue="To Production">
-								<Label>To Production</Label>
-								<Description>
-									{isDeployedToProduction
-										? "This version is already in production"
-										: "Deploy this version to production"}
-								</Description>
+							<Dropdown.Item
+								id="production"
+								textValue="To Production"
+								isDisabled={isDeployedToProduction}
+							>
+								<div className="size-3 rounded-full bg-success" />
+								<div className="flex flex-col">
+									<Label>To Production</Label>
+									<Description>
+										{isDeployedToProduction
+											? "This version is already in production"
+											: "Deploy this version to production"}
+									</Description>
+								</div>
 							</Dropdown.Item>
-							<Dropdown.Item id="both" textValue="To Both">
-								<Label>To Both</Label>
-								<Description>
-									{isDeployedToStaging && isDeployedToProduction
-										? "This version is already deployed to both"
-										: "Deploy this version to staging and production"}
-								</Description>
+							<Dropdown.Item
+								id="both"
+								textValue="To Both"
+								isDisabled={isDeployedToProduction && isDeployedToStaging}
+							>
+								<div className="flex">
+									<div className="h-3 w-1.5 rounded-l-2xl bg-warning" />
+									<div className="h-3 w-1.5 rounded-r-2xl bg-success" />
+								</div>
+								<div className="flex flex-col">
+									<Label>To Both</Label>
+									<Description>
+										{isDeployedToStaging && isDeployedToProduction
+											? "This version is already deployed to both"
+											: "Deploy this version to staging and production"}
+									</Description>
+								</div>
 							</Dropdown.Item>
 						</Dropdown.Menu>
 					</Dropdown.Popover>

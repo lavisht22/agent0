@@ -6,7 +6,6 @@ import {
 	Label,
 	ListBox,
 	Popover,
-	ScrollShadow,
 	useOverlayState,
 } from "@heroui/react";
 import type { Tables } from "@repo/database";
@@ -43,7 +42,7 @@ export const VersionHistory = ({
 			<Button size="sm" variant="tertiary">
 				<LucideHistory className="size-3.5" />
 			</Button>
-			<Popover.Content placement="bottom end" className="w-[500px]">
+			<Popover.Content placement="bottom end" className="max-w-[350px]">
 				<Popover.Dialog className="max-h-96 overflow-auto">
 					<ListBox aria-label="Version History" className="p-0">
 						{versions.map((version) => {
@@ -63,7 +62,7 @@ export const VersionHistory = ({
 										onSelectionChange(version);
 										state.close();
 									}}
-									className="flex items-center justify-between"
+									className="flex items-center justify-between gap-8"
 								>
 									<div className="flex gap-2">
 										<Avatar size="sm" className="shrink-0">
@@ -84,13 +83,13 @@ export const VersionHistory = ({
 									</div>
 									<div className="flex gap-1">
 										{isStaging && (
-											<Chip size="sm" color="warning" variant="soft">
-												STAGING
+											<Chip size="sm" color="warning" variant="primary">
+												S
 											</Chip>
 										)}
 										{isProduction && (
-											<Chip size="sm" color="success" variant="soft">
-												PRODUCTION
+											<Chip size="sm" color="success" variant="primary">
+												P
 											</Chip>
 										)}
 									</div>

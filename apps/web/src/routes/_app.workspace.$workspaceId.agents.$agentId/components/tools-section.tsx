@@ -4,6 +4,7 @@ import {
 	Chip,
 	CloseButton,
 	Description,
+	Drawer,
 	Dropdown,
 	Header,
 	Input,
@@ -294,10 +295,10 @@ export default function ToolsSection({
 	return (
 		<>
 			<Card className={isInvalid ? "border-danger border" : ""}>
-				<Card.Header className="flex flex-row items-center justify-between pb-3 border-b border-default-200">
+				<Card.Header className="flex flex-row items-center justify-between">
 					<span className="text-sm text-default-500">Tools</span>
 					<Dropdown>
-						<Button size="sm" variant="tertiary">
+						<Button size="sm" variant="tertiary" isIconOnly>
 							<LucidePlus className="size-3.5" />
 						</Button>
 						<Dropdown.Popover>
@@ -315,13 +316,17 @@ export default function ToolsSection({
 							>
 								<Dropdown.Item id="mcp" textValue="From MCP Server">
 									<LucideServer className="size-4" />
-									<Label>From MCP Server</Label>
-									<Description>Add a tool from an MCP server</Description>
+									<div className="flex flex-col">
+										<Label>From MCP Server</Label>
+										<Description>Add a tool from an MCP server</Description>
+									</div>
 								</Dropdown.Item>
 								<Dropdown.Item id="custom" textValue="Custom Tool">
 									<LucideWrench className="size-4" />
-									<Label>Custom Tool</Label>
-									<Description>Define a custom tool</Description>
+									<div className="flex flex-col">
+										<Label>Custom Tool</Label>
+										<Description>Define a custom tool</Description>
+									</div>
 								</Dropdown.Item>
 							</Dropdown.Menu>
 						</Dropdown.Popover>
@@ -338,14 +343,14 @@ export default function ToolsSection({
 							{mcpTools.map((tool) => {
 								const mcpTool = tool as { mcp_id: string; name: string };
 								return (
-									<Chip
-										key={`mcp-${mcpTool.mcp_id}-${mcpTool.name}`}
-										variant="tertiary"
-									>
-										<span>{mcpTool.name}</span>
-										<span className="text-default-400 ml-1 text-xs">
-											{getMcpName(mcpTool.mcp_id)}
-										</span>
+									<Chip key={`mcp-${mcpTool.mcp_id}-${mcpTool.name}`}>
+										<Chip.Label>
+											{mcpTool.name}{" "}
+											<span className="text-muted ml-1 text-xs">
+												{getMcpName(mcpTool.mcp_id)}
+											</span>
+										</Chip.Label>
+
 										<CloseButton
 											aria-label="Remove tool"
 											onPress={() => handleRemoveTool(tool)}
@@ -357,12 +362,14 @@ export default function ToolsSection({
 							{customTools.map((tool) => (
 								<Chip
 									key={`custom-${tool.title}`}
-									variant="tertiary"
 									className="cursor-pointer"
 									onClick={() => handleEditCustomTool(tool)}
 								>
-									<span>{tool.title}</span>
-									<span className="text-default-400 ml-1 text-xs">Custom</span>
+									<Chip.Label>
+										{tool.title}{" "}
+										<span className="text-muted ml-1 text-xs">Custom</span>
+									</Chip.Label>
+
 									<CloseButton
 										aria-label="Remove tool"
 										onPress={() => handleRemoveTool(tool)}
@@ -375,38 +382,37 @@ export default function ToolsSection({
 			</Card>
 
 			{/* MCP Tools Modal */}
-			<Modal state={mcpToolModalState}>
-				<Modal.Backdrop>
-					<Modal.Container size="lg" scroll="inside">
-						<Modal.Dialog>
-							<Modal.CloseTrigger />
-							<Modal.Header>
-								<Modal.Heading>Add MCP Tool</Modal.Heading>
-							</Modal.Header>
-							<Modal.Body className="pb-6 pt-0">
-								<div className="sticky top-0 z-30 pb-2 bg-background">
-									<InputGroup>
-										<InputGroup.Prefix>
-											<LucideSearch className="size-4" />
-										</InputGroup.Prefix>
-										<Input
-											placeholder="Search tools..."
-											value={mcpToolSearch}
-											onChange={(e) => setMcpToolSearch(e.target.value)}
-										/>
+			<Drawer state={mcpToolModalState}>
+				<Drawer.Backdrop>
+					<Drawer.Content placement="right">
+						<Drawer.Dialog>
+							<Drawer.CloseTrigger />
+							<Drawer.Header>
+								<Drawer.Heading>Add MCP Tool</Drawer.Heading>
+								<InputGroup fullWidth variant="secondary">
+									<InputGroup.Prefix>
+										<LucideSearch className="size-4" />
+									</InputGroup.Prefix>
+									<InputGroup.Input
+										placeholder="Search tools..."
+										value={mcpToolSearch}
+										onChange={(e) => setMcpToolSearch(e.target.value)}
+									/>
+									<InputGroup.Suffix>
 										{mcpToolSearch && (
 											<CloseButton
 												aria-label="Clear search"
 												onPress={() => setMcpToolSearch("")}
 											/>
 										)}
-									</InputGroup>
-								</div>
-
+									</InputGroup.Suffix>
+								</InputGroup>
+							</Drawer.Header>
+							<Drawer.Body>
 								<ListBox aria-label="Available MCP Tools">
 									{/** biome-ignore lint/complexity/noUselessFragments: <heroui problem> */}
 									<>
-										{mcps?.map((mcp) => {
+										{mcps?.map((mcp, index) => {
 											const tools = mcp?.tools as
 												| { name: string; description: string }[]
 												| undefined;
@@ -452,23 +458,26 @@ export default function ToolsSection({
 											}
 
 											return (
-												<ListBox.Section key={mcp.id}>
-													<Header>{mcp.name}</Header>
-													{availableMcpTools?.map((tool) => (
-														<ListBox.Item
-															key={mcp.id + tool.name}
-															id={mcp.id + tool.name}
-															textValue={tool.name}
-															onAction={() => {
-																handleAddMCPTool(mcp.id, tool.name);
-															}}
-														>
-															<Label>{tool.name}</Label>
-															<Description>{tool.description}</Description>
-														</ListBox.Item>
-													))}
-													<Separator />
-												</ListBox.Section>
+												<>
+													<ListBox.Section key={mcp.id}>
+														<Header>{mcp.name}</Header>
+														{availableMcpTools?.map((tool) => (
+															<ListBox.Item
+																key={mcp.id + tool.name}
+																id={mcp.id + tool.name}
+																textValue={tool.name}
+																onAction={() => {
+																	handleAddMCPTool(mcp.id, tool.name);
+																}}
+																className="flex-col items-start"
+															>
+																<Label>{tool.name}</Label>
+																<Description>{tool.description}</Description>
+															</ListBox.Item>
+														))}
+													</ListBox.Section>
+													<Separator className="my-4" />
+												</>
 											);
 										})}
 									</>
@@ -480,25 +489,25 @@ export default function ToolsSection({
 										servers are configured.
 									</p>
 								)}
-							</Modal.Body>
-						</Modal.Dialog>
-					</Modal.Container>
-				</Modal.Backdrop>
-			</Modal>
+							</Drawer.Body>
+						</Drawer.Dialog>
+					</Drawer.Content>
+				</Drawer.Backdrop>
+			</Drawer>
 
 			{/* Custom Tool Modal */}
-			<Modal state={customToolModalState}>
-				<Modal.Backdrop>
-					<Modal.Container size="lg">
-						<Modal.Dialog>
-							<Modal.CloseTrigger />
-							<Modal.Header>
-								<Modal.Heading>
+			<Drawer state={customToolModalState}>
+				<Drawer.Backdrop>
+					<Drawer.Content placement="right">
+						<Drawer.Dialog>
+							<Drawer.CloseTrigger />
+							<Drawer.Header>
+								<Drawer.Heading>
 									{editingCustomTool ? "Edit Custom Tool" : "Add Custom Tool"}
-								</Modal.Heading>
-							</Modal.Header>
-							<Modal.Body className="space-y-4">
-								<TextField isRequired>
+								</Drawer.Heading>
+							</Drawer.Header>
+							<Drawer.Body className="space-y-4">
+								<TextField isRequired variant="secondary">
 									<Label>Tool Title</Label>
 									<Input
 										placeholder="e.g., get_weather"
@@ -510,7 +519,7 @@ export default function ToolsSection({
 										recommended)
 									</Description>
 								</TextField>
-								<TextField isRequired>
+								<TextField isRequired variant="secondary">
 									<Label>Description</Label>
 									<TextArea
 										placeholder="Describe what this tool does..."
@@ -545,8 +554,8 @@ export default function ToolsSection({
 									errorMessage={inputSchemaError}
 									editorMinHeight={250}
 								/>
-							</Modal.Body>
-							<Modal.Footer>
+							</Drawer.Body>
+							<Drawer.Footer>
 								<Button
 									variant="tertiary"
 									onPress={() => {
@@ -563,11 +572,11 @@ export default function ToolsSection({
 								<Button variant="primary" onPress={handleSaveCustomTool}>
 									{editingCustomTool ? "Save Changes" : "Add Tool"}
 								</Button>
-							</Modal.Footer>
-						</Modal.Dialog>
-					</Modal.Container>
-				</Modal.Backdrop>
-			</Modal>
+							</Drawer.Footer>
+						</Drawer.Dialog>
+					</Drawer.Content>
+				</Drawer.Backdrop>
+			</Drawer>
 		</>
 	);
 }
