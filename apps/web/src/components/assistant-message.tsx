@@ -1,6 +1,6 @@
 import { Button, Card, Dropdown, Label } from "@heroui/react";
 import { Reorder, useDragControls } from "framer-motion";
-import { LucideGripVertical, LucidePlus, LucideTrash2 } from "lucide-react";
+import { LucideGripVertical, LucidePlus, LucideX } from "lucide-react";
 import { useMemo } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { z } from "zod";
@@ -140,21 +140,17 @@ export function AssistantMessage({
 			dragControls={controls}
 		>
 			<Card>
-				<Card.Header className="flex items-center justify-between pl-1 pr-1 h-10 z-0">
-					<div className="flex items-center">
+				<Card.Header className="flex flex-row items-center justify-between pb-3 border-b border-default-200 z-0">
+					<div className="flex items-center gap-2">
 						{!isReadOnly && (
 							<div
-								className="h-full py-3 px-2 reorder-handle cursor-grab"
+								className="reorder-handle cursor-grab"
 								onPointerDown={(e) => controls.start(e)}
 							>
 								<LucideGripVertical className="size-3.5 text-default-500" />
 							</div>
 						)}
-						<span
-							className={`text-sm text-default-500 ${isReadOnly ? "pl-2" : ""}`}
-						>
-							Assistant
-						</span>
+						<span className="text-sm text-default-500">Assistant</span>
 					</div>
 					{!isReadOnly && (
 						<Dropdown>
@@ -216,10 +212,10 @@ export function AssistantMessage({
 						</Dropdown>
 					)}
 				</Card.Header>
-				<Card.Content className="p-3 border-t border-default-200 flex flex-col gap-3">
+				<Card.Content className="gap-3">
 					{value.content.map((part, index) => {
 						return (
-							<div key={`${index + 1}`} className="flex">
+							<div key={`${index + 1}`} className="flex items-start">
 								<AssistantMessagePart
 									isReadOnly={isReadOnly}
 									value={part}
@@ -231,10 +227,9 @@ export function AssistantMessage({
 								/>
 								{!isReadOnly && (
 									<Button
-										className="-mr-2"
 										size="sm"
 										isIconOnly
-										variant="tertiary"
+										variant="ghost"
 										onPress={() => {
 											const newContent = [...value.content];
 											newContent.splice(index, 1);
@@ -247,7 +242,7 @@ export function AssistantMessage({
 											onValueChange({ ...value, content: newContent });
 										}}
 									>
-										<LucideTrash2 className="size-3.5" />
+										<LucideX className="size-3.5" />
 									</Button>
 								)}
 							</div>

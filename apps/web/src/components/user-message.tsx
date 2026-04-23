@@ -14,7 +14,7 @@ import {
 	LucideFileText,
 	LucideGripVertical,
 	LucidePlus,
-	LucideTrash2,
+	LucideX,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import TextareaAutosize from "react-textarea-autosize";
@@ -246,21 +246,17 @@ export function UserMessage({
 				dragControls={controls}
 			>
 				<Card>
-					<Card.Header className="flex items-center justify-between pl-1 pr-1 h-10 z-0">
-						<div className="flex items-center">
+					<Card.Header className="flex flex-row items-center justify-between pb-3 border-b border-default-200 z-0">
+						<div className="flex items-center gap-2">
 							{!isReadOnly && (
 								<div
-									className="h-full py-3 px-2 reorder-handle cursor-grab"
+									className="reorder-handle cursor-grab"
 									onPointerDown={(e) => controls.start(e)}
 								>
 									<LucideGripVertical className="size-3.5 text-default-500" />
 								</div>
 							)}
-							<span
-								className={`text-sm text-default-500 ${isReadOnly ? "pl-2" : ""}`}
-							>
-								User
-							</span>
+							<span className="text-sm text-default-500">User</span>
 						</div>
 						{!isReadOnly && (
 							<Dropdown>
@@ -288,10 +284,10 @@ export function UserMessage({
 							</Dropdown>
 						)}
 					</Card.Header>
-					<Card.Content className="p-3 border-t border-default-200 flex flex-col gap-2">
+					<Card.Content className="gap-2">
 						{value.content.map((part, index) => {
 							return (
-								<div key={`${index + 1}`} className="flex">
+								<div key={`${index + 1}`} className="flex items-start">
 									<UserMessagePart
 										isReadOnly={isReadOnly}
 										value={part}
@@ -304,10 +300,9 @@ export function UserMessage({
 
 									{!isReadOnly && (
 										<Button
-											className="-mr-2"
 											size="sm"
 											isIconOnly
-											variant="tertiary"
+											variant="ghost"
 											onPress={() => {
 												const newContent = [...value.content];
 												newContent.splice(index, 1);
@@ -320,7 +315,7 @@ export function UserMessage({
 												onValueChange({ ...value, content: newContent });
 											}}
 										>
-											<LucideTrash2 className="size-3.5" />
+											<LucideX className="size-3.5" />
 										</Button>
 									)}
 								</div>

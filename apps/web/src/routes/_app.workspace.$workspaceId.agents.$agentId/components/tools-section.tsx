@@ -294,7 +294,7 @@ export default function ToolsSection({
 	return (
 		<>
 			<Card className={isInvalid ? "border-danger border" : ""}>
-				<Card.Header className="flex items-center justify-between pl-3 pr-1 h-10">
+				<Card.Header className="flex flex-row items-center justify-between pb-3 border-b border-default-200">
 					<span className="text-sm text-default-500">Tools</span>
 					<Dropdown>
 						<Button size="sm" variant="tertiary">
@@ -327,7 +327,7 @@ export default function ToolsSection({
 						</Dropdown.Popover>
 					</Dropdown>
 				</Card.Header>
-				<Card.Content className="p-3 border-t border-default-200">
+				<Card.Content>
 					{value.length === 0 ? (
 						<p className="text-sm text-default-400">
 							No tools added. Click "+" to add tools to your agent. (Optional)

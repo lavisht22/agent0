@@ -43,28 +43,29 @@ export const VersionHistory = ({
 			<Button size="sm" variant="tertiary">
 				<LucideHistory className="size-3.5" />
 			</Button>
-			<Popover.Content placement="bottom end">
-				<Popover.Dialog className="p-0">
-					<ScrollShadow className="max-h-96 p-2">
-						<ListBox aria-label="Version History">
-							{versions.map((version) => {
-								const user = workspace?.workspace_user.find(
-									(user) => user.user_id === version.user_id,
-								)?.users;
+			<Popover.Content placement="bottom end" className="w-[500px]">
+				<Popover.Dialog className="max-h-96 overflow-auto">
+					<ListBox aria-label="Version History" className="p-0">
+						{versions.map((version) => {
+							const user = workspace?.workspace_user.find(
+								(user) => user.user_id === version.user_id,
+							)?.users;
 
-								const isStaging = stagingVersionId === version.id;
-								const isProduction = productionVersionId === version.id;
+							const isStaging = stagingVersionId === version.id;
+							const isProduction = productionVersionId === version.id;
 
-								return (
-									<ListBox.Item
-										key={version.id}
-										id={version.id}
-										textValue={version.id}
-										onAction={() => {
-											onSelectionChange(version);
-											state.close();
-										}}
-									>
+							return (
+								<ListBox.Item
+									key={version.id}
+									id={version.id}
+									textValue={version.id}
+									onAction={() => {
+										onSelectionChange(version);
+										state.close();
+									}}
+									className="flex items-center justify-between"
+								>
+									<div className="flex gap-2">
 										<Avatar size="sm" className="shrink-0">
 											<Avatar.Image
 												src={`https://api.dicebear.com/9.x/initials/svg?seed=${user?.name}`}
@@ -74,27 +75,29 @@ export const VersionHistory = ({
 												{user?.name?.slice(0, 1)}
 											</Avatar.Fallback>
 										</Avatar>
-										<Label>{version.id}</Label>
-										<Description>
-											{`${format(version.created_at, "d LLL, hh:mm a")} by ${user?.name}`}
-										</Description>
-										<div className="flex gap-1">
-											{isStaging && (
-												<Chip size="sm" variant="tertiary">
-													STAGING
-												</Chip>
-											)}
-											{isProduction && (
-												<Chip size="sm" variant="tertiary">
-													PRODUCTION
-												</Chip>
-											)}
+										<div className="flex flex-col">
+											<Label>{version.id}</Label>
+											<Description>
+												{`${format(version.created_at, "d LLL, hh:mm a")} by ${user?.name}`}
+											</Description>
 										</div>
-									</ListBox.Item>
-								);
-							})}
-						</ListBox>
-					</ScrollShadow>
+									</div>
+									<div className="flex gap-1">
+										{isStaging && (
+											<Chip size="sm" color="warning" variant="soft">
+												STAGING
+											</Chip>
+										)}
+										{isProduction && (
+											<Chip size="sm" color="success" variant="soft">
+												PRODUCTION
+											</Chip>
+										)}
+									</div>
+								</ListBox.Item>
+							);
+						})}
+					</ListBox>
 				</Popover.Dialog>
 			</Popover.Content>
 		</Popover>
