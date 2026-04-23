@@ -8,7 +8,7 @@ import {
 } from "@heroui/react";
 import { getLocalTimeZone, parseDate, today } from "@internationalized/date";
 import { format } from "date-fns";
-import { LucideArrowLeft } from "lucide-react";
+import { LucideArrowLeft, LucideClock } from "lucide-react";
 import { useMemo, useState } from "react";
 
 const DATE_PRESETS = [
@@ -248,7 +248,8 @@ export function DateRangePicker({
 				}
 			}}
 		>
-			<Select.Trigger>
+			<Select.Trigger className="flex items-center gap-2">
+				<LucideClock className="size-3.5 text-muted" />
 				<Select.Value>{displayLabel}</Select.Value>
 				<Select.Indicator />
 			</Select.Trigger>

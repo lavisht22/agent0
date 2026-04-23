@@ -95,17 +95,11 @@ function RouteComponent() {
 							</Table.Header>
 							<Table.Body
 								items={providers || []}
-								renderEmptyState={() =>
-									isLoading ? (
-										<p className="text-center text-default-400 p-6">
-											Loading...
-										</p>
-									) : (
-										<p className="text-center text-default-400 p-6">
-											You haven't added any providers yet.
-										</p>
-									)
-								}
+								renderEmptyState={() => (
+									<p className="text-center text-muted p-6">
+										You haven't added any providers yet.
+									</p>
+								)}
 							>
 								{(item) => {
 									const provider = PROVIDER_TYPES.find(

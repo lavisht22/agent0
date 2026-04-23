@@ -19,8 +19,8 @@ export function StatusFilter({ value, onValueChange }: StatusFilterProps) {
 				onValueChange((key as StatusFilterValue) || undefined);
 			}}
 		>
-			<Select.Trigger className="min-h-8">
-				<Activity className="size-3.5 shrink-0" />
+			<Select.Trigger className="min-h-8 flex items-center gap-2">
+				<Activity className="size-3.5 shrink-0 text-muted" />
 				<Select.Value />
 				<Select.Indicator />
 			</Select.Trigger>

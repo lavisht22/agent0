@@ -1,6 +1,6 @@
 import { ComboBox, Input, ListBox } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
-import { LucideBot } from "lucide-react";
+
 import { agentsLiteQuery } from "@/lib/queries";
 
 interface AgentFilterProps {
@@ -26,7 +26,6 @@ export function AgentFilter({
 			}}
 		>
 			<ComboBox.InputGroup>
-				<LucideBot className="size-3.5 shrink-0" />
 				<Input placeholder="All Agents" />
 				<ComboBox.Trigger />
 			</ComboBox.InputGroup>

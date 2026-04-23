@@ -226,14 +226,12 @@ function RouteComponent() {
 							<Table.Body
 								items={agents || []}
 								renderEmptyState={() => (
-									<div className="flex justify-center items-center py-8">
-										<p className="text-muted">
-											{searchQuery ||
-											(selectedTags?.length && selectedTags.length > 0)
-												? "No agents found matching your criteria."
-												: "You haven't created any agents yet."}
-										</p>
-									</div>
+									<p className="text-center text-muted p-6">
+										{searchQuery ||
+										(selectedTags?.length && selectedTags.length > 0)
+											? "No agents found matching your criteria."
+											: "You haven't created any agents yet."}
+									</p>
 								)}
 							>
 								{(item) => (

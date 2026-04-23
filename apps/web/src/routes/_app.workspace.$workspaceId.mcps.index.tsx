@@ -113,102 +113,102 @@ function RouteComponent() {
 				)}
 			</div>
 
-			<Table>
-				<Table.ScrollContainer className="flex-1 overflow-y-auto">
-					<Table.Content aria-label="MCP Servers Table">
-						<Table.Header>
-							<Table.Column>Name</Table.Column>
-							<Table.Column>ID</Table.Column>
-							<Table.Column>Last Updated</Table.Column>
-							<Table.Column className="w-20">Actions</Table.Column>
-						</Table.Header>
-						<Table.Body
-							items={mcps || []}
-							renderEmptyState={() =>
-								isLoading ? (
-									<p className="text-center text-default-400 p-6">Loading...</p>
-								) : (
+			<div className="flex-1 p-4 flex flex-col">
+				<Table className="flex-1 overflow-hidden">
+					<Table.ScrollContainer className="flex-1 overflow-y-auto">
+						<Table.Content aria-label="MCP Servers Table">
+							<Table.Header className="sticky top-0 z-10">
+								<Table.Column>Name</Table.Column>
+								<Table.Column>ID</Table.Column>
+								<Table.Column>Last Updated</Table.Column>
+								<Table.Column className="w-20"></Table.Column>
+							</Table.Header>
+							<Table.Body
+								items={mcps || []}
+								renderEmptyState={() => (
 									<p className="text-center text-default-400 p-6">
 										You haven't added any MCP servers yet.
 									</p>
-								)
-							}
-						>
-							{(item) => (
-								<Table.Row
-									key={item.id}
-									id={item.id}
-									className="hover:bg-default-100 cursor-pointer"
-									onAction={
-										user?.role === "admin"
-											? () =>
-													navigate({
-														to: "/workspace/$workspaceId/mcps/$mcpId",
-														params: { workspaceId, mcpId: item.id },
-													})
-											: undefined
-									}
-								>
-									<Table.Cell>{item.name}</Table.Cell>
-									<Table.Cell>
-										<IDCopy id={item.id} />
-									</Table.Cell>
-									<Table.Cell>
-										{format(item.updated_at, "d LLL, hh:mm a")}
-									</Table.Cell>
-									<Table.Cell className="flex justify-end">
-										<Dropdown>
-											<Button
-												isIconOnly
-												variant="tertiary"
-												isDisabled={
-													user?.role !== "admin" && user?.role !== "writer"
-												}
-											>
-												<LucideEllipsisVertical className="size-4" />
-											</Button>
-											<Dropdown.Popover>
-												<Dropdown.Menu>
-													<Dropdown.Item
-														id="refresh"
-														textValue="Refresh"
-														onAction={() => refreshMcpMutation.mutate(item.id)}
-													>
-														<Label>Refresh</Label>
-													</Dropdown.Item>
-													<Dropdown.Item
-														id="edit"
-														textValue="Edit"
-														isDisabled={user?.role !== "admin"}
-														onAction={() => navigate({ to: item.id })}
-													>
-														<Label>Edit</Label>
-													</Dropdown.Item>
-													<Dropdown.Item
-														id="delete"
-														textValue="Delete"
-														variant="danger"
-														isDisabled={user?.role !== "admin"}
-														onAction={() => {
-															setMcpToDelete({
-																id: item.id,
-																name: item.name,
-															});
-															deleteState.open();
-														}}
-													>
-														<Label>Delete</Label>
-													</Dropdown.Item>
-												</Dropdown.Menu>
-											</Dropdown.Popover>
-										</Dropdown>
-									</Table.Cell>
-								</Table.Row>
-							)}
-						</Table.Body>
-					</Table.Content>
-				</Table.ScrollContainer>
-			</Table>
+								)}
+							>
+								{(item) => (
+									<Table.Row
+										key={item.id}
+										id={item.id}
+										className="hover:bg-default-100 cursor-pointer"
+										onAction={
+											user?.role === "admin"
+												? () =>
+														navigate({
+															to: "/workspace/$workspaceId/mcps/$mcpId",
+															params: { workspaceId, mcpId: item.id },
+														})
+												: undefined
+										}
+									>
+										<Table.Cell>{item.name}</Table.Cell>
+										<Table.Cell>
+											<IDCopy id={item.id} />
+										</Table.Cell>
+										<Table.Cell>
+											{format(item.updated_at, "d LLL, hh:mm a")}
+										</Table.Cell>
+										<Table.Cell className="flex justify-end">
+											<Dropdown>
+												<Button
+													isIconOnly
+													variant="ghost"
+													isDisabled={
+														user?.role !== "admin" && user?.role !== "writer"
+													}
+												>
+													<LucideEllipsisVertical className="size-4" />
+												</Button>
+												<Dropdown.Popover>
+													<Dropdown.Menu>
+														<Dropdown.Item
+															id="refresh"
+															textValue="Refresh"
+															onAction={() =>
+																refreshMcpMutation.mutate(item.id)
+															}
+														>
+															<Label>Refresh</Label>
+														</Dropdown.Item>
+														<Dropdown.Item
+															id="edit"
+															textValue="Edit"
+															isDisabled={user?.role !== "admin"}
+															onAction={() => navigate({ to: item.id })}
+														>
+															<Label>Edit</Label>
+														</Dropdown.Item>
+														<Dropdown.Item
+															id="delete"
+															textValue="Delete"
+															variant="danger"
+															isDisabled={user?.role !== "admin"}
+															onAction={() => {
+																setMcpToDelete({
+																	id: item.id,
+																	name: item.name,
+																});
+																deleteState.open();
+															}}
+														>
+															<Label>Delete</Label>
+														</Dropdown.Item>
+													</Dropdown.Menu>
+												</Dropdown.Popover>
+											</Dropdown>
+										</Table.Cell>
+									</Table.Row>
+								)}
+							</Table.Body>
+						</Table.Content>
+					</Table.ScrollContainer>
+				</Table>
+			</div>
 
 			<ConfirmationModal
 				isOpen={deleteState.isOpen}

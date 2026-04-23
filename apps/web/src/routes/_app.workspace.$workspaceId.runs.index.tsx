@@ -95,8 +95,8 @@ function RouteComponent() {
 				<h1 className="text-xl font-medium tracking-tight">Runs</h1>
 			</div>
 
-			<div className="flex-1 overflow-y-auto flex flex-col">
-				<div className="w-full flex justify-between items-center p-3 border-b border-default-200">
+			<div className="flex-1 overflow-y-auto flex flex-col p-4 gap-4">
+				<div className="shrink-0 w-full flex justify-between items-center">
 					<div className="flex items-center gap-2">
 						<DateRangePicker
 							value={dateValues}
@@ -205,31 +205,23 @@ function RouteComponent() {
 					</div>
 				</div>
 
-				<Table>
+				<Table className="flex-1 overflow-hidden">
 					<Table.ScrollContainer className="flex-1 overflow-y-auto">
 						<Table.Content aria-label="Runs Table">
-							<Table.Header>
+							<Table.Header className="sticky top-0 z-10">
 								<Table.Column>Created At</Table.Column>
 								<Table.Column>Status</Table.Column>
 								<Table.Column>Time</Table.Column>
 								<Table.Column>Cost</Table.Column>
 								<Table.Column>Agent</Table.Column>
 								<Table.Column>ID</Table.Column>
-								<Table.Column className="w-20">Actions</Table.Column>
+								<Table.Column className="w-20"></Table.Column>
 							</Table.Header>
 							<Table.Body
 								items={runs || []}
-								renderEmptyState={() =>
-									isLoading ? (
-										<div className="flex items-center justify-center p-6">
-											<Spinner />
-										</div>
-									) : (
-										<p className="text-center text-default-400 p-6">
-											No runs found.
-										</p>
-									)
-								}
+								renderEmptyState={() => (
+									<p className="text-center text-muted p-6">No runs found.</p>
+								)}
 							>
 								{(item) => (
 									<Table.Row
@@ -292,7 +284,7 @@ function RouteComponent() {
 
 										<Table.Cell className="flex justify-end">
 											<Dropdown>
-												<Button isIconOnly variant="tertiary">
+												<Button isIconOnly variant="ghost">
 													<LucideEllipsisVertical className="size-4" />
 												</Button>
 												<Dropdown.Popover>

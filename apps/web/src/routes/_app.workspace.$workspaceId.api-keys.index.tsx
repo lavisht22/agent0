@@ -74,7 +74,7 @@ function RouteComponent() {
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
-			<div className="flex justify-between items-center h-16 border-b border-default-200 box-content px-4">
+			<div className="shrink-0 flex justify-between items-center h-16 border-b border-default-200 box-content px-4">
 				<h1 className="text-xl font-medium tracking-tight">API Keys</h1>
 
 				<Button
@@ -91,99 +91,103 @@ function RouteComponent() {
 				</Button>
 			</div>
 
-			<Table>
-				<Table.ScrollContainer className="flex-1 overflow-y-auto">
-					<Table.Content aria-label="API Keys Table">
-						<Table.Header>
-							<Table.Column>Name</Table.Column>
-							<Table.Column>API Key</Table.Column>
-							<Table.Column>Created By</Table.Column>
-							<Table.Column>Created At</Table.Column>
-							<Table.Column className="w-20">Actions</Table.Column>
-						</Table.Header>
-						<Table.Body
-							items={apiKeys || []}
-							renderEmptyState={() =>
-								isLoading ? (
-									<p className="text-center text-default-400 p-6">Loading...</p>
-								) : (
-									<p className="text-center text-default-400 p-6">
-										You haven't created any API keys yet.
-									</p>
-								)
-							}
-						>
-							{(item) => {
-								const user = workspace?.workspace_user.find(
-									(user) => user.user_id === item.user_id,
-								)?.users;
-								const userName = user?.name || "Unknown";
+			<div className="flex-1 flex flex-col overflow-hidden p-4 gap-4">
+				<Table className="flex-1 overflow-hidden">
+					<Table.ScrollContainer className="flex-1 overflow-y-auto">
+						<Table.Content aria-label="API Keys Table">
+							<Table.Header className="sticky top-0 z-10">
+								<Table.Column>Name</Table.Column>
+								<Table.Column>API Key</Table.Column>
+								<Table.Column>Created By</Table.Column>
+								<Table.Column>Created At</Table.Column>
+								<Table.Column className="w-20"></Table.Column>
+							</Table.Header>
+							<Table.Body
+								items={apiKeys || []}
+								renderEmptyState={() =>
+									isLoading ? (
+										<p className="text-center text-default-400 p-6">
+											Loading...
+										</p>
+									) : (
+										<p className="text-center text-default-400 p-6">
+											You haven't created any API keys yet.
+										</p>
+									)
+								}
+							>
+								{(item) => {
+									const user = workspace?.workspace_user.find(
+										(user) => user.user_id === item.user_id,
+									)?.users;
+									const userName = user?.name || "Unknown";
 
-								return (
-									<Table.Row key={item.id} id={item.id}>
-										<Table.Cell>{item.name}</Table.Cell>
-										<Table.Cell>
-											<IDCopy id={item.key} redacted={redactKey(item.key)} />
-										</Table.Cell>
-										<Table.Cell>
-											<div className="flex items-center gap-2">
-												<Avatar size="sm">
-													<Avatar.Image
-														src={`https://api.dicebear.com/9.x/initials/svg?seed=${userName}`}
-														alt={userName}
-													/>
-													<Avatar.Fallback>
-														{userName
-															?.split(" ")
-															.map((s) => s[0])
-															.join("")
-															.slice(0, 2)
-															.toUpperCase() || "?"}
-													</Avatar.Fallback>
-												</Avatar>
-												<div className="flex flex-col min-w-0">
-													<span className="text-sm font-medium truncate">
-														{userName}
-													</span>
+									return (
+										<Table.Row key={item.id} id={item.id}>
+											<Table.Cell>{item.name}</Table.Cell>
+											<Table.Cell>
+												<IDCopy id={item.key} redacted={redactKey(item.key)} />
+											</Table.Cell>
+											<Table.Cell>
+												<div className="flex items-center gap-2">
+													<Avatar size="sm">
+														<Avatar.Image
+															src={`https://api.dicebear.com/9.x/initials/svg?seed=${userName}`}
+															alt={userName}
+														/>
+														<Avatar.Fallback>
+															{userName
+																?.split(" ")
+																.map((s) => s[0])
+																.join("")
+																.slice(0, 2)
+																.toUpperCase() || "?"}
+														</Avatar.Fallback>
+													</Avatar>
+													<div className="flex flex-col min-w-0">
+														<span className="text-sm font-medium truncate">
+															{userName}
+														</span>
+													</div>
 												</div>
-											</div>
-										</Table.Cell>
-										<Table.Cell>
-											{format(item.created_at, "d LLL, hh:mm a")}
-										</Table.Cell>
+											</Table.Cell>
+											<Table.Cell>
+												{format(item.created_at, "d LLL, hh:mm a")}
+											</Table.Cell>
 
-										<Table.Cell className="flex justify-end">
-											<Dropdown>
-												<Button isIconOnly variant="tertiary">
-													<LucideEllipsisVertical className="size-4" />
-												</Button>
-												<Dropdown.Popover>
-													<Dropdown.Menu>
-														<Dropdown.Item
-															id="delete"
-															textValue="Delete"
-															variant="danger"
-															onAction={() => {
-																setKeyToDelete({
-																	id: item.id,
-																	name: item.name,
-																});
-																deleteState.open();
-															}}
-														>
-															<Label>Delete</Label>
-														</Dropdown.Item>
-													</Dropdown.Menu>
-												</Dropdown.Popover>
-											</Dropdown>
-										</Table.Cell>
-									</Table.Row>
-								);
-							}}
-						</Table.Body>
-					</Table.Content>
-				</Table.ScrollContainer>
-			</Table>
+											<Table.Cell className="flex justify-end">
+												<Dropdown>
+													<Button isIconOnly variant="ghost">
+														<LucideEllipsisVertical className="size-4" />
+													</Button>
+													<Dropdown.Popover>
+														<Dropdown.Menu>
+															<Dropdown.Item
+																id="delete"
+																textValue="Delete"
+																variant="danger"
+																onAction={() => {
+																	setKeyToDelete({
+																		id: item.id,
+																		name: item.name,
+																	});
+																	deleteState.open();
+																}}
+															>
+																<Label>Delete</Label>
+															</Dropdown.Item>
+														</Dropdown.Menu>
+													</Dropdown.Popover>
+												</Dropdown>
+											</Table.Cell>
+										</Table.Row>
+									);
+								}}
+							</Table.Body>
+						</Table.Content>
+					</Table.ScrollContainer>
+				</Table>
+			</div>
 
 			<ConfirmationModal
 				isOpen={deleteState.isOpen}
