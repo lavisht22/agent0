@@ -1,4 +1,4 @@
-import { addToast } from "@heroui/react";
+import { toast } from "@heroui/react";
 
 export const copyToClipboard = (
 	text: string,
@@ -7,14 +7,8 @@ export const copyToClipboard = (
 ) => {
 	try {
 		navigator.clipboard.writeText(text);
-		addToast({
-			title: successMessage || "Copied!",
-			color: "success",
-		});
+		toast.success(successMessage || "Copied!");
 	} catch {
-		addToast({
-			title: errorMessage || "Unable to copy to clipboard.",
-			color: "danger",
-		});
+		toast.danger(errorMessage || "Unable to copy to clipboard.");
 	}
 };

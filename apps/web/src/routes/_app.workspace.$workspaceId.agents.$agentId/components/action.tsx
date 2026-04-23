@@ -1,10 +1,4 @@
-import {
-	Button,
-	Dropdown,
-	DropdownItem,
-	DropdownMenu,
-	DropdownTrigger,
-} from "@heroui/react";
+import { Button, Description, Dropdown, Label, Spinner } from "@heroui/react";
 import type { Tables } from "@repo/database";
 import { LucideChevronDown } from "lucide-react";
 
@@ -36,12 +30,17 @@ export function Action({
 		return (
 			<Button
 				size="sm"
-				color="primary"
-				isLoading={isSubmitting}
+				variant="primary"
+				isPending={isSubmitting}
 				isDisabled={!canSubmit}
 				onPress={() => handleSubmit({})}
 			>
-				Create
+				{({ isPending }) => (
+					<>
+						{isPending && <Spinner color="current" size="sm" />}
+						Create
+					</>
+				)}
 			</Button>
 		);
 	}
@@ -57,91 +56,110 @@ export function Action({
 			{isDirty && (
 				<Button
 					size="sm"
-					color="primary"
-					isLoading={isLoading}
+					variant="primary"
+					isPending={isLoading}
 					isDisabled={!canSubmit}
 					onPress={() => handleSubmit({})}
 				>
-					Save
+					{({ isPending }) => (
+						<>
+							{isPending && <Spinner color="current" size="sm" />}
+							Save
+						</>
+					)}
 				</Button>
 			)}
 
 			{!isDirty && (!isDeployedToProduction || !isDeployedToStaging) && (
-				<Dropdown placement="bottom-end">
-					<DropdownTrigger>
-						<Button
-							size="sm"
-							color="primary"
-							isLoading={isLoading}
-							isDisabled={
-								!canSubmit || (isDeployedToStaging && isDeployedToProduction)
-							}
-							endContent={<LucideChevronDown className="size-4" />}
-						>
-							Deploy
-						</Button>
-					</DropdownTrigger>
-					<DropdownMenu
-						variant="flat"
-						aria-label="Deploy options"
-						disabledKeys={[
-							...(isDeployedToStaging ? ["staging"] : []),
-							...(isDeployedToProduction ? ["production"] : []),
-							...(isDeployedToStaging && isDeployedToProduction
-								? ["both"]
-								: []),
-						]}
+				<Dropdown>
+					<Button
+						size="sm"
+						variant="primary"
+						isPending={isLoading}
+						isDisabled={
+							!canSubmit || (isDeployedToStaging && isDeployedToProduction)
+						}
 					>
-						<DropdownItem
-							key="staging"
-							color="warning"
-							description={
-								isDeployedToStaging
-									? "This version is already in staging"
-									: "Deploy this version to staging"
-							}
-							onPress={async () => {
-								if (version) {
+						{({ isPending }) => (
+							<>
+								{isPending && <Spinner color="current" size="sm" />}
+								Deploy
+								<LucideChevronDown className="size-4" />
+							</>
+						)}
+					</Button>
+					<Dropdown.Popover placement="bottom end">
+						<Dropdown.Menu
+							aria-label="Deploy options"
+							disabledKeys={[
+								...(isDeployedToStaging ? ["staging"] : []),
+								...(isDeployedToProduction ? ["production"] : []),
+								...(isDeployedToStaging && isDeployedToProduction
+									? ["both"]
+									: []),
+							]}
+							onAction={async (key) => {
+								if (!version) return;
+								if (key === "staging") {
 									await deploy(version.id, "staging");
-								}
-							}}
-						>
-							To Staging
-						</DropdownItem>
-						<DropdownItem
-							key="production"
-							color="success"
-							description={
-								isDeployedToProduction
-									? "This version is already in production"
-									: "Deploy this version to production"
-							}
-							onPress={async () => {
-								if (version) {
+								} else if (key === "production") {
 									await deploy(version.id, "production");
-								}
-							}}
-						>
-							To Production
-						</DropdownItem>
-						<DropdownItem
-							key="both"
-							color="primary"
-							description={
-								isDeployedToStaging && isDeployedToProduction
-									? "This version is already deployed to both"
-									: "Deploy this version to staging and production"
-							}
-							onPress={async () => {
-								if (version) {
+								} else if (key === "both") {
 									await deploy(version.id, "staging");
 									await deploy(version.id, "production");
 								}
 							}}
 						>
-							To Both
-						</DropdownItem>
-					</DropdownMenu>
+							<Dropdown.Item
+								id="staging"
+								textValue="To Staging"
+								isDisabled={isDeployedToStaging}
+							>
+								<div className="size-3 rounded-full bg-warning" />
+								<div className="flex flex-col">
+									<Label>To Staging</Label>
+									<Description>
+										{isDeployedToStaging
+											? "This version is already in staging"
+											: "Deploy this version to staging"}
+									</Description>
+								</div>
+							</Dropdown.Item>
+							<Dropdown.Item
+								id="production"
+								textValue="To Production"
+								isDisabled={isDeployedToProduction}
+							>
+								<div className="size-3 rounded-full bg-success" />
+								<div className="flex flex-col">
+									<Label>To Production</Label>
+									<Description>
+										{isDeployedToProduction
+											? "This version is already in production"
+											: "Deploy this version to production"}
+									</Description>
+								</div>
+							</Dropdown.Item>
+							<Dropdown.Item
+								id="both"
+								textValue="To Both"
+								isDisabled={isDeployedToProduction && isDeployedToStaging}
+							>
+								<div className="flex">
+									<div className="h-3 w-1.5 rounded-l-2xl bg-warning" />
+									<div className="h-3 w-1.5 rounded-r-2xl bg-success" />
+								</div>
+								<div className="flex flex-col">
+									<Label>To Both</Label>
+									<Description>
+										{isDeployedToStaging && isDeployedToProduction
+											? "This version is already deployed to both"
+											: "Deploy this version to staging and production"}
+									</Description>
+								</div>
+							</Dropdown.Item>
+						</Dropdown.Menu>
+					</Dropdown.Popover>
 				</Dropdown>
 			)}
 		</>

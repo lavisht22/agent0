@@ -1,12 +1,15 @@
 import {
 	Button,
 	Card,
-	CardBody,
-	CardHeader,
+	Description,
+	FieldError,
 	Input,
+	Label,
+	ListBox,
 	Select,
-	SelectItem,
-	Textarea,
+	Spinner,
+	TextArea,
+	TextField,
 } from "@heroui/react";
 import { useState } from "react";
 
@@ -23,12 +26,12 @@ interface ProviderFormProps {
 	initialValues?: {
 		name: string;
 		type: string;
-		data: any;
+		data: Record<string, unknown>;
 	};
 	onSubmit: (values: {
 		name: string;
 		type: string;
-		data: any;
+		data: Record<string, unknown>;
 	}) => Promise<void>;
 	isSubmitting: boolean;
 	title: string;
@@ -52,7 +55,7 @@ export function ProviderForm({
 		let parsedData;
 		try {
 			parsedData = JSON.parse(dataStr);
-		} catch (e) {
+		} catch (_e) {
 			setJsonError("Invalid JSON configuration. Please check your input.");
 			return;
 		}
@@ -66,59 +69,73 @@ export function ProviderForm({
 
 	return (
 		<Card className="max-w-2xl mx-auto shadow-sm border border-gray-100">
-			<CardHeader>
-				<h1 className="text-xl font-bold">{title}</h1>
-			</CardHeader>
-			<CardBody>
+			<Card.Header>
+				<Card.Title className="text-xl font-bold">{title}</Card.Title>
+			</Card.Header>
+			<Card.Content>
 				<form onSubmit={handleSubmit} className="flex flex-col gap-4">
-					<Input
-						autoFocus
-						label="Name"
-						name="name"
-						placeholder="e.g. My OpenAI Production"
-						variant="bordered"
-						defaultValue={initialValues?.name}
-						isRequired
-					/>
+					<TextField name="name" isRequired>
+						<Label>Name</Label>
+						<Input
+							autoFocus
+							placeholder="e.g. My OpenAI Production"
+							defaultValue={initialValues?.name}
+						/>
+					</TextField>
 					<Select
-						label="Provider Type"
 						name="type"
 						placeholder="Select a provider"
-						variant="bordered"
-						defaultSelectedKeys={initialValues ? [initialValues.type] : []}
+						defaultValue={initialValues?.type}
 						isRequired
 					>
-						{PROVIDER_TYPES.map((type) => (
-							<SelectItem key={type.key}>{type.label}</SelectItem>
-						))}
+						<Label>Provider Type</Label>
+						<Select.Trigger>
+							<Select.Value />
+							<Select.Indicator />
+						</Select.Trigger>
+						<Select.Popover>
+							<ListBox items={PROVIDER_TYPES}>
+								{(type) => (
+									<ListBox.Item id={type.key} textValue={type.label}>
+										{type.label}
+										<ListBox.ItemIndicator />
+									</ListBox.Item>
+								)}
+							</ListBox>
+						</Select.Popover>
 					</Select>
-					<Textarea
-						label="Configuration (JSON)"
-						name="data"
-						placeholder='{"apiKey": "..."}'
-						variant="bordered"
-						defaultValue={
-							initialValues ? JSON.stringify(initialValues.data, null, 2) : ""
-						}
-						isRequired
-						description="Enter the provider configuration as a JSON object."
-						errorMessage={jsonError}
-						isInvalid={!!jsonError}
-					/>
+					<TextField name="data" isRequired isInvalid={!!jsonError}>
+						<Label>Configuration (JSON)</Label>
+						<TextArea
+							placeholder='{"apiKey": "..."}'
+							defaultValue={
+								initialValues ? JSON.stringify(initialValues.data, null, 2) : ""
+							}
+						/>
+						<Description>
+							Enter the provider configuration as a JSON object.
+						</Description>
+						{jsonError && <FieldError>{jsonError}</FieldError>}
+					</TextField>
 					<div className="flex justify-end gap-2 mt-4">
 						<Button
-							variant="flat"
+							variant="tertiary"
 							onPress={() => window.history.back()}
 							isDisabled={isSubmitting}
 						>
 							Cancel
 						</Button>
-						<Button color="primary" type="submit" isLoading={isSubmitting}>
-							Save Provider
+						<Button variant="primary" type="submit" isPending={isSubmitting}>
+							{({ isPending }) => (
+								<>
+									{isPending && <Spinner color="current" size="sm" />}
+									Save Provider
+								</>
+							)}
 						</Button>
 					</div>
 				</form>
-			</CardBody>
+			</Card.Content>
 		</Card>
 	);
 }

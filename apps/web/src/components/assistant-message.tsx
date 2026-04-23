@@ -1,15 +1,6 @@
-import {
-	Button,
-	Card,
-	CardBody,
-	CardHeader,
-	Dropdown,
-	DropdownItem,
-	DropdownMenu,
-	DropdownTrigger,
-} from "@heroui/react";
+import { Button, Card, Dropdown, Label } from "@heroui/react";
 import { Reorder, useDragControls } from "framer-motion";
-import { LucideGripVertical, LucidePlus, LucideTrash2 } from "lucide-react";
+import { LucideGripVertical, LucidePlus, LucideX } from "lucide-react";
 import { useMemo } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { z } from "zod";
@@ -86,7 +77,7 @@ function AssistantMessagePart({
 	if (value.type === "reasoning") {
 		return (
 			<TextareaAutosize
-				className="outline-none w-full resize-none text-sm scrollbar-hide text-default-500 italic"
+				className="outline-none w-full resize-none text-sm scrollbar-hide text-muted italic"
 				readOnly={isReadOnly}
 				maxRows={1000000000000}
 				placeholder="Assistant reasoning..."
@@ -103,7 +94,7 @@ function AssistantMessagePart({
 
 	if (value.type === "tool-call") {
 		return (
-			<div className="w-full space-y-2 rounded-large border border-default-200 overflow-hidden">
+			<div className="w-full space-y-2 rounded-[14px] border border-border overflow-hidden">
 				<MonacoJsonEditor
 					readOnly={isReadOnly}
 					value={JSON.stringify(value, null, 2)}
@@ -148,92 +139,83 @@ export function AssistantMessage({
 			dragListener={false}
 			dragControls={controls}
 		>
-			<Card>
-				<CardHeader className="flex items-center justify-between pl-1 pr-1 h-10 z-0">
-					<div className="flex items-center">
+			<Card className="text-default-foreground">
+				<Card.Header className="flex flex-row items-center justify-between z-0">
+					<div className="flex items-center gap-2">
 						{!isReadOnly && (
 							<div
-								className="h-full py-3 px-2 reorder-handle cursor-grab"
+								className="reorder-handle cursor-grab"
 								onPointerDown={(e) => controls.start(e)}
 							>
-								<LucideGripVertical className="size-3.5 text-default-500" />
+								<LucideGripVertical className="size-3.5 text-muted" />
 							</div>
 						)}
-						<span
-							className={`text-sm text-default-500 ${isReadOnly ? "pl-2" : ""}`}
-						>
-							Assistant
-						</span>
+						<span className="text-sm text-muted">Assistant</span>
 					</div>
 					{!isReadOnly && (
 						<Dropdown>
-							<DropdownTrigger>
-								<Button size="sm" isIconOnly variant="light">
-									<LucidePlus className="size-3.5" />
-								</Button>
-							</DropdownTrigger>
-							<DropdownMenu>
-								<DropdownItem
-									key="text"
-									onPress={() =>
-										onValueChange({
-											...value,
-											content: [
-												...value.content,
-												{
-													type: "text",
-													text: "",
-												},
-											],
-										})
-									}
+							<Button size="sm" isIconOnly variant="tertiary">
+								<LucidePlus className="size-3.5" />
+							</Button>
+							<Dropdown.Popover>
+								<Dropdown.Menu
+									onAction={(key) => {
+										if (key === "text") {
+											onValueChange({
+												...value,
+												content: [
+													...value.content,
+													{
+														type: "text",
+														text: "",
+													},
+												],
+											});
+										} else if (key === "reasoning") {
+											onValueChange({
+												...value,
+												content: [
+													...value.content,
+													{
+														type: "reasoning",
+														text: "",
+													},
+												],
+											});
+										} else if (key === "tool-call") {
+											onValueChange({
+												...value,
+												content: [
+													...value.content,
+													{
+														type: "tool-call",
+														toolCallId: "",
+														toolName: "",
+														input: {},
+													},
+												],
+											});
+										}
+									}}
 								>
-									Text Part
-								</DropdownItem>
-								<DropdownItem
-									key="reasoning"
-									onPress={() =>
-										onValueChange({
-											...value,
-											content: [
-												...value.content,
-												{
-													type: "reasoning",
-													text: "",
-												},
-											],
-										})
-									}
-								>
-									Reasoning Part
-								</DropdownItem>
-								<DropdownItem
-									key="tool-call"
-									onPress={() =>
-										onValueChange({
-											...value,
-											content: [
-												...value.content,
-												{
-													type: "tool-call",
-													toolCallId: "",
-													toolName: "",
-													input: {},
-												},
-											],
-										})
-									}
-								>
-									Tool Call Part
-								</DropdownItem>
-							</DropdownMenu>
+									<Dropdown.Item id="text" textValue="Text Part">
+										<Label>Text Part</Label>
+									</Dropdown.Item>
+									<Dropdown.Item id="reasoning" textValue="Reasoning Part">
+										<Label>Reasoning Part</Label>
+									</Dropdown.Item>
+									<Dropdown.Item id="tool-call" textValue="Tool Call Part">
+										<Label>Tool Call Part</Label>
+									</Dropdown.Item>
+								</Dropdown.Menu>
+							</Dropdown.Popover>
 						</Dropdown>
 					)}
-				</CardHeader>
-				<CardBody className="p-3 border-t border-default-200 flex flex-col gap-3">
+				</Card.Header>
+				<Card.Content className="gap-3">
 					{value.content.map((part, index) => {
 						return (
-							<div key={`${index + 1}`} className="flex">
+							<div key={`${index + 1}`} className="flex items-start">
 								<AssistantMessagePart
 									isReadOnly={isReadOnly}
 									value={part}
@@ -245,10 +227,9 @@ export function AssistantMessage({
 								/>
 								{!isReadOnly && (
 									<Button
-										className="-mr-2"
 										size="sm"
 										isIconOnly
-										variant="light"
+										variant="ghost"
 										onPress={() => {
 											const newContent = [...value.content];
 											newContent.splice(index, 1);
@@ -261,7 +242,7 @@ export function AssistantMessage({
 											onValueChange({ ...value, content: newContent });
 										}}
 									>
-										<LucideTrash2 className="size-3.5" />
+										<LucideX className="size-3.5" />
 									</Button>
 								)}
 							</div>
@@ -273,7 +254,7 @@ export function AssistantMessage({
 							onVariablePress={onVariablePress}
 						/>
 					)}
-				</CardBody>
+				</Card.Content>
 			</Card>
 		</Reorder.Item>
 	);

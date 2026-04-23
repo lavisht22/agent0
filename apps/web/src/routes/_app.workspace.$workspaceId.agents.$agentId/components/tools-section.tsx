@@ -1,25 +1,21 @@
 import {
-	addToast,
 	Button,
 	Card,
-	CardBody,
-	CardHeader,
 	Chip,
+	CloseButton,
+	Description,
+	Drawer,
 	Dropdown,
-	DropdownItem,
-	DropdownMenu,
-	DropdownTrigger,
+	Header,
 	Input,
-	Listbox,
-	ListboxItem,
-	ListboxSection,
-	Modal,
-	ModalBody,
-	ModalContent,
-	ModalFooter,
-	ModalHeader,
-	Textarea,
-	useDisclosure,
+	InputGroup,
+	Label,
+	ListBox,
+	Separator,
+	TextArea,
+	TextField,
+	toast,
+	useOverlayState,
 } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -79,18 +75,10 @@ export default function ToolsSection({
 	isInvalid,
 }: ToolsSectionProps) {
 	// Modal state for adding custom tool
-	const {
-		isOpen: isCustomToolModalOpen,
-		onOpen: onOpenCustomToolModal,
-		onClose: onCloseCustomToolModal,
-	} = useDisclosure();
+	const customToolModalState = useOverlayState();
 
 	// Modal state for MCP tool selection
-	const {
-		isOpen: isMCPToolModalOpen,
-		onOpen: onOpenMCPToolModal,
-		onClose: onCloseMCPToolModal,
-	} = useDisclosure();
+	const mcpToolModalState = useOverlayState();
 
 	// Search filter for MCP tools
 	const [mcpToolSearch, setMcpToolSearch] = useState("");
@@ -173,23 +161,17 @@ export default function ToolsSection({
 			tool.inputSchema ? JSON.stringify(tool.inputSchema, null, 2) : "",
 		);
 		setInputSchemaError(null);
-		onOpenCustomToolModal();
+		customToolModalState.open();
 	};
 
 	const handleSaveCustomTool = () => {
 		if (!customToolTitle.trim()) {
-			addToast({
-				title: "Tool title is required.",
-				color: "danger",
-			});
+			toast.danger("Tool title is required.");
 			return;
 		}
 
 		if (!customToolDescription.trim()) {
-			addToast({
-				title: "Tool description is required.",
-				color: "danger",
-			});
+			toast.danger("Tool description is required.");
 			return;
 		}
 
@@ -202,17 +184,11 @@ export default function ToolsSection({
 					typeof parsedInputSchema !== "object" ||
 					parsedInputSchema === null
 				) {
-					addToast({
-						title: "Input schema must be a valid JSON object.",
-						color: "danger",
-					});
+					toast.danger("Input schema must be a valid JSON object.");
 					return;
 				}
 			} catch {
-				addToast({
-					title: "Invalid JSON in input schema.",
-					color: "danger",
-				});
+				toast.danger("Invalid JSON in input schema.");
 				return;
 			}
 		}
@@ -230,10 +206,7 @@ export default function ToolsSection({
 		});
 
 		if (isAlreadyAdded) {
-			addToast({
-				title: "A custom tool with this title already exists.",
-				color: "danger",
-			});
+			toast.danger("A custom tool with this title already exists.");
 			return;
 		}
 
@@ -265,7 +238,7 @@ export default function ToolsSection({
 		setCustomToolInputSchema("");
 		setInputSchemaError(null);
 		setEditingCustomTool(null);
-		onCloseCustomToolModal();
+		customToolModalState.close();
 	};
 
 	// Get MCP name by id for display purposes
@@ -321,38 +294,46 @@ export default function ToolsSection({
 	return (
 		<>
 			<Card className={isInvalid ? "border-danger border" : ""}>
-				<CardHeader className="flex items-center justify-between pl-3 pr-1 h-10">
-					<span className="text-sm text-default-500">Tools</span>
-					<Dropdown placement="bottom-end">
-						<DropdownTrigger>
-							<Button size="sm" variant="light" isIconOnly>
-								<LucidePlus className="size-3.5" />
-							</Button>
-						</DropdownTrigger>
-						<DropdownMenu>
-							<DropdownItem
-								key="mcp"
-								startContent={<LucideServer className="size-4" />}
-								description="Add a tool from an MCP server"
-								isDisabled={!hasMCPs || availableMCPTools.length === 0}
-								onPress={onOpenMCPToolModal}
+				<Card.Header className="flex flex-row items-center justify-between">
+					<span className="text-sm text-muted">Tools</span>
+					<Dropdown>
+						<Button size="sm" variant="tertiary" isIconOnly>
+							<LucidePlus className="size-3.5" />
+						</Button>
+						<Dropdown.Popover>
+							<Dropdown.Menu
+								disabledKeys={
+									!hasMCPs || availableMCPTools.length === 0 ? ["mcp"] : []
+								}
+								onAction={(key) => {
+									if (key === "mcp") {
+										mcpToolModalState.open();
+									} else if (key === "custom") {
+										customToolModalState.open();
+									}
+								}}
 							>
-								From MCP Server
-							</DropdownItem>
-							<DropdownItem
-								key="custom"
-								startContent={<LucideWrench className="size-4" />}
-								description="Define a custom tool"
-								onPress={onOpenCustomToolModal}
-							>
-								Custom Tool
-							</DropdownItem>
-						</DropdownMenu>
+								<Dropdown.Item id="mcp" textValue="From MCP Server">
+									<LucideServer className="size-4" />
+									<div className="flex flex-col">
+										<Label>From MCP Server</Label>
+										<Description>Add a tool from an MCP server</Description>
+									</div>
+								</Dropdown.Item>
+								<Dropdown.Item id="custom" textValue="Custom Tool">
+									<LucideWrench className="size-4" />
+									<div className="flex flex-col">
+										<Label>Custom Tool</Label>
+										<Description>Define a custom tool</Description>
+									</div>
+								</Dropdown.Item>
+							</Dropdown.Menu>
+						</Dropdown.Popover>
 					</Dropdown>
-				</CardHeader>
-				<CardBody className="p-3 border-t border-default-200">
+				</Card.Header>
+				<Card.Content>
 					{value.length === 0 ? (
-						<p className="text-sm text-default-400">
+						<p className="text-sm text-muted">
 							No tools added. Click "+" to add tools to your agent. (Optional)
 						</p>
 					) : (
@@ -361,15 +342,18 @@ export default function ToolsSection({
 							{mcpTools.map((tool) => {
 								const mcpTool = tool as { mcp_id: string; name: string };
 								return (
-									<Chip
-										key={`mcp-${mcpTool.mcp_id}-${mcpTool.name}`}
-										variant="flat"
-										onClose={() => handleRemoveTool(tool)}
-									>
-										<span>{mcpTool.name}</span>
-										<span className="text-default-400 ml-1 text-xs">
-											{getMcpName(mcpTool.mcp_id)}
-										</span>
+									<Chip key={`mcp-${mcpTool.mcp_id}-${mcpTool.name}`}>
+										<Chip.Label>
+											{mcpTool.name}{" "}
+											<span className="text-muted ml-1 text-xs">
+												{getMcpName(mcpTool.mcp_id)}
+											</span>
+										</Chip.Label>
+
+										<CloseButton
+											aria-label="Remove tool"
+											onPress={() => handleRemoveTool(tool)}
+										/>
 									</Chip>
 								);
 							})}
@@ -377,193 +361,221 @@ export default function ToolsSection({
 							{customTools.map((tool) => (
 								<Chip
 									key={`custom-${tool.title}`}
-									variant="flat"
-									onClose={() => handleRemoveTool(tool)}
 									className="cursor-pointer"
 									onClick={() => handleEditCustomTool(tool)}
 								>
-									<span>{tool.title}</span>
-									<span className="text-default-400 ml-1 text-xs">Custom</span>
+									<Chip.Label>
+										{tool.title}{" "}
+										<span className="text-muted ml-1 text-xs">Custom</span>
+									</Chip.Label>
+
+									<CloseButton
+										aria-label="Remove tool"
+										onPress={() => handleRemoveTool(tool)}
+									/>
 								</Chip>
 							))}
 						</div>
 					)}
-				</CardBody>
+				</Card.Content>
 			</Card>
 
 			{/* MCP Tools Modal */}
-			<Modal
-				isOpen={isMCPToolModalOpen}
-				onClose={() => {
-					onCloseMCPToolModal();
-					setMcpToolSearch("");
-				}}
-				size="xl"
-				scrollBehavior="inside"
-			>
-				<ModalContent>
-					<ModalHeader>Add MCP Tool</ModalHeader>
-					<ModalBody className="pb-6 pt-0">
-						<div className="sticky top-0 z-30 pb-2 bg-background">
-							<Input
-								placeholder="Search tools..."
-								value={mcpToolSearch}
-								onValueChange={setMcpToolSearch}
-								startContent={<LucideSearch className="size-4" />}
-								isClearable
-								onClear={() => setMcpToolSearch("")}
-							/>
-						</div>
+			<Drawer state={mcpToolModalState}>
+				<Drawer.Backdrop>
+					<Drawer.Content placement="right">
+						<Drawer.Dialog>
+							<Drawer.CloseTrigger />
+							<Drawer.Header>
+								<Drawer.Heading>Add MCP Tool</Drawer.Heading>
+								<InputGroup fullWidth variant="secondary">
+									<InputGroup.Prefix>
+										<LucideSearch className="size-4" />
+									</InputGroup.Prefix>
+									<InputGroup.Input
+										placeholder="Search tools..."
+										value={mcpToolSearch}
+										onChange={(e) => setMcpToolSearch(e.target.value)}
+									/>
+									<InputGroup.Suffix>
+										{mcpToolSearch && (
+											<CloseButton
+												aria-label="Clear search"
+												onPress={() => setMcpToolSearch("")}
+											/>
+										)}
+									</InputGroup.Suffix>
+								</InputGroup>
+							</Drawer.Header>
+							<Drawer.Body>
+								<ListBox aria-label="Available MCP Tools">
+									{/** biome-ignore lint/complexity/noUselessFragments: <heroui problem> */}
+									<>
+										{mcps?.map((mcp, _index) => {
+											const tools = mcp?.tools as
+												| { name: string; description: string }[]
+												| undefined;
 
-						<Listbox variant="flat">
-							{/** biome-ignore lint/complexity/noUselessFragments: <heroui problem> */}
-							<>
-								{mcps?.map((mcp) => {
-									const tools = mcp?.tools as
-										| { name: string; description: string }[]
-										| undefined;
+											const availableMcpTools = tools?.filter((tool) => {
+												// Check if already selected
+												const isSelected = value.some((item) => {
+													if (isMCPTool(item)) {
+														const mcpTool = item as {
+															mcp_id: string;
+															name: string;
+														};
+														return (
+															mcpTool.mcp_id === mcp.id &&
+															mcpTool.name === tool.name
+														);
+													}
+													return false;
+												});
 
-									const availableMcpTools = tools?.filter((tool) => {
-										// Check if already selected
-										const isSelected = value.some((item) => {
-											if (isMCPTool(item)) {
-												const mcpTool = item as {
-													mcp_id: string;
-													name: string;
-												};
-												return (
-													mcpTool.mcp_id === mcp.id &&
-													mcpTool.name === tool.name
-												);
+												if (isSelected) return false;
+
+												// Apply search filter
+												if (mcpToolSearch.trim()) {
+													const searchLower = mcpToolSearch.toLowerCase();
+													return (
+														tool.name.toLowerCase().includes(searchLower) ||
+														tool.description
+															?.toLowerCase()
+															.includes(searchLower) ||
+														mcp.name.toLowerCase().includes(searchLower)
+													);
+												}
+
+												return true;
+											});
+
+											if (
+												!availableMcpTools ||
+												availableMcpTools.length === 0
+											) {
+												return null;
 											}
-											return false;
-										});
 
-										if (isSelected) return false;
-
-										// Apply search filter
-										if (mcpToolSearch.trim()) {
-											const searchLower = mcpToolSearch.toLowerCase();
 											return (
-												tool.name.toLowerCase().includes(searchLower) ||
-												tool.description?.toLowerCase().includes(searchLower) ||
-												mcp.name.toLowerCase().includes(searchLower)
+												<>
+													<ListBox.Section key={mcp.id}>
+														<Header>{mcp.name}</Header>
+														{availableMcpTools?.map((tool) => (
+															<ListBox.Item
+																key={mcp.id + tool.name}
+																id={mcp.id + tool.name}
+																textValue={tool.name}
+																onAction={() => {
+																	handleAddMCPTool(mcp.id, tool.name);
+																}}
+																className="flex-col items-start"
+															>
+																<Label>{tool.name}</Label>
+																<Description>{tool.description}</Description>
+															</ListBox.Item>
+														))}
+													</ListBox.Section>
+													<Separator className="my-4" />
+												</>
 											);
-										}
+										})}
+									</>
+								</ListBox>
 
-										return true;
-									});
-
-									if (!availableMcpTools || availableMcpTools.length === 0) {
-										return null;
-									}
-
-									return (
-										<ListboxSection key={mcp.id} title={mcp.name} showDivider>
-											{availableMcpTools?.map((tool) => (
-												<ListboxItem
-													key={mcp.id + tool.name}
-													onPress={() => {
-														handleAddMCPTool(mcp.id, tool.name);
-													}}
-													title={tool.name}
-													description={tool.description}
-												/>
-											))}
-										</ListboxSection>
-									);
-								})}
-							</>
-						</Listbox>
-
-						{availableMCPTools.length === 0 && (
-							<p className="text-sm text-default-400 text-center py-4">
-								No available MCP tools. All tools have been added or no MCP
-								servers are configured.
-							</p>
-						)}
-					</ModalBody>
-				</ModalContent>
-			</Modal>
+								{availableMCPTools.length === 0 && (
+									<p className="text-sm text-muted text-center py-4">
+										No available MCP tools. All tools have been added or no MCP
+										servers are configured.
+									</p>
+								)}
+							</Drawer.Body>
+						</Drawer.Dialog>
+					</Drawer.Content>
+				</Drawer.Backdrop>
+			</Drawer>
 
 			{/* Custom Tool Modal */}
-			<Modal
-				isOpen={isCustomToolModalOpen}
-				onClose={() => {
-					setCustomToolTitle("");
-					setCustomToolDescription("");
-					setCustomToolInputSchema("");
-					setInputSchemaError(null);
-					setEditingCustomTool(null);
-					onCloseCustomToolModal();
-				}}
-				size="xl"
-			>
-				<ModalContent>
-					<ModalHeader>
-						{editingCustomTool ? "Edit Custom Tool" : "Add Custom Tool"}
-					</ModalHeader>
-					<ModalBody className="space-y-4">
-						<Input
-							label="Tool Title"
-							placeholder="e.g., get_weather"
-							value={customToolTitle}
-							onValueChange={setCustomToolTitle}
-							description="A unique identifier for the tool (lowercase with underscores recommended)"
-							isRequired
-						/>
-						<Textarea
-							label="Description"
-							placeholder="Describe what this tool does..."
-							value={customToolDescription}
-							onValueChange={setCustomToolDescription}
-							description="A clear description helps the AI understand when to use this tool"
-							isRequired
-						/>
-						<MonacoJsonField
-							label="Input Schema"
-							isRequired
-							description="Define the parameters this tool accepts using JSON Schema format."
-							value={customToolInputSchema}
-							onValueChange={(val) => {
-								setCustomToolInputSchema(val);
-								// Validate JSON on change
-								if (val.trim()) {
-									try {
-										JSON.parse(val);
+			<Drawer state={customToolModalState}>
+				<Drawer.Backdrop>
+					<Drawer.Content placement="right">
+						<Drawer.Dialog>
+							<Drawer.CloseTrigger />
+							<Drawer.Header>
+								<Drawer.Heading>
+									{editingCustomTool ? "Edit Custom Tool" : "Add Custom Tool"}
+								</Drawer.Heading>
+							</Drawer.Header>
+							<Drawer.Body className="space-y-4">
+								<TextField isRequired variant="secondary">
+									<Label>Tool Title</Label>
+									<Input
+										placeholder="e.g., get_weather"
+										value={customToolTitle}
+										onChange={(e) => setCustomToolTitle(e.target.value)}
+									/>
+									<Description>
+										A unique identifier for the tool (lowercase with underscores
+										recommended)
+									</Description>
+								</TextField>
+								<TextField isRequired variant="secondary">
+									<Label>Description</Label>
+									<TextArea
+										placeholder="Describe what this tool does..."
+										value={customToolDescription}
+										onChange={(e) => setCustomToolDescription(e.target.value)}
+									/>
+									<Description>
+										A clear description helps the AI understand when to use this
+										tool
+									</Description>
+								</TextField>
+								<MonacoJsonField
+									label="Input Schema"
+									isRequired
+									description="Define the parameters this tool accepts using JSON Schema format."
+									value={customToolInputSchema}
+									onValueChange={(val) => {
+										setCustomToolInputSchema(val);
+										// Validate JSON on change
+										if (val.trim()) {
+											try {
+												JSON.parse(val);
+												setInputSchemaError(null);
+											} catch {
+												setInputSchemaError("Invalid JSON format");
+											}
+										} else {
+											setInputSchemaError(null);
+										}
+									}}
+									isInvalid={!!inputSchemaError}
+									errorMessage={inputSchemaError}
+									editorMinHeight={250}
+								/>
+							</Drawer.Body>
+							<Drawer.Footer>
+								<Button
+									variant="tertiary"
+									onPress={() => {
+										setCustomToolTitle("");
+										setCustomToolDescription("");
+										setCustomToolInputSchema("");
 										setInputSchemaError(null);
-									} catch {
-										setInputSchemaError("Invalid JSON format");
-									}
-								} else {
-									setInputSchemaError(null);
-								}
-							}}
-							isInvalid={!!inputSchemaError}
-							errorMessage={inputSchemaError}
-							editorMinHeight={250}
-						/>
-					</ModalBody>
-					<ModalFooter>
-						<Button
-							variant="flat"
-							onPress={() => {
-								setCustomToolTitle("");
-								setCustomToolDescription("");
-								setCustomToolInputSchema("");
-								setInputSchemaError(null);
-								setEditingCustomTool(null);
-								onCloseCustomToolModal();
-							}}
-						>
-							Cancel
-						</Button>
-						<Button color="primary" onPress={handleSaveCustomTool}>
-							{editingCustomTool ? "Save Changes" : "Add Tool"}
-						</Button>
-					</ModalFooter>
-				</ModalContent>
-			</Modal>
+										setEditingCustomTool(null);
+										customToolModalState.close();
+									}}
+								>
+									Cancel
+								</Button>
+								<Button variant="primary" onPress={handleSaveCustomTool}>
+									{editingCustomTool ? "Save Changes" : "Add Tool"}
+								</Button>
+							</Drawer.Footer>
+						</Drawer.Dialog>
+					</Drawer.Content>
+				</Drawer.Backdrop>
+			</Drawer>
 		</>
 	);
 }

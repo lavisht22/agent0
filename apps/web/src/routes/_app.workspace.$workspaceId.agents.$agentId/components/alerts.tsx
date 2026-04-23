@@ -1,4 +1,4 @@
-import { Accordion, AccordionItem } from "@heroui/react";
+import { Accordion } from "@heroui/react";
 import { LucideShieldAlert, LucideShieldX } from "lucide-react";
 
 export function Alerts({
@@ -11,44 +11,54 @@ export function Alerts({
 	return (
 		<>
 			{warnings.length > 0 && (
-				<Accordion variant="splitted">
+				<Accordion>
 					{warnings.map((warning, index) => (
-						<AccordionItem
+						<Accordion.Item
 							key={`${index + 1}`}
-							classNames={{
-								base: "bg-warning-50 bg",
-								title: "text-warning-600 font-medium",
-							}}
-							title="Warning"
-							startContent={
-								<LucideShieldAlert className="size-4 text-warning-600" />
-							}
+							id={`${index + 1}`}
+							className="bg-warning-soft"
 						>
-							<p className="whitespace-pre-wrap font-mono text-xs">
-								{JSON.stringify(warning, null, 2)}
-							</p>
-						</AccordionItem>
+							<Accordion.Heading>
+								<Accordion.Trigger>
+									<LucideShieldAlert className="size-4 text-warning" />
+									<span className="text-warning font-medium">Warning</span>
+									<Accordion.Indicator />
+								</Accordion.Trigger>
+							</Accordion.Heading>
+							<Accordion.Panel>
+								<Accordion.Body>
+									<p className="whitespace-pre-wrap font-mono text-xs">
+										{JSON.stringify(warning, null, 2)}
+									</p>
+								</Accordion.Body>
+							</Accordion.Panel>
+						</Accordion.Item>
 					))}
 				</Accordion>
 			)}
 			{errors.length > 0 && (
-				<Accordion variant="splitted">
+				<Accordion>
 					{errors.map((error, index) => (
-						<AccordionItem
+						<Accordion.Item
 							key={`${index + 1}`}
-							classNames={{
-								base: "bg-danger-50",
-								title: "text-danger-600 font-medium",
-							}}
-							title="Error"
-							startContent={
-								<LucideShieldX className="size-4 text-danger-600" />
-							}
+							id={`${index + 1}`}
+							className="bg-danger-soft"
 						>
-							<p className="whitespace-pre-wrap font-mono text-xs">
-								{JSON.stringify(error, null, 2)}
-							</p>
-						</AccordionItem>
+							<Accordion.Heading>
+								<Accordion.Trigger>
+									<LucideShieldX className="size-4 text-danger" />
+									<span className="text-danger font-medium">Error</span>
+									<Accordion.Indicator />
+								</Accordion.Trigger>
+							</Accordion.Heading>
+							<Accordion.Panel>
+								<Accordion.Body>
+									<p className="whitespace-pre-wrap font-mono text-xs">
+										{JSON.stringify(error, null, 2)}
+									</p>
+								</Accordion.Body>
+							</Accordion.Panel>
+						</Accordion.Item>
 					))}
 				</Accordion>
 			)}

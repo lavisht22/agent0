@@ -1,11 +1,9 @@
 import {
 	Button,
-	Listbox,
-	ListboxItem,
+	Label,
+	ListBox,
 	Popover,
-	PopoverContent,
-	PopoverTrigger,
-	useDisclosure,
+	useOverlayState,
 } from "@heroui/react";
 import { LucideServer } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -34,7 +32,7 @@ export function ModelSelector({
 }: ModelSelectorProps) {
 	const [selectedProvider, setSelectedProvider] = useState<string>("");
 	const [selectedModel, setSelectedModel] = useState<string>("");
-	const { isOpen, onOpenChange } = useDisclosure();
+	const state = useOverlayState();
 
 	const selectedProviderType = providers.find(
 		(p) => p.id === selectedProvider,
@@ -49,85 +47,85 @@ export function ModelSelector({
 	}, [value]);
 
 	return (
-		<Popover
-			placement="bottom-start"
-			isOpen={isOpen}
-			onOpenChange={onOpenChange}
-		>
-			<PopoverTrigger>
-				<Button
-					size="sm"
-					variant="flat"
-					color={isInvalid ? "danger" : "default"}
-					startContent={<LucideServer className="size-3.5" />}
-				>
+		<Popover isOpen={state.isOpen} onOpenChange={state.setOpen}>
+			<Button
+				size="sm"
+				variant={isInvalid ? "danger-soft" : "tertiary"}
+				className="min-w-0"
+			>
+				<LucideServer className="size-3.5 shrink-0" />
+				<span className="truncate max-w-64 min-w-0">
 					{value.name === ""
 						? "Select Model"
 						: `@${providers.find((p) => p.id === value.provider_id)?.name}/${value.name}`}
-				</Button>
-			</PopoverTrigger>
-			<PopoverContent className="p-2 flex flex-row items-start">
-				<Listbox
-					aria-label="Providers"
-					variant="flat"
-					emptyContent="You haven't created any providers."
-					selectionMode="single"
-					className="w-48 max-h-64 overflow-y-auto"
-					selectedKeys={selectedProvider ? [selectedProvider] : []}
-					onSelectionChange={(keys) => {
-						const selected = Array.from(keys)[0] as string;
+				</span>
+			</Button>
+			<Popover.Content placement="bottom start">
+				<Popover.Dialog className="p-2 flex flex-row items-start">
+					<ListBox
+						aria-label="Providers"
+						selectionMode="single"
+						className="w-52 max-h-64 overflow-y-auto"
+						selectedKeys={selectedProvider ? [selectedProvider] : []}
+						onSelectionChange={(keys) => {
+							const selected = Array.from(keys)[0] as string;
 
-						if (selected) {
-							setSelectedProvider(selected);
-							setSelectedModel("");
-						}
-					}}
-				>
-					{providers.map((provider) => {
-						const providerType = PROVIDER_TYPES.find(
-							(p) => p.key === provider.type,
-						);
+							if (selected) {
+								setSelectedProvider(selected);
+								setSelectedModel("");
+							}
+						}}
+					>
+						{providers.map((provider) => {
+							const providerType = PROVIDER_TYPES.find(
+								(p) => p.key === provider.type,
+							);
 
-						return (
-							<ListboxItem
-								key={provider.id}
-								startContent={
-									providerType?.icon && <providerType.icon className="size-5" />
-								}
-								title={provider.name}
-								// description={providerType?.label}
-							/>
-						);
-					})}
-				</Listbox>
+							return (
+								<ListBox.Item
+									key={provider.id}
+									id={provider.id}
+									textValue={provider.name}
+								>
+									{providerType?.icon && (
+										<providerType.icon className="size-5" />
+									)}
+									<Label className="line-clamp-1">{provider.name}</Label>
+									<ListBox.ItemIndicator />
+								</ListBox.Item>
+							);
+						})}
+					</ListBox>
 
-				<Listbox
-					aria-label="Models"
-					variant="flat"
-					emptyContent="Select a provider to see available models"
-					selectionMode="single"
-					className="w-64 max-h-64 overflow-y-auto"
-					selectedKeys={selectedModel ? [selectedModel] : []}
-					onSelectionChange={(keys) => {
-						const selected = Array.from(keys)[0] as string;
+					<ListBox
+						aria-label="Models"
+						selectionMode="single"
+						className="w-64 max-h-64 overflow-y-auto"
+						selectedKeys={selectedModel ? [selectedModel] : []}
+						onSelectionChange={(keys) => {
+							const selected = Array.from(keys)[0] as string;
 
-						if (selected) {
-							setSelectedModel(selected);
+							if (selected) {
+								setSelectedModel(selected);
 
-							onValueChange({
-								provider_id: selectedProvider,
-								name: selected,
-							});
+								onValueChange({
+									provider_id: selectedProvider,
+									name: selected,
+								});
 
-							onOpenChange();
-						}
-					}}
-				>
-					{availableModels.map((model) => (
-						<ListboxItem key={model} title={model} />
-					))}
-				</Listbox>
-			</PopoverContent>
+								state.close();
+							}
+						}}
+					>
+						{availableModels.map((model) => (
+							<ListBox.Item key={model} id={model} textValue={model}>
+								<Label>{model}</Label>
+								<ListBox.ItemIndicator />
+							</ListBox.Item>
+						))}
+					</ListBox>
+				</Popover.Dialog>
+			</Popover.Content>
 		</Popover>
 	);
 }

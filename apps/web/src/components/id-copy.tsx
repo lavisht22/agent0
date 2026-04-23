@@ -14,15 +14,8 @@ export default function IDCopy({
 
 	return (
 		<Button
-			variant="flat"
+			variant="tertiary"
 			size="sm"
-			endContent={
-				!copied ? (
-					<LucideCopy className="size-3.5" />
-				) : (
-					<LucideCheck className="size-3.5" />
-				)
-			}
 			onPress={() => {
 				copyToClipboard(id);
 
@@ -33,6 +26,11 @@ export default function IDCopy({
 			}}
 		>
 			<span className="font-mono">{redacted || id}</span>
+			{!copied ? (
+				<LucideCopy className="size-3.5" />
+			) : (
+				<LucideCheck className="size-3.5" />
+			)}
 		</Button>
 	);
 }

@@ -1,19 +1,22 @@
 import {
-	addToast,
 	Button,
+	Description,
+	FieldError,
 	Input,
+	InputGroup,
+	Label,
 	Modal,
-	ModalBody,
-	ModalContent,
-	ModalFooter,
-	ModalHeader,
+	Spinner,
+	TextField,
+	toast,
 } from "@heroui/react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Check, Copy } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { customAlphabet, nanoid } from "nanoid";
 import { useState } from "react";
+import { PageHeader } from "@/components/page-header";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute(
@@ -63,11 +66,9 @@ function RouteComponent() {
 			setCreatedKey(data);
 		},
 		onError: (error) => {
-			addToast({
-				description:
-					error instanceof Error ? error.message : "Failed to create API key.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error ? error.message : "Failed to create API key.",
+			);
 		},
 	});
 
@@ -86,16 +87,10 @@ function RouteComponent() {
 		try {
 			await navigator.clipboard.writeText(createdKey);
 			setCopied(true);
-			addToast({
-				description: "API key copied to clipboard",
-				color: "success",
-			});
+			toast.success("API key copied to clipboard");
 			setTimeout(() => setCopied(false), 2000);
 		} catch {
-			addToast({
-				description: "Failed to copy API key",
-				color: "danger",
-			});
+			toast.danger("Failed to copy API key");
 		}
 	};
 
@@ -111,132 +106,143 @@ function RouteComponent() {
 	// Show success modal with the created key
 	if (createdKey) {
 		return (
-			<Modal
-				isOpen={true}
-				onClose={handleDone}
-				isDismissable={false}
-				hideCloseButton
-			>
-				<ModalContent>
-					<ModalHeader className="flex flex-col gap-1">
-						API Key Created
-					</ModalHeader>
-					<ModalBody>
-						<div className="space-y-4">
-							<div>
-								<p className="text-sm text-default-500 mb-2">
-									Keep it safe. This API Key can be used to call the run API for
-									your workspace.
-								</p>
-								<Input
-									value={createdKey}
-									isReadOnly
-									endContent={
-										<Button variant="light" onPress={handleCopy} isIconOnly>
-											{copied ? (
-												<Check className="size-4" />
-											) : (
-												<Copy className="size-4" />
-											)}
-										</Button>
-									}
-								/>
-							</div>
-						</div>
-					</ModalBody>
-					<ModalFooter>
-						<Button color="primary" onPress={handleDone}>
-							Done
-						</Button>
-					</ModalFooter>
-				</ModalContent>
+			<Modal>
+				<Modal.Backdrop isOpen={true} isDismissable={false}>
+					<Modal.Container>
+						<Modal.Dialog>
+							<Modal.Header>
+								<Modal.Heading>API Key Created</Modal.Heading>
+							</Modal.Header>
+							<Modal.Body>
+								<div className="space-y-4">
+									<div>
+										<p className="text-sm text-muted mb-2">
+											Keep it safe. This API Key can be used to call the run API
+											for your workspace.
+										</p>
+										<InputGroup>
+											<InputGroup.Input value={createdKey} readOnly />
+											<InputGroup.Suffix>
+												<Button
+													variant="tertiary"
+													onPress={handleCopy}
+													isIconOnly
+												>
+													{copied ? (
+														<Check className="size-4" />
+													) : (
+														<Copy className="size-4" />
+													)}
+												</Button>
+											</InputGroup.Suffix>
+										</InputGroup>
+									</div>
+								</div>
+							</Modal.Body>
+							<Modal.Footer>
+								<Button variant="primary" onPress={handleDone}>
+									Done
+								</Button>
+							</Modal.Footer>
+						</Modal.Dialog>
+					</Modal.Container>
+				</Modal.Backdrop>
 			</Modal>
 		);
 	}
 
 	return (
-		<div>
-			<div className="flex items-center p-2">
-				<Button
-					variant="light"
-					isIconOnly
-					onPress={() =>
-						navigate({
-							to: "..",
-						})
-					}
-				>
-					<ArrowLeft className="size-4" />
-				</Button>
-			</div>
+		<div className="h-screen flex flex-col">
+			<PageHeader
+				breadcrumbs={[
+					{
+						label: "API Keys",
+						to: "/workspace/$workspaceId/api-keys",
+						params: { workspaceId },
+					},
+					{ label: "Create" },
+				]}
+			/>
 
-			<div className="p-6 max-w-4xl mx-auto space-y-6">
-				<h1 className="text-xl font-medium tracking-tight">Create API Key</h1>
-
-				<form
-					onSubmit={(e) => {
-						e.preventDefault();
-						e.stopPropagation();
-						form.handleSubmit();
-					}}
-				>
-					{/* Name Field */}
-					<form.Field
-						name="name"
-						validators={{
-							onChange: ({ value }) =>
-								!value || value.trim() === ""
-									? "API key name is required"
-									: undefined,
+			<div className="flex-1 overflow-y-auto p-6">
+				<div className="max-w-4xl mx-auto space-y-6">
+					<form
+						onSubmit={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							form.handleSubmit();
 						}}
 					>
-						{(field) => (
-							<Input
-								label="Name"
-								placeholder="e.g., Production API Key"
-								value={field.state.value}
-								onValueChange={field.handleChange}
-								isRequired
-								variant="bordered"
-								description="A friendly name to identify this API key"
-								isInvalid={field.state.meta.errors.length > 0}
-								errorMessage={field.state.meta.errors[0]}
-							/>
-						)}
-					</form.Field>
-
-					<div className="flex justify-end gap-3 mt-6">
-						<Button
-							variant="light"
-							onPress={() =>
-								navigate({
-									to: "/workspace/$workspaceId/api-keys",
-									params: { workspaceId },
-								})
-							}
-							isDisabled={isLoading}
+						{/* Name Field */}
+						<form.Field
+							name="name"
+							validators={{
+								onChange: ({ value }) =>
+									!value || value.trim() === ""
+										? "API key name is required"
+										: undefined,
+							}}
 						>
-							Cancel
-						</Button>
-						<form.Subscribe
-							selector={(state) => ({
-								canSubmit: state.canSubmit,
-								isSubmitting: state.isSubmitting,
-							})}
-						>
-							{(state) => (
-								<Button
-									type="submit"
-									color="primary"
-									isLoading={isLoading || state.isSubmitting}
-									isDisabled={!state.canSubmit || isLoading}
+							{(field) => (
+								<TextField
+									name="name"
+									isRequired
+									isInvalid={field.state.meta.errors.length > 0}
 								>
-									Create
-								</Button>
+									<Label>Name</Label>
+									<Input
+										placeholder="e.g., Production API Key"
+										value={field.state.value}
+										onChange={(e) => field.handleChange(e.target.value)}
+									/>
+									<Description>
+										A friendly name to identify this API key
+									</Description>
+									{field.state.meta.errors.length > 0 && (
+										<FieldError>{field.state.meta.errors[0]}</FieldError>
+									)}
+								</TextField>
 							)}
-						</form.Subscribe>
-					</div>
-				</form>
+						</form.Field>
+
+						<div className="flex justify-end gap-3 mt-6">
+							<Button
+								variant="tertiary"
+								onPress={() =>
+									navigate({
+										to: "/workspace/$workspaceId/api-keys",
+										params: { workspaceId },
+									})
+								}
+								isDisabled={isLoading}
+							>
+								Cancel
+							</Button>
+							<form.Subscribe
+								selector={(state) => ({
+									canSubmit: state.canSubmit,
+									isSubmitting: state.isSubmitting,
+								})}
+							>
+								{(state) => (
+									<Button
+										type="submit"
+										variant="primary"
+										isPending={isLoading || state.isSubmitting}
+										isDisabled={!state.canSubmit || isLoading}
+									>
+										{({ isPending }) => (
+											<>
+												{isPending && <Spinner color="current" size="sm" />}
+												Create
+											</>
+										)}
+									</Button>
+								)}
+							</form.Subscribe>
+						</div>
+					</form>
+				</div>
 			</div>
 		</div>
 	);

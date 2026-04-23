@@ -2,13 +2,11 @@ import {
 	Avatar,
 	Button,
 	Chip,
-	Listbox,
-	ListboxItem,
+	Description,
+	Label,
+	ListBox,
 	Popover,
-	PopoverContent,
-	PopoverTrigger,
-	ScrollShadow,
-	useDisclosure,
+	useOverlayState,
 } from "@heroui/react";
 import type { Tables } from "@repo/database";
 import { useQuery } from "@tanstack/react-query";
@@ -22,6 +20,8 @@ interface VersionHistoryProps {
 	versions: Tables<"agent_versions">[];
 	stagingVersionId?: string | null;
 	productionVersionId?: string | null;
+	currentVersionId?: string;
+	isDirty?: boolean;
 	onSelectionChange: (version: Tables<"agent_versions">) => void;
 }
 
@@ -30,25 +30,34 @@ export const VersionHistory = ({
 	versions,
 	stagingVersionId,
 	productionVersionId,
+	currentVersionId,
+	isDirty,
 	onSelectionChange,
 }: VersionHistoryProps) => {
-	const { isOpen, onOpenChange } = useDisclosure();
+	const state = useOverlayState();
 	const { data: workspaces } = useQuery(workspacesQuery);
 
 	const workspace = useMemo(() => {
 		return workspaces?.find((workspace) => workspace.id === workspaceId);
 	}, [workspaces, workspaceId]);
 
+	const versionLabel = isDirty
+		? "Unsaved"
+		: currentVersionId
+			? `#${currentVersionId.slice(0, 7)}`
+			: undefined;
+
 	return (
-		<Popover placement="bottom-end" isOpen={isOpen} onOpenChange={onOpenChange}>
-			<PopoverTrigger>
-				<Button isIconOnly size="sm" variant="flat">
-					<LucideHistory className="size-3.5" />
-				</Button>
-			</PopoverTrigger>
-			<PopoverContent className="p-0">
-				<ScrollShadow className="max-h-96 p-2">
-					<Listbox label="Version History">
+		<Popover isOpen={state.isOpen} onOpenChange={state.setOpen}>
+			<Button size="sm" variant="tertiary">
+				<LucideHistory className="size-3.5" />
+				{versionLabel && (
+					<span className="text-xs text-muted">{versionLabel}</span>
+				)}
+			</Button>
+			<Popover.Content placement="bottom end" className="max-w-[350px]">
+				<Popover.Dialog className="max-h-96 overflow-auto">
+					<ListBox aria-label="Version History" className="p-0">
 						{versions.map((version) => {
 							const user = workspace?.workspace_user.find(
 								(user) => user.user_id === version.user_id,
@@ -58,43 +67,51 @@ export const VersionHistory = ({
 							const isProduction = productionVersionId === version.id;
 
 							return (
-								<ListboxItem
-									variant="faded"
+								<ListBox.Item
 									key={version.id}
-									onPress={() => {
+									id={version.id}
+									textValue={version.id}
+									onAction={() => {
 										onSelectionChange(version);
-										onOpenChange();
+										state.close();
 									}}
-									title={version.id}
-									description={`${format(version.created_at, "d LLL, hh:mm a")} by ${user?.name}`}
-									startContent={
-										<Avatar
-											className="shrink-0"
-											size="sm"
-											src={`https://api.dicebear.com/9.x/initials/svg?seed=${user?.name}`}
-											fallback={user?.name?.slice(0, 1)}
-										/>
-									}
-									endContent={
-										<div className="flex gap-1">
-											{isStaging && (
-												<Chip color="warning" size="sm" variant="flat">
-													STAGING
-												</Chip>
-											)}
-											{isProduction && (
-												<Chip color="success" size="sm" variant="flat">
-													PRODUCTION
-												</Chip>
-											)}
+									className="flex items-center justify-between gap-8"
+								>
+									<div className="flex gap-2">
+										<Avatar size="sm" className="shrink-0">
+											<Avatar.Image
+												src={`https://api.dicebear.com/9.x/initials/svg?seed=${user?.name}`}
+												alt={user?.name ?? ""}
+											/>
+											<Avatar.Fallback>
+												{user?.name?.slice(0, 1)}
+											</Avatar.Fallback>
+										</Avatar>
+										<div className="flex flex-col">
+											<Label>{version.id}</Label>
+											<Description>
+												{`${format(version.created_at, "d LLL, hh:mm a")} by ${user?.name}`}
+											</Description>
 										</div>
-									}
-								/>
+									</div>
+									<div className="flex gap-1">
+										{isStaging && (
+											<Chip size="sm" color="warning" variant="primary">
+												S
+											</Chip>
+										)}
+										{isProduction && (
+											<Chip size="sm" color="success" variant="primary">
+												P
+											</Chip>
+										)}
+									</div>
+								</ListBox.Item>
 							);
 						})}
-					</Listbox>
-				</ScrollShadow>
-			</PopoverContent>
+					</ListBox>
+				</Popover.Dialog>
+			</Popover.Content>
 		</Popover>
 	);
 };

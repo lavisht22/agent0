@@ -1,13 +1,11 @@
 import {
 	Button,
-	Divider,
 	Drawer,
-	DrawerBody,
-	DrawerContent,
-	DrawerFooter,
-	DrawerHeader,
 	Input,
-	Textarea,
+	Label,
+	Separator,
+	TextArea,
+	TextField,
 } from "@heroui/react";
 import { LucidePlay } from "lucide-react";
 import { useMemo } from "react";
@@ -101,91 +99,92 @@ export function VariablesDrawer({
 	}, [mcps, tools]);
 
 	return (
-		<Drawer isOpen={isOpen} onOpenChange={onOpenChange} scrollBehavior="inside">
-			<DrawerContent>
-				<DrawerHeader>Variables & Headers</DrawerHeader>
-				<DrawerBody>
-					<div className="flex flex-col gap-4">
-						{/* Prompt Variables Section */}
-						{variables.length === 0 && mcpHeaders.length === 0 && (
-							<p className="text-default-500 text-sm">
-								No variables or MCP headers found.
-							</p>
-						)}
-
-						{variables.length > 0 && (
-							<>
-								{mcpHeaders.length > 0 && (
-									<p className="text-sm font-medium text-default-700">
-										Variables
+		<Drawer>
+			<Drawer.Backdrop isOpen={isOpen} onOpenChange={onOpenChange}>
+				<Drawer.Content placement="right">
+					<Drawer.Dialog>
+						<Drawer.CloseTrigger />
+						<Drawer.Header>
+							<Drawer.Heading>Variables & Headers</Drawer.Heading>
+						</Drawer.Header>
+						<Drawer.Body>
+							<div className="flex flex-col gap-4">
+								{/* Prompt Variables Section */}
+								{variables.length === 0 && mcpHeaders.length === 0 && (
+									<p className="text-muted text-sm">
+										No variables or MCP headers found.
 									</p>
 								)}
-								{variables.map((variable) => (
-									<Textarea
-										maxRows={10}
-										key={variable}
-										label={variable}
-										placeholder={`Value for ${variable}`}
-										value={values[variable] || ""}
-										onValueChange={(val) =>
-											onValuesChange({ ...values, [variable]: val })
-										}
-									/>
-								))}
-							</>
-						)}
 
-						{/* MCP Headers Section */}
-						{mcpHeaders.length > 0 && (
-							<>
-								{variables.length > 0 && <Divider />}
-								<p className="text-sm font-medium text-default-700">
-									MCP Headers
-								</p>
-								{mcpHeaders.map((mcp) => (
-									<div key={mcp.id} className="flex flex-col gap-3">
-										<p className="text-xs text-default-500">{mcp.name}</p>
-										{mcp.headers.map((header) => (
-											<Input
-												key={`${mcp.id}-${header}`}
-												label={header}
-												placeholder={`Value for ${header}`}
-												value={
-													mcpHeaderValues[mcp.id]?.[header] || ""
-												}
-												onValueChange={(val) =>
-													onMcpHeaderValuesChange({
-														...mcpHeaderValues,
-														[mcp.id]: {
-															...mcpHeaderValues[mcp.id],
-															[header]: val,
-														},
-													})
-												}
-											/>
-										))}
-									</div>
+								{variables.map((variable) => (
+									<TextField key={variable} name={variable} variant="secondary">
+										<Label>{variable}</Label>
+										<TextArea
+											placeholder={`Value for ${variable}`}
+											value={values[variable] || ""}
+											onChange={(e) =>
+												onValuesChange({
+													...values,
+													[variable]: e.target.value,
+												})
+											}
+										/>
+									</TextField>
 								))}
-							</>
+
+								{/* MCP Headers Section */}
+								{mcpHeaders.length > 0 && (
+									<>
+										{variables.length > 0 && <Separator />}
+										<p className="text-sm font-medium text-foreground">
+											MCP Headers
+										</p>
+										{mcpHeaders.map((mcp) => (
+											<div key={mcp.id} className="flex flex-col gap-3">
+												<p className="text-xs text-muted">{mcp.name}</p>
+												{mcp.headers.map((header) => (
+													<TextField key={`${mcp.id}-${header}`} name={header}>
+														<Label>{header}</Label>
+														<Input
+															placeholder={`Value for ${header}`}
+															value={mcpHeaderValues[mcp.id]?.[header] || ""}
+															onChange={(e) =>
+																onMcpHeaderValuesChange({
+																	...mcpHeaderValues,
+																	[mcp.id]: {
+																		...mcpHeaderValues[mcp.id],
+																		[header]: e.target.value,
+																	},
+																})
+															}
+															variant="secondary"
+														/>
+													</TextField>
+												))}
+											</div>
+										))}
+									</>
+								)}
+							</div>
+						</Drawer.Body>
+						{onRun && (
+							<Drawer.Footer>
+								<Button
+									variant="primary"
+									className="w-full"
+									onPress={() => {
+										onOpenChange();
+										onRun();
+									}}
+								>
+									<LucidePlay className="size-4" />
+									Run
+								</Button>
+							</Drawer.Footer>
 						)}
-					</div>
-				</DrawerBody>
-				{onRun && (
-					<DrawerFooter>
-						<Button
-							color="primary"
-							className="w-full"
-							startContent={<LucidePlay className="size-4" />}
-							onPress={() => {
-								onOpenChange();
-								onRun();
-							}}
-						>
-							Run
-						</Button>
-					</DrawerFooter>
-				)}
-			</DrawerContent>
+					</Drawer.Dialog>
+				</Drawer.Content>
+			</Drawer.Backdrop>
 		</Drawer>
 	);
 }

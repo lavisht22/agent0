@@ -1,6 +1,6 @@
-import { Autocomplete, AutocompleteItem } from "@heroui/react";
+import { ComboBox, Input, ListBox } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
-import { LucideBot } from "lucide-react";
+
 import { agentsLiteQuery } from "@/lib/queries";
 
 interface AgentFilterProps {
@@ -17,25 +17,28 @@ export function AgentFilter({
 	const { data: agents } = useQuery(agentsLiteQuery(workspaceId));
 
 	return (
-		<Autocomplete
-			startContent={<LucideBot className="size-3.5 shrink-0" />}
-			variant="bordered"
+		<ComboBox
 			aria-label="Filter by agent"
-			placeholder="All Agents"
-			size="sm"
-			classNames={{
-				base: "w-64",
-				popoverContent: "w-96",
-			}}
-			isClearable
+			className="w-64"
 			selectedKey={value ?? null}
 			onSelectionChange={(key) => {
 				onValueChange(key ? String(key) : undefined);
 			}}
 		>
-			{(agents || []).map((agent) => (
-				<AutocompleteItem key={agent.id}>{agent.name}</AutocompleteItem>
-			))}
-		</Autocomplete>
+			<ComboBox.InputGroup>
+				<Input placeholder="All Agents" />
+				<ComboBox.Trigger />
+			</ComboBox.InputGroup>
+			<ComboBox.Popover className="w-96">
+				<ListBox items={agents || []}>
+					{(agent) => (
+						<ListBox.Item id={agent.id} textValue={agent.name}>
+							{agent.name}
+							<ListBox.ItemIndicator />
+						</ListBox.Item>
+					)}
+				</ListBox>
+			</ComboBox.Popover>
+		</ComboBox>
 	);
 }

@@ -1,4 +1,4 @@
-import { Select, SelectItem } from "@heroui/react";
+import { ListBox, Select } from "@heroui/react";
 import { Activity } from "lucide-react";
 
 export type StatusFilterValue = "success" | "failed" | undefined;
@@ -11,28 +11,31 @@ interface StatusFilterProps {
 export function StatusFilter({ value, onValueChange }: StatusFilterProps) {
 	return (
 		<Select
-			isClearable
-			startContent={<Activity className="size-3.5 shrink-0" />}
-			variant="bordered"
 			aria-label="Filter by status"
 			placeholder="All Statuses"
-			size="sm"
-			classNames={{
-				base: "w-40",
-				trigger: "min-h-8",
-			}}
-			selectedKeys={value ? [value] : []}
-			onSelectionChange={(keys) => {
-				const selected = Array.from(keys)[0] as StatusFilterValue;
-				onValueChange(selected || undefined);
+			className="w-40"
+			value={value ?? null}
+			onChange={(key) => {
+				onValueChange((key as StatusFilterValue) || undefined);
 			}}
 		>
-			<SelectItem key="sucess" color="success">
-				Success
-			</SelectItem>
-			<SelectItem key="failed" color="danger">
-				Failed
-			</SelectItem>
+			<Select.Trigger className="min-h-8 flex items-center gap-2">
+				<Activity className="size-3.5 shrink-0 text-muted" />
+				<Select.Value />
+				<Select.Indicator />
+			</Select.Trigger>
+			<Select.Popover>
+				<ListBox>
+					<ListBox.Item id="success" textValue="Success">
+						Success
+						<ListBox.ItemIndicator />
+					</ListBox.Item>
+					<ListBox.Item id="failed" textValue="Failed" variant="danger">
+						Failed
+						<ListBox.ItemIndicator />
+					</ListBox.Item>
+				</ListBox>
+			</Select.Popover>
 		</Select>
 	);
 }

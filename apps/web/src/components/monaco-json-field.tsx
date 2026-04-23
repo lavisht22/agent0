@@ -24,7 +24,7 @@ export function MonacoJsonField({
 }: MonacoJsonFieldProps) {
 	return (
 		<div className="space-y-1">
-			<div className="rounded-large border-2 border-default-200 overflow-hidden">
+			<div className="rounded-[14px] border-2 border-border overflow-hidden">
 				<span className="block text-xs ml-3 my-2">
 					{label}
 					{isRequired && <span className="text-danger">*</span>}
@@ -35,12 +35,7 @@ export function MonacoJsonField({
 					minHeight={editorMinHeight}
 				/>
 			</div>
-			<p
-				className={cn(
-					"ml-1 text-xs text-default-400",
-					isInvalid && "text-danger",
-				)}
-			>
+			<p className={cn("ml-1 text-xs text-muted", isInvalid && "text-danger")}>
 				{errorMessage ? errorMessage : description}
 			</p>
 		</div>

@@ -1,20 +1,13 @@
 import {
-	addToast,
 	Button,
+	CloseButton,
 	Dropdown,
-	DropdownItem,
-	DropdownMenu,
-	DropdownTrigger,
-	Input,
-	Spinner,
+	InputGroup,
+	Label,
 	Table,
-	TableBody,
-	TableCell,
-	TableColumn,
-	TableHeader,
-	TableRow,
 	Tooltip,
-	useDisclosure,
+	toast,
+	useOverlayState,
 } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -29,6 +22,7 @@ import {
 import { useEffect, useState } from "react";
 import { ConfirmationModal } from "@/components/confirmation-modal";
 import IDCopy from "@/components/id-copy";
+import { PageHeader } from "@/components/page-header";
 import { TagChip } from "@/components/tag-chip";
 import { TagsSelect } from "@/components/tags-select";
 import { agentsQuery } from "@/lib/queries";
@@ -56,14 +50,14 @@ function RouteComponent() {
 	const queryClient = useQueryClient();
 
 	// Delete confirmation modal state
-	const { isOpen, onOpen, onOpenChange } = useDisclosure();
+	const deleteState = useOverlayState();
 	const [agentToDelete, setAgentToDelete] = useState<{
 		id: string;
 		name: string;
 	} | null>(null);
 
 	// Fetch Agents with tag filter
-	const { data: agents, isLoading } = useQuery(
+	const { data: agents } = useQuery(
 		agentsQuery(workspaceId, page, searchQuery, selectedTags),
 	);
 
@@ -108,30 +102,22 @@ function RouteComponent() {
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["agents", workspaceId] });
-			addToast({
-				description: "Agent deleted successfully.",
-				color: "success",
-			});
-			onOpenChange();
+			toast.success("Agent deleted successfully.");
+			deleteState.close();
 			setAgentToDelete(null);
 		},
 		onError: (error) => {
-			addToast({
-				description:
-					error instanceof Error ? error.message : "Failed to delete agent.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error ? error.message : "Failed to delete agent.",
+			);
 		},
 	});
 
 	return (
-		<div className="h-screen overflow-hidden flex flex-col">
-			<div className="flex justify-between items-center h-16 border-b border-default-200 box-content px-4">
-				<h1 className="text-xl font-medium tracking-tight">Agents</h1>
-
+		<div className="h-screen flex flex-col">
+			<PageHeader breadcrumbs={[{ label: "Agents" }]}>
 				<Button
-					color="primary"
-					startContent={<Plus size={18} />}
+					variant="primary"
 					onPress={() =>
 						navigate({
 							to: "/workspace/$workspaceId/agents/$agentId",
@@ -139,53 +125,54 @@ function RouteComponent() {
 						})
 					}
 				>
+					<Plus size={18} />
 					Create
 				</Button>
-			</div>
+			</PageHeader>
 
-			<Table
-				aria-label="Agents Table"
-				shadow="none"
-				classNames={{
-					wrapper: "bg-background",
-					base: "overflow-auto flex-1 w-full",
-				}}
-				isHeaderSticky
-				topContent={
-					<div className="w-full flex justify-between items-center">
-						<div className="flex items-center gap-2">
-							<Input
-								size="sm"
+			<div className="flex-1 p-4 flex flex-col gap-4 overflow-hidden">
+				<div className="w-full flex justify-between items-center">
+					<div className="flex items-center gap-2">
+						<InputGroup className="w-64">
+							<InputGroup.Prefix>
+								<Search className="size-3.5 text-muted" />
+							</InputGroup.Prefix>
+							<InputGroup.Input
 								placeholder="Search agents..."
-								startContent={<Search className="size-3.5 text-default-400" />}
-								className="w-64"
 								value={localSearch}
-								onValueChange={setLocalSearch}
-								isClearable
-								onClear={() => setLocalSearch("")}
+								onChange={(e) => setLocalSearch(e.target.value)}
 							/>
-							<div className="w-64">
-								<TagsSelect
-									workspaceId={workspaceId}
-									selectedTags={selectedTags || []}
-									onTagsChange={(tags) =>
-										navigate({
-											search: {
-												page: 1,
-												search: searchQuery,
-												tags: tags.length > 0 ? tags : undefined,
-											},
-										})
-									}
-								/>
-							</div>
+							<InputGroup.Suffix>
+								{localSearch && (
+									<CloseButton
+										aria-label="Clear search"
+										onPress={() => setLocalSearch("")}
+									/>
+								)}
+							</InputGroup.Suffix>
+						</InputGroup>
+						<div className="w-64">
+							<TagsSelect
+								workspaceId={workspaceId}
+								selectedTags={selectedTags || []}
+								onTagsChange={(tags) =>
+									navigate({
+										search: {
+											page: 1,
+											search: searchQuery,
+											tags: tags.length > 0 ? tags : undefined,
+										},
+									})
+								}
+							/>
 						</div>
-						<div className="flex gap-2">
-							<Tooltip content="Previous">
+					</div>
+					<div className="flex gap-2">
+						<Tooltip delay={0}>
+							<Tooltip.Trigger>
 								<Button
 									size="sm"
-									isIconOnly
-									variant="flat"
+									variant="tertiary"
 									isDisabled={page === 1}
 									onPress={() =>
 										navigate({
@@ -199,12 +186,14 @@ function RouteComponent() {
 								>
 									<LucideChevronLeft className="size-3.5" />
 								</Button>
-							</Tooltip>
-							<Tooltip content="Next">
+							</Tooltip.Trigger>
+							<Tooltip.Content placement="top">Previous</Tooltip.Content>
+						</Tooltip>
+						<Tooltip delay={0}>
+							<Tooltip.Trigger>
 								<Button
 									size="sm"
-									isIconOnly
-									variant="flat"
+									variant="tertiary"
 									isDisabled={!agents || agents.length < 20}
 									onPress={() =>
 										navigate({
@@ -218,93 +207,106 @@ function RouteComponent() {
 								>
 									<LucideChevronRight className="size-3.5" />
 								</Button>
-							</Tooltip>
-						</div>
+							</Tooltip.Trigger>
+							<Tooltip.Content placement="top">Next</Tooltip.Content>
+						</Tooltip>
 					</div>
-				}
-			>
-				<TableHeader>
-					<TableColumn>Name</TableColumn>
-					<TableColumn>Tags</TableColumn>
-					<TableColumn>ID</TableColumn>
-					<TableColumn>Created At</TableColumn>
-					<TableColumn className="w-20" hideHeader>
-						Actions
-					</TableColumn>
-				</TableHeader>
-				<TableBody
-					items={agents || []}
-					isLoading={isLoading}
-					loadingContent={<Spinner />}
-					emptyContent="You haven't created any agents yet."
-				>
-					{(item) => (
-						<TableRow
-							key={item.id}
-							className="hover:bg-default-100"
-							href={`/workspace/${workspaceId}/agents/${item.id}`}
-						>
-							<TableCell>{item.name}</TableCell>
-							<TableCell>
-								<div className="flex gap-1 flex-wrap">
-									{item.agent_tags?.map((at) =>
-										at.tags ? (
-											<TagChip
-												key={at.tags.id}
-												name={at.tags.name}
-												color={at.tags.color}
-											/>
-										) : null,
-									)}
-								</div>
-							</TableCell>
-							<TableCell>
-								<IDCopy id={item.id} />
-							</TableCell>
-							<TableCell>{format(item.created_at, "d LLL, hh:mm a")}</TableCell>
-							<TableCell className="flex justify-end">
-								<Dropdown>
-									<DropdownTrigger>
-										<Button isIconOnly variant="light">
-											<LucideEllipsisVertical className="size-4" />
-										</Button>
-									</DropdownTrigger>
-									<DropdownMenu>
-										<DropdownItem
-											key="edit"
-											onPress={() =>
-												navigate({
-													to: "$agentId",
-													params: {
-														agentId: item.id,
-													},
-												})
-											}
-										>
-											Edit
-										</DropdownItem>
-										<DropdownItem
-											key="delete"
-											className="text-danger"
-											color="danger"
-											onPress={() => {
-												setAgentToDelete({ id: item.id, name: item.name });
-												onOpen();
-											}}
-										>
-											Delete
-										</DropdownItem>
-									</DropdownMenu>
-								</Dropdown>
-							</TableCell>
-						</TableRow>
-					)}
-				</TableBody>
-			</Table>
-
+				</div>
+				<Table className="flex-1 overflow-hidden">
+					<Table.ScrollContainer className="h-full overflow-auto">
+						<Table.Content aria-label="Agents Table">
+							<Table.Header className="sticky top-0 z-10">
+								<Table.Column id="name">Name</Table.Column>
+								<Table.Column id="tags">Tags</Table.Column>
+								<Table.Column id="id">ID</Table.Column>
+								<Table.Column id="createdAt">Created At</Table.Column>
+								<Table.Column id="actions" className="w-20"></Table.Column>
+							</Table.Header>
+							<Table.Body
+								items={agents || []}
+								renderEmptyState={() => (
+									<p className="text-center text-muted p-6">
+										{searchQuery ||
+										(selectedTags?.length && selectedTags.length > 0)
+											? "No agents found matching your criteria."
+											: "You haven't created any agents yet."}
+									</p>
+								)}
+							>
+								{(item) => (
+									<Table.Row
+										key={item.id}
+										id={item.id}
+										href={`/workspace/${workspaceId}/agents/${item.id}`}
+									>
+										<Table.Cell>{item.name}</Table.Cell>
+										<Table.Cell>
+											<div className="flex gap-1 flex-wrap">
+												{item.agent_tags?.map((at) =>
+													at.tags ? (
+														<TagChip
+															key={at.tags.id}
+															name={at.tags.name}
+															color={at.tags.color}
+														/>
+													) : null,
+												)}
+											</div>
+										</Table.Cell>
+										<Table.Cell>
+											<IDCopy id={item.id} />
+										</Table.Cell>
+										<Table.Cell>
+											{format(item.created_at, "d LLL, hh:mm a")}
+										</Table.Cell>
+										<Table.Cell className="flex justify-end">
+											<Dropdown>
+												<Button isIconOnly variant="ghost">
+													<LucideEllipsisVertical className="size-4" />
+												</Button>
+												<Dropdown.Popover>
+													<Dropdown.Menu
+														onAction={(key) => {
+															if (key === "edit") {
+																navigate({
+																	to: "$agentId",
+																	params: {
+																		agentId: item.id,
+																	},
+																});
+															} else if (key === "delete") {
+																setAgentToDelete({
+																	id: item.id,
+																	name: item.name,
+																});
+																deleteState.open();
+															}
+														}}
+													>
+														<Dropdown.Item id="edit" textValue="Edit">
+															<Label>Edit</Label>
+														</Dropdown.Item>
+														<Dropdown.Item
+															id="delete"
+															textValue="Delete"
+															variant="danger"
+														>
+															<Label>Delete</Label>
+														</Dropdown.Item>
+													</Dropdown.Menu>
+												</Dropdown.Popover>
+											</Dropdown>
+										</Table.Cell>
+									</Table.Row>
+								)}
+							</Table.Body>
+						</Table.Content>
+					</Table.ScrollContainer>
+				</Table>
+			</div>
 			<ConfirmationModal
-				isOpen={isOpen}
-				onOpenChange={onOpenChange}
+				isOpen={deleteState.isOpen}
+				onOpenChange={deleteState.setOpen}
 				title="Delete Agent"
 				description={`Are you sure you want to delete "${agentToDelete?.name}"? This action cannot be undone and will delete all versions associated with this agent.`}
 				onConfirm={() => {

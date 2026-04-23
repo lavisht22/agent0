@@ -1,27 +1,20 @@
 import {
 	Button,
 	Card,
-	CardBody,
-	CardHeader,
 	Dropdown,
-	DropdownItem,
-	DropdownMenu,
-	DropdownTrigger,
 	Input,
+	Label,
 	Modal,
-	ModalBody,
-	ModalContent,
-	ModalFooter,
-	ModalHeader,
 	Radio,
 	RadioGroup,
+	TextField,
 } from "@heroui/react";
 import { Reorder, useDragControls } from "framer-motion";
 import {
 	LucideFileText,
 	LucideGripVertical,
 	LucidePlus,
-	LucideTrash2,
+	LucideX,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import TextareaAutosize from "react-textarea-autosize";
@@ -90,7 +83,7 @@ function UserMessagePart({
 				: `data:${value.mediaType || "image/png"};base64,${value.image}`;
 
 		return (
-			<div className="bg-default-50 w-full rounded-large p-2 flex justify-center items-center">
+			<div className="bg-surface-secondary w-full rounded-[14px] p-2 flex justify-center items-center">
 				<img
 					src={imageSrc}
 					alt="Preview"
@@ -115,17 +108,17 @@ function UserMessagePart({
 				: `${approximateSize} KB`;
 
 		return (
-			<div className="bg-default-50 w-full rounded-large p-3">
+			<div className="bg-surface-secondary w-full rounded-[14px] p-3">
 				<div className="flex items-center gap-3">
-					<div className="shrink-0 w-12 h-12 bg-default-200 rounded-lg flex items-center justify-center">
-						<LucideFileText className="size-6 text-default-600" />
+					<div className="shrink-0 w-12 h-12 bg-surface-tertiary rounded-lg flex items-center justify-center">
+						<LucideFileText className="size-6 text-foreground" />
 					</div>
 					<div className="flex-1 min-w-0">
-						<p className="text-sm font-medium text-default-900 truncate">
+						<p className="text-sm font-medium text-foreground truncate">
 							{value.mediaType || "Unknown file type"}
 						</p>
 						{approximateSize > 0 && (
-							<p className="text-xs text-default-500">{sizeDisplay}</p>
+							<p className="text-xs text-muted">{sizeDisplay}</p>
 						)}
 					</div>
 				</div>
@@ -252,51 +245,49 @@ export function UserMessage({
 				dragListener={false}
 				dragControls={controls}
 			>
-				<Card>
-					<CardHeader className="flex items-center justify-between pl-1 pr-1 h-10 z-0">
-						<div className="flex items-center">
+				<Card className="text-default-foreground">
+					<Card.Header className="flex flex-row items-center justify-between z-0">
+						<div className="flex items-center gap-2">
 							{!isReadOnly && (
 								<div
-									className="h-full py-3 px-2 reorder-handle cursor-grab"
+									className="reorder-handle cursor-grab"
 									onPointerDown={(e) => controls.start(e)}
 								>
-									<LucideGripVertical className="size-3.5 text-default-500" />
+									<LucideGripVertical className="size-3.5 text-muted" />
 								</div>
 							)}
-							<span
-								className={`text-sm text-default-500 ${isReadOnly ? "pl-2" : ""}`}
-							>
-								User
-							</span>
+							<span className="text-sm text-muted">User</span>
 						</div>
 						{!isReadOnly && (
 							<Dropdown>
-								<DropdownTrigger>
-									<Button size="sm" isIconOnly variant="light">
-										<LucidePlus className="size-3.5" />
-									</Button>
-								</DropdownTrigger>
-								<DropdownMenu>
-									<DropdownItem
-										key="upload"
-										onPress={() => fileInputRef.current?.click()}
+								<Button size="sm" isIconOnly variant="tertiary">
+									<LucidePlus className="size-3.5" />
+								</Button>
+								<Dropdown.Popover>
+									<Dropdown.Menu
+										onAction={(key) => {
+											if (key === "upload") {
+												fileInputRef.current?.click();
+											} else if (key === "embed") {
+												setIsEmbedModalOpen(true);
+											}
+										}}
 									>
-										Upload
-									</DropdownItem>
-									<DropdownItem
-										key="embed"
-										onPress={() => setIsEmbedModalOpen(true)}
-									>
-										Embed
-									</DropdownItem>
-								</DropdownMenu>
+										<Dropdown.Item id="upload" textValue="Upload">
+											<Label>Upload</Label>
+										</Dropdown.Item>
+										<Dropdown.Item id="embed" textValue="Embed">
+											<Label>Embed</Label>
+										</Dropdown.Item>
+									</Dropdown.Menu>
+								</Dropdown.Popover>
 							</Dropdown>
 						)}
-					</CardHeader>
-					<CardBody className="p-3 border-t border-default-200 flex flex-col gap-2">
+					</Card.Header>
+					<Card.Content className="gap-2">
 						{value.content.map((part, index) => {
 							return (
-								<div key={`${index + 1}`} className="flex">
+								<div key={`${index + 1}`} className="flex items-start">
 									<UserMessagePart
 										isReadOnly={isReadOnly}
 										value={part}
@@ -309,10 +300,9 @@ export function UserMessage({
 
 									{!isReadOnly && (
 										<Button
-											className="-mr-2"
 											size="sm"
 											isIconOnly
-											variant="light"
+											variant="ghost"
 											onPress={() => {
 												const newContent = [...value.content];
 												newContent.splice(index, 1);
@@ -325,7 +315,7 @@ export function UserMessage({
 												onValueChange({ ...value, content: newContent });
 											}}
 										>
-											<LucideTrash2 className="size-3.5" />
+											<LucideX className="size-3.5" />
 										</Button>
 									)}
 								</div>
@@ -335,7 +325,7 @@ export function UserMessage({
 							variables={variables}
 							onVariablePress={onVariablePress}
 						/>
-					</CardBody>
+					</Card.Content>
 				</Card>
 			</Reorder.Item>
 
@@ -348,61 +338,87 @@ export function UserMessage({
 			/>
 
 			{/* Embed Modal */}
-			<Modal isOpen={isEmbedModalOpen} onOpenChange={setIsEmbedModalOpen}>
-				<ModalContent>
-					{(onClose) => (
-						<>
-							<ModalHeader>Embed Content</ModalHeader>
-							<ModalBody>
-								<RadioGroup
-									label="Content Type"
-									value={embedType}
-									onValueChange={(value) =>
-										setEmbedType(value as "image" | "file")
-									}
-								>
-									<Radio value="image">Image</Radio>
-									<Radio value="file">File</Radio>
-								</RadioGroup>
+			<Modal>
+				<Modal.Backdrop
+					isOpen={isEmbedModalOpen}
+					onOpenChange={setIsEmbedModalOpen}
+				>
+					<Modal.Container>
+						<Modal.Dialog>
+							{({ close }) => (
+								<>
+									<Modal.Header>
+										<Modal.Heading>Embed Content</Modal.Heading>
+									</Modal.Header>
+									<Modal.Body>
+										<RadioGroup
+											value={embedType}
+											onChange={(value) =>
+												setEmbedType(value as "image" | "file")
+											}
+										>
+											<Label>Content Type</Label>
+											<Radio value="image">
+												<Radio.Control>
+													<Radio.Indicator />
+												</Radio.Control>
+												<Radio.Content>
+													<Label>Image</Label>
+												</Radio.Content>
+											</Radio>
+											<Radio value="file">
+												<Radio.Control>
+													<Radio.Indicator />
+												</Radio.Control>
+												<Radio.Content>
+													<Label>File</Label>
+												</Radio.Content>
+											</Radio>
+										</RadioGroup>
 
-								<Input
-									variant="bordered"
-									label={embedType === "image" ? "Image Data" : "File Data"}
-									placeholder="Base64 encoded data or URL"
-									value={embedData}
-									onChange={(e) => setEmbedData(e.target.value)}
-								/>
+										<TextField>
+											<Label>
+												{embedType === "image" ? "Image Data" : "File Data"}
+											</Label>
+											<Input
+												placeholder="Base64 encoded data or URL"
+												value={embedData}
+												onChange={(e) => setEmbedData(e.target.value)}
+											/>
+										</TextField>
 
-								<Input
-									variant="bordered"
-									label="Media Type"
-									placeholder={
-										embedType === "image"
-											? "e.g., image/png (optional)"
-											: "e.g., application/pdf"
-									}
-									value={embedMediaType}
-									onChange={(e) => setEmbedMediaType(e.target.value)}
-									isRequired={embedType === "file"}
-								/>
-							</ModalBody>
-							<ModalFooter>
-								<Button variant="light" onPress={onClose}>
-									Cancel
-								</Button>
-								<Button
-									color="primary"
-									onPress={handleEmbedSubmit}
-									isDisabled={
-										!embedData || (embedType === "file" && !embedMediaType)
-									}
-								>
-									Add
-								</Button>
-							</ModalFooter>
-						</>
-					)}
-				</ModalContent>
+										<TextField isRequired={embedType === "file"}>
+											<Label>Media Type</Label>
+											<Input
+												placeholder={
+													embedType === "image"
+														? "e.g., image/png (optional)"
+														: "e.g., application/pdf"
+												}
+												value={embedMediaType}
+												onChange={(e) => setEmbedMediaType(e.target.value)}
+											/>
+										</TextField>
+									</Modal.Body>
+									<Modal.Footer>
+										<Button variant="tertiary" onPress={close}>
+											Cancel
+										</Button>
+										<Button
+											variant="primary"
+											onPress={handleEmbedSubmit}
+											isDisabled={
+												!embedData || (embedType === "file" && !embedMediaType)
+											}
+										>
+											Add
+										</Button>
+									</Modal.Footer>
+								</>
+							)}
+						</Modal.Dialog>
+					</Modal.Container>
+				</Modal.Backdrop>
 			</Modal>
 		</>
 	);

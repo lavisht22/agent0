@@ -1,4 +1,4 @@
-import { Card, CardBody, CardHeader } from "@heroui/react";
+import { Card } from "@heroui/react";
 import { Reorder } from "framer-motion";
 import { useMemo } from "react";
 import TextareaAutosize from "react-textarea-autosize";
@@ -41,11 +41,11 @@ export function SystemMessage({
 			layout="position"
 			dragListener={false}
 		>
-			<Card>
-				<CardHeader className="flex items-center justify-between pl-3 pr-1 h-10">
-					<span className="text-sm text-default-500">System</span>
-				</CardHeader>
-				<CardBody className="p-3 border-t border-default-200 gap-4">
+			<Card className="text-default-foreground">
+				<Card.Header className="flex flex-row items-center justify-between">
+					<span className="text-sm text-muted">System</span>
+				</Card.Header>
+				<Card.Content className="gap-4">
 					<TextareaAutosize
 						className="outline-none w-full resize-none text-sm scrollbar-hide"
 						readOnly={isReadOnly}
@@ -57,7 +57,7 @@ export function SystemMessage({
 						}
 					/>
 					<Variables variables={variables} onVariablePress={onVariablePress} />
-				</CardBody>
+				</Card.Content>
 			</Card>
 		</Reorder.Item>
 	);

@@ -1,17 +1,14 @@
 import {
 	Button,
+	DateField,
 	DateRangePicker as HeroDateRangePicker,
+	ListBox,
+	RangeCalendar,
 	Select,
-	SelectItem,
 } from "@heroui/react";
-import {
-	type CalendarDate,
-	getLocalTimeZone,
-	parseDate,
-	today,
-} from "@internationalized/date";
+import { getLocalTimeZone, parseDate, today } from "@internationalized/date";
 import { format } from "date-fns";
-import { LucideArrowLeft, LucideCalendar } from "lucide-react";
+import { LucideArrowLeft, LucideClock } from "lucide-react";
 import { useMemo, useState } from "react";
 
 const DATE_PRESETS = [
@@ -145,22 +142,25 @@ export function DateRangePicker({
 	// Determine selected key for the Select
 	const selectedKey = value.datePreset || (showCustom ? "custom" : undefined);
 
+	const displayLabel =
+		selectedKey === "custom" && value.startDate && value.endDate
+			? getCustomDateLabel(value)
+			: selectedKey
+				? DATE_PRESETS.find((p) => p.key === selectedKey)?.label ||
+					"Select Date"
+				: "Select Date";
+
 	if (showCustom) {
 		return (
 			<HeroDateRangePicker
-				variant="bordered"
-				size="sm"
 				className="w-64"
 				aria-label="Select date range"
 				value={customDateValue}
 				maxValue={today(getLocalTimeZone())}
 				isOpen={isCalendarOpen}
 				onOpenChange={setIsCalendarOpen}
-				onChange={(
-					range: { start: CalendarDate; end: CalendarDate } | null,
-				) => {
+				onChange={(range) => {
 					if (range) {
-						// Convert CalendarDate to ISO string for start of day / end of day
 						const startDate = range.start.toDate(getLocalTimeZone());
 						startDate.setHours(0, 0, 0, 0);
 
@@ -173,11 +173,28 @@ export function DateRangePicker({
 						});
 					}
 				}}
-				CalendarTopContent={
+			>
+				<DateField.Group>
+					<DateField.InputContainer>
+						<DateField.Input slot="start">
+							{(segment) => <DateField.Segment segment={segment} />}
+						</DateField.Input>
+						<HeroDateRangePicker.RangeSeparator />
+						<DateField.Input slot="end">
+							{(segment) => <DateField.Segment segment={segment} />}
+						</DateField.Input>
+					</DateField.InputContainer>
+					<DateField.Suffix>
+						<HeroDateRangePicker.Trigger>
+							<HeroDateRangePicker.TriggerIndicator />
+						</HeroDateRangePicker.Trigger>
+					</DateField.Suffix>
+				</DateField.Group>
+				<HeroDateRangePicker.Popover>
 					<div className="p-2">
 						<Button
-							fullWidth
-							variant="light"
+							className="w-full"
+							variant="tertiary"
 							size="sm"
 							onPress={() => {
 								setShowCustom(false);
@@ -186,54 +203,66 @@ export function DateRangePicker({
 									datePreset: "1hr",
 								});
 							}}
-							startContent={<LucideArrowLeft className="size-3.5" />}
 						>
+							<LucideArrowLeft className="size-3.5" />
 							Back to Presets
 						</Button>
 					</div>
-				}
-			/>
+					<RangeCalendar aria-label="Choose date range">
+						<RangeCalendar.Header>
+							<RangeCalendar.Heading />
+							<RangeCalendar.NavButton slot="previous" />
+							<RangeCalendar.NavButton slot="next" />
+						</RangeCalendar.Header>
+						<RangeCalendar.Grid>
+							<RangeCalendar.GridHeader>
+								{(day) => (
+									<RangeCalendar.HeaderCell>{day}</RangeCalendar.HeaderCell>
+								)}
+							</RangeCalendar.GridHeader>
+							<RangeCalendar.GridBody>
+								{(date) => <RangeCalendar.Cell date={date} />}
+							</RangeCalendar.GridBody>
+						</RangeCalendar.Grid>
+					</RangeCalendar>
+				</HeroDateRangePicker.Popover>
+			</HeroDateRangePicker>
 		);
 	}
 
 	return (
 		<Select
-			startContent={<LucideCalendar className="size-3.5" />}
-			variant="bordered"
 			aria-label="Filter by date range"
 			placeholder="Select Date"
-			size="sm"
-			classNames={{
-				base: "w-44",
-				popoverContent: "w-[200px]",
-			}}
-			selectedKeys={selectedKey ? [selectedKey] : []}
-			onSelectionChange={(keys) => {
-				const key = Array.from(keys)[0] as string | undefined;
-				if (key === "custom") {
+			className="w-44"
+			value={selectedKey ?? null}
+			onChange={(key) => {
+				const stringKey = key as string | null;
+				if (stringKey === "custom") {
 					setShowCustom(true);
 					setIsCalendarOpen(true);
-				} else if (key) {
+				} else if (stringKey) {
 					onValueChange({
-						datePreset: key,
+						datePreset: stringKey,
 					});
 				}
 			}}
-			renderValue={(items) => {
-				const item = items[0];
-				if (!item) return "Select Date";
-
-				// For custom with dates selected, show the date range
-				if (item.key === "custom" && value.startDate && value.endDate) {
-					return getCustomDateLabel(value);
-				}
-
-				return item.textValue;
-			}}
 		>
-			{DATE_PRESETS.map((preset) => (
-				<SelectItem key={preset.key}>{preset.label}</SelectItem>
-			))}
+			<Select.Trigger className="flex items-center gap-2">
+				<LucideClock className="size-3.5 text-muted" />
+				<Select.Value>{displayLabel}</Select.Value>
+				<Select.Indicator />
+			</Select.Trigger>
+			<Select.Popover className="w-[200px]">
+				<ListBox items={DATE_PRESETS}>
+					{(preset) => (
+						<ListBox.Item id={preset.key} textValue={preset.label}>
+							{preset.label}
+							<ListBox.ItemIndicator />
+						</ListBox.Item>
+					)}
+				</ListBox>
+			</Select.Popover>
 		</Select>
 	);
 }

@@ -12,14 +12,13 @@ export function Variables({
 		<div className="flex flex-wrap gap-1 items-center">
 			{variables.map((variable) => (
 				<Button
-					color="warning"
 					size="sm"
 					key={variable}
-					startContent={<LucideBraces className="size-3" />}
-					className="gap-1 h-6 px-2"
-					variant="flat"
+					className="gap-1 h-6 px-2 text-warning bg-warning-soft hover:bg-warning-soft-hover"
+					variant="tertiary"
 					onPress={() => onVariablePress()}
 				>
+					<LucideBraces className="size-3" />
 					{variable}
 				</Button>
 			))}

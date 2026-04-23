@@ -4,7 +4,7 @@ interface TagChipProps {
 	name: string;
 	color: string;
 	size?: "sm" | "md" | "lg";
-	onRemove?: () => void;
+
 	onClick?: () => void;
 }
 
@@ -19,23 +19,19 @@ function hexToRgba(hex: string, opacity: number): string {
 	return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
 
-export function TagChip({ name, color, size = "sm", onRemove }: TagChipProps) {
+export function TagChip({ name, color, size = "sm" }: TagChipProps) {
 	const bgColor = hexToRgba(color, 0.2);
 
 	return (
 		<Chip
 			size={size}
-			variant="flat"
+			variant="tertiary"
 			style={{
 				backgroundColor: bgColor,
 				color: color,
 			}}
-			classNames={{
-				content: "font-medium",
-			}}
-			onClose={onRemove}
 		>
-			{name}
+			<Chip.Label className="font-medium">{name}</Chip.Label>
 		</Chip>
 	);
 }

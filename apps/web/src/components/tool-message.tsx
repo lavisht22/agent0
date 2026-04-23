@@ -1,6 +1,6 @@
-import { Button, Card, CardBody, CardHeader, cn } from "@heroui/react";
+import { Button, Card, cn } from "@heroui/react";
 import { Reorder, useDragControls } from "framer-motion";
-import { LucideGripVertical, LucideTrash2 } from "lucide-react";
+import { LucideGripVertical, LucideX } from "lucide-react";
 import { useMemo } from "react";
 import { z } from "zod";
 import { MonacoJsonEditor } from "./monaco-json-editor";
@@ -37,7 +37,7 @@ function ToolMessagePart({
 		return (
 			<div
 				className={cn(
-					"border border-default-200 overflow-hidden rounded-large w-full space-y-2",
+					"border border-border overflow-hidden rounded-[14px] w-full space-y-2",
 					(value.output as { type: string; value: unknown })?.type.startsWith(
 						"error",
 					)
@@ -89,28 +89,24 @@ export function ToolMessage({
 			dragListener={false}
 			dragControls={controls}
 		>
-			<Card>
-				<CardHeader className="flex items-center justify-between pl-1 pr-1 h-10 z-0">
-					<div className="flex items-center">
+			<Card className="text-default-foreground">
+				<Card.Header className="flex flex-row items-center justify-between z-0">
+					<div className="flex items-center gap-2">
 						{!isReadOnly && (
 							<div
-								className="h-full py-3 px-2 reorder-handle cursor-grab"
+								className="reorder-handle cursor-grab"
 								onPointerDown={(e) => controls.start(e)}
 							>
-								<LucideGripVertical className="size-3.5 text-default-500" />
+								<LucideGripVertical className="size-3.5 text-muted" />
 							</div>
 						)}
-						<span
-							className={`text-sm text-default-500 ${isReadOnly ? "pl-2" : ""}`}
-						>
-							Tool
-						</span>
+						<span className="text-sm text-muted">Tool</span>
 					</div>
-				</CardHeader>
-				<CardBody className="p-3 border-t border-default-200 flex flex-col gap-3">
+				</Card.Header>
+				<Card.Content className="gap-3">
 					{value.content.map((part, index) => {
 						return (
-							<div key={`${index + 1}`} className="flex">
+							<div key={`${index + 1}`} className="flex items-start">
 								<ToolMessagePart
 									isReadOnly={isReadOnly}
 									value={part}
@@ -122,10 +118,9 @@ export function ToolMessage({
 								/>
 								{!isReadOnly && (
 									<Button
-										className="-mr-2"
 										size="sm"
 										isIconOnly
-										variant="light"
+										variant="ghost"
 										onPress={() => {
 											const newContent = [...value.content];
 											newContent.splice(index, 1);
@@ -138,7 +133,7 @@ export function ToolMessage({
 											onValueChange({ ...value, content: newContent });
 										}}
 									>
-										<LucideTrash2 className="size-3.5" />
+										<LucideX className="size-3.5" />
 									</Button>
 								)}
 							</div>
@@ -150,7 +145,7 @@ export function ToolMessage({
 							onVariablePress={onVariablePress}
 						/>
 					)}
-				</CardBody>
+				</Card.Content>
 			</Card>
 		</Reorder.Item>
 	);

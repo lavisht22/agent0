@@ -1,4 +1,13 @@
-import { addToast, Button, Form, Input } from "@heroui/react";
+import {
+	Button,
+	FieldError,
+	Form,
+	Input,
+	Label,
+	Spinner,
+	TextField,
+	toast,
+} from "@heroui/react";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { nanoid } from "nanoid";
@@ -34,13 +43,9 @@ function RouteComponent() {
 			return data;
 		},
 		onError: (error) => {
-			addToast({
-				description:
-					error instanceof Error
-						? error.message
-						: "Failed to create workspace.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error ? error.message : "Failed to create workspace.",
+			);
 		},
 		onSuccess: (workspace) => {
 			// TODO: Invalidate the workspaces query
@@ -58,25 +63,31 @@ function RouteComponent() {
 			<div className="w-full max-w-sm space-y-8">
 				<div className="text-center space-y-2">
 					<h1 className="text-3xl font-medium tracking-tight">New Workspace</h1>
-					<p className="text-default-500">Create a new workspace</p>
+					<p className="text-muted">Create a new workspace</p>
 				</div>
 				<Form onSubmit={handleCreateWorkspace} className="flex flex-col gap-4">
-					<Input
-						label="Name"
-						placeholder="Workspace Name"
-						value={name}
-						onValueChange={setName}
-						isRequired
-						variant="bordered"
-					/>
+					<TextField name="name" isRequired className="w-full">
+						<Label>Name</Label>
+						<Input
+							placeholder="Workspace Name"
+							value={name}
+							onChange={(e) => setName(e.target.value)}
+						/>
+						<FieldError />
+					</TextField>
 					<Button
 						type="submit"
-						color="primary"
-						isLoading={createWorkspace.isPending}
-						fullWidth
+						variant="primary"
+						isPending={createWorkspace.isPending}
 						size="lg"
+						className="w-full"
 					>
-						Create
+						{({ isPending }) => (
+							<>
+								{isPending && <Spinner color="current" size="sm" />}
+								Create
+							</>
+						)}
 					</Button>
 				</Form>
 			</div>

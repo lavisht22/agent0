@@ -1,12 +1,22 @@
-import { addToast, Button, Input } from "@heroui/react";
+import {
+	Button,
+	Description,
+	FieldError,
+	Input,
+	Label,
+	Spinner,
+	TextField,
+	toast,
+} from "@heroui/react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Pencil, ShieldAlert } from "lucide-react";
+import { Pencil, ShieldAlert } from "lucide-react";
 import { nanoid } from "nanoid";
 import * as openpgp from "openpgp";
 import { useState } from "react";
 import { MonacoJsonField } from "@/components/monaco-json-field";
+import { PageHeader } from "@/components/page-header";
 import { mcpsQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
 
@@ -92,10 +102,7 @@ function RouteComponent() {
 		},
 		onSuccess: async ({ id }) => {
 			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });
-			addToast({
-				description: "MCP server created successfully.",
-				color: "success",
-			});
+			toast.success("MCP server created successfully.");
 			navigate({
 				to: "/workspace/$workspaceId/mcps",
 				params: { workspaceId },
@@ -121,13 +128,9 @@ function RouteComponent() {
 			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });
 		},
 		onError: (error) => {
-			addToast({
-				description:
-					error instanceof Error
-						? error.message
-						: "Failed to create MCP server.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error ? error.message : "Failed to create MCP server.",
+			);
 		},
 	});
 
@@ -169,10 +172,7 @@ function RouteComponent() {
 		onSuccess: async () => {
 			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });
 
-			addToast({
-				description: "MCP server updated successfully.",
-				color: "success",
-			});
+			toast.success("MCP server updated successfully.");
 
 			navigate({
 				to: "/workspace/$workspaceId/mcps",
@@ -199,13 +199,9 @@ function RouteComponent() {
 			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });
 		},
 		onError: (error) => {
-			addToast({
-				description:
-					error instanceof Error
-						? error.message
-						: "Failed to update MCP server.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error ? error.message : "Failed to update MCP server.",
+			);
 		},
 	});
 
@@ -231,104 +227,83 @@ function RouteComponent() {
 	const isLoading = createMutation.isPending || updateMutation.isPending;
 
 	return (
-		<div>
-			<div className="flex items-center p-2">
-				<Button
-					variant="light"
-					isIconOnly
-					onPress={() =>
-						navigate({
-							to: "..",
-						})
-					}
-				>
-					<ArrowLeft className="size-4" />
-				</Button>
-			</div>
+		<div className="h-screen flex flex-col">
+			<PageHeader
+				breadcrumbs={[
+					{
+						label: "MCP Servers",
+						to: "/workspace/$workspaceId/mcps",
+						params: { workspaceId },
+					},
+					{
+						label: isNewMcp ? "New" : currentMcp?.name || "Edit",
+					},
+				]}
+			/>
 
-			<div className="p-6 max-w-4xl mx-auto space-y-6">
-				<h1 className="text-xl font-medium tracking-tight">
-					{isNewMcp ? "Add New MCP Server" : "Edit MCP Server"}
-				</h1>
-
-				<form
-					onSubmit={(e) => {
-						e.preventDefault();
-						e.stopPropagation();
-						form.handleSubmit();
-					}}
-					className="space-y-4"
-				>
-					{/* Name Field */}
-					<form.Field
-						name="name"
-						validators={{
-							onChange: ({ value }) =>
-								!value || value.trim() === ""
-									? "MCP server name is required"
-									: undefined,
+			<div className="flex-1 overflow-y-auto p-6">
+				<div className="max-w-4xl mx-auto space-y-6">
+					<form
+						onSubmit={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							form.handleSubmit();
 						}}
+						className="space-y-4"
 					>
-						{(field) => (
-							<Input
-								label="Name"
-								placeholder="e.g., my-mcp-server"
-								value={field.state.value}
-								onValueChange={field.handleChange}
-								isRequired
-								variant="bordered"
-								description="A friendly name to identify this MCP server"
-								isInvalid={field.state.meta.errors.length > 0}
-								errorMessage={field.state.meta.errors[0]}
-							/>
-						)}
-					</form.Field>
-
-					{/* Custom Headers Field */}
-					<form.Field name="custom_headers">
-						{(field) => (
-							<Input
-								label="Custom Headers"
-								placeholder="e.g., X-User-Token, X-Tenant-Id"
-								value={field.state.value}
-								onValueChange={field.handleChange}
-								variant="bordered"
-								description="Comma-separated list of header names that callers can provide at runtime."
-							/>
-						)}
-					</form.Field>
-
-					{/* Configuration Section */}
-					{isNewMcp ? (
-						// New MCP: always show the config editor
+						{/* Name Field */}
 						<form.Field
-							name="data"
+							name="name"
 							validators={{
-								onChange: ({ value }) => validateJsonField(value),
+								onChange: ({ value }) =>
+									!value || value.trim() === ""
+										? "MCP server name is required"
+										: undefined,
 							}}
 						>
 							{(field) => (
-								<MonacoJsonField
-									label="Configuration (JSON)"
-									value={field.state.value}
-									onValueChange={field.handleChange}
+								<TextField
+									name="name"
 									isRequired
-									description="MCP server configuration in JSON format. See Vercel AI SDK MCP docs for details."
 									isInvalid={field.state.meta.errors.length > 0}
-									errorMessage={field.state.meta.errors[0]}
-								/>
+								>
+									<Label>Name</Label>
+									<Input
+										placeholder="e.g., my-mcp-server"
+										value={field.state.value}
+										onChange={(e) => field.handleChange(e.target.value)}
+									/>
+									<Description>
+										A friendly name to identify this MCP server
+									</Description>
+									{field.state.meta.errors.length > 0 && (
+										<FieldError>{field.state.meta.errors[0]}</FieldError>
+									)}
+								</TextField>
 							)}
 						</form.Field>
-					) : showConfigEditor ? (
-						// Editing: user explicitly chose to edit config
-						<>
-							<div className="flex items-center gap-2 rounded-lg bg-warning-50 px-3 py-2 text-warning-700 text-sm">
-								<ShieldAlert className="size-4 shrink-0" />
-								<span>
-									You are updating the server configuration. This will
-									overwrite the existing encrypted config.
-								</span>
-							</div>
+
+						{/* Custom Headers Field */}
+						<form.Field name="custom_headers">
+							{(field) => (
+								<TextField name="custom_headers">
+									<Label>Custom Headers</Label>
+									<Input
+										placeholder="e.g., X-User-Token, X-Tenant-Id"
+										value={field.state.value}
+										onChange={(e) => field.handleChange(e.target.value)}
+									/>
+									<Description>
+										Comma-separated list of header names that callers can
+										provide at runtime.
+									</Description>
+								</TextField>
+							)}
+						</form.Field>
+
+						{/* Configuration Section */}
+						{isNewMcp ? (
+							// New MCP: always show the config editor
 							<form.Field
 								name="data"
 								validators={{
@@ -337,74 +312,108 @@ function RouteComponent() {
 							>
 								{(field) => (
 									<MonacoJsonField
-										label="New Configuration (JSON)"
+										label="Configuration (JSON)"
 										value={field.state.value}
 										onValueChange={field.handleChange}
 										isRequired
-										description="Enter the new MCP server configuration. This will replace the existing config."
+										description="MCP server configuration in JSON format. See Vercel AI SDK MCP docs for details."
 										isInvalid={field.state.meta.errors.length > 0}
 										errorMessage={field.state.meta.errors[0]}
 									/>
 								)}
 							</form.Field>
-						</>
-					) : (
-						// Editing: config is collapsed by default
-						<div className="rounded-lg border border-default-200 p-4">
-							<div className="flex items-center justify-between">
-								<div>
-									<p className="text-sm font-medium text-default-700">
-										Server Configuration
-									</p>
-									<p className="text-xs text-default-400 mt-1">
-										The configuration is stored encrypted. Click edit to
-										replace it with a new config.
-									</p>
+						) : showConfigEditor ? (
+							// Editing: user explicitly chose to edit config
+							<>
+								<div className="flex items-center gap-2 rounded-lg bg-warning-soft px-3 py-2 text-warning text-sm">
+									<ShieldAlert className="size-4 shrink-0" />
+									<span>
+										You are updating the server configuration. This will
+										overwrite the existing encrypted config.
+									</span>
 								</div>
-								<Button
-									size="sm"
-									variant="flat"
-									startContent={<Pencil className="size-3" />}
-									onPress={() => setShowConfigEditor(true)}
+								<form.Field
+									name="data"
+									validators={{
+										onChange: ({ value }) => validateJsonField(value),
+									}}
 								>
-									Edit Config
-								</Button>
+									{(field) => (
+										<MonacoJsonField
+											label="New Configuration (JSON)"
+											value={field.state.value}
+											onValueChange={field.handleChange}
+											isRequired
+											description="Enter the new MCP server configuration. This will replace the existing config."
+											isInvalid={field.state.meta.errors.length > 0}
+											errorMessage={field.state.meta.errors[0]}
+										/>
+									)}
+								</form.Field>
+							</>
+						) : (
+							// Editing: config is collapsed by default
+							<div className="rounded-lg border border-border p-4">
+								<div className="flex items-center justify-between">
+									<div>
+										<p className="text-sm font-medium text-foreground">
+											Server Configuration
+										</p>
+										<p className="text-xs text-muted mt-1">
+											The configuration is stored encrypted. Click edit to
+											replace it with a new config.
+										</p>
+									</div>
+									<Button
+										size="sm"
+										variant="tertiary"
+										onPress={() => setShowConfigEditor(true)}
+									>
+										<Pencil className="size-3" />
+										Edit Config
+									</Button>
+								</div>
 							</div>
-						</div>
-					)}
+						)}
 
-					<div className="flex justify-end gap-3">
-						<Button
-							variant="light"
-							onPress={() =>
-								navigate({
-									to: "/workspace/$workspaceId/mcps",
-									params: { workspaceId },
-								})
-							}
-							isDisabled={isLoading}
-						>
-							Cancel
-						</Button>
-						<form.Subscribe
-							selector={(state) => ({
-								canSubmit: state.canSubmit,
-								isSubmitting: state.isSubmitting,
-							})}
-						>
-							{(state) => (
-								<Button
-									type="submit"
-									color="primary"
-									isLoading={isLoading || state.isSubmitting}
-									isDisabled={!state.canSubmit || isLoading}
-								>
-									{isNewMcp ? "Create" : "Update"}
-								</Button>
-							)}
-						</form.Subscribe>
-					</div>
-				</form>
+						<div className="flex justify-end gap-3">
+							<Button
+								variant="tertiary"
+								onPress={() =>
+									navigate({
+										to: "/workspace/$workspaceId/mcps",
+										params: { workspaceId },
+									})
+								}
+								isDisabled={isLoading}
+							>
+								Cancel
+							</Button>
+							<form.Subscribe
+								selector={(state) => ({
+									canSubmit: state.canSubmit,
+									isSubmitting: state.isSubmitting,
+								})}
+							>
+								{(state) => (
+									<Button
+										type="submit"
+										variant="primary"
+										isPending={isLoading || state.isSubmitting}
+										isDisabled={!state.canSubmit || isLoading}
+									>
+										{({ isPending }) => (
+											<>
+												{isPending && <Spinner color="current" size="sm" />}
+												{isNewMcp ? "Create" : "Update"}
+											</>
+										)}
+									</Button>
+								)}
+							</form.Subscribe>
+						</div>
+					</form>
+				</div>
 			</div>
 		</div>
 	);
