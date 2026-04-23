@@ -1,4 +1,13 @@
-import { Divider, Input, Select, SelectItem, Switch } from "@heroui/react";
+import {
+	Description,
+	Input,
+	Label,
+	ListBox,
+	Select,
+	Separator,
+	Switch,
+	TextField,
+} from "@heroui/react";
 
 /**
  * Provider-specific options type matching the form schema.
@@ -54,59 +63,70 @@ function GoogleVertexOptions({
 				<div className="flex gap-2 w-full">
 					<Select
 						className="flex-1"
-						variant="bordered"
-						label="Thinking Level"
 						placeholder="Not set"
-						isClearable
 						isDisabled={!!opts?.thinkingConfig?.thinkingBudget}
-						selectedKeys={
-							opts?.thinkingConfig?.thinkingLevel
-								? [opts.thinkingConfig.thinkingLevel]
-								: []
-						}
-						onSelectionChange={(keys) => {
-							const selected = Array.from(keys)[0] as
-								| "minimal"
-								| "low"
-								| "medium"
-								| "high"
-								| undefined;
+						value={opts?.thinkingConfig?.thinkingLevel ?? null}
+						onChange={(selected) => {
 							setOpts({
 								thinkingConfig: {
 									includeThoughts: opts?.thinkingConfig?.includeThoughts,
-									thinkingLevel: selected,
+									thinkingLevel: selected as
+										| "minimal"
+										| "low"
+										| "medium"
+										| "high"
+										| undefined,
 									thinkingBudget: undefined,
 								},
 							});
 						}}
 					>
-						<SelectItem key="minimal">Minimal</SelectItem>
-						<SelectItem key="low">Low</SelectItem>
-						<SelectItem key="medium">Medium</SelectItem>
-						<SelectItem key="high">High</SelectItem>
+						<Label>Thinking Level</Label>
+						<Select.Trigger>
+							<Select.Value />
+							<Select.Indicator />
+						</Select.Trigger>
+						<Select.Popover>
+							<ListBox>
+								<ListBox.Item id="minimal" textValue="Minimal">
+									Minimal
+								</ListBox.Item>
+								<ListBox.Item id="low" textValue="Low">
+									Low
+								</ListBox.Item>
+								<ListBox.Item id="medium" textValue="Medium">
+									Medium
+								</ListBox.Item>
+								<ListBox.Item id="high" textValue="High">
+									High
+								</ListBox.Item>
+							</ListBox>
+						</Select.Popover>
 					</Select>
-					<Input
+					<TextField
 						className="flex-1"
-						isClearable
-						variant="bordered"
-						type="number"
-						label="Thinking Budget"
-						placeholder="e.g. 8192"
 						isDisabled={!!opts?.thinkingConfig?.thinkingLevel}
-						value={opts?.thinkingConfig?.thinkingBudget?.toString() || ""}
-						onValueChange={(inputValue) => {
-							const numValue = inputValue
-								? parseInt(inputValue, 10)
-								: undefined;
-							setOpts({
-								thinkingConfig: {
-									includeThoughts: opts?.thinkingConfig?.includeThoughts,
-									thinkingBudget: numValue,
-									thinkingLevel: undefined,
-								},
-							});
-						}}
-					/>
+					>
+						<Label>Thinking Budget</Label>
+						<Input
+							type="number"
+							placeholder="e.g. 8192"
+							value={opts?.thinkingConfig?.thinkingBudget?.toString() || ""}
+							onChange={(e) => {
+								const inputValue = e.target.value;
+								const numValue = inputValue
+									? parseInt(inputValue, 10)
+									: undefined;
+								setOpts({
+									thinkingConfig: {
+										includeThoughts: opts?.thinkingConfig?.includeThoughts,
+										thinkingBudget: numValue,
+										thinkingLevel: undefined,
+									},
+								});
+							}}
+						/>
+					</TextField>
 				</div>
 				<p className="text-xs text-default-500">
 					Use Thinking Level with 3 series and Thinking Budget with 2.5 series
@@ -114,9 +134,8 @@ function GoogleVertexOptions({
 				</p>
 			</div>
 			<Switch
-				size="sm"
 				isSelected={opts?.thinkingConfig?.includeThoughts || false}
-				onValueChange={(checked) => {
+				onChange={(checked) => {
 					setOpts({
 						...opts,
 						thinkingConfig: {
@@ -126,34 +145,55 @@ function GoogleVertexOptions({
 					});
 				}}
 			>
-				Include Thoughts
+				<Switch.Control>
+					<Switch.Thumb />
+				</Switch.Control>
+				<Switch.Content>
+					<Label>Include Thoughts</Label>
+				</Switch.Content>
 			</Switch>
 			<Select
-				isClearable
-				variant="bordered"
-				label="Media Resolution"
 				placeholder="Not set"
-				description="Controls the resolution for processing media inputs"
-				selectedKeys={
-					opts?.mediaResolution ? [opts.mediaResolution] : []
-				}
-				onSelectionChange={(keys) => {
-					const selected = Array.from(keys)[0] as
-						| "MEDIA_RESOLUTION_UNSPECIFIED"
-						| "MEDIA_RESOLUTION_LOW"
-						| "MEDIA_RESOLUTION_MEDIUM"
-						| "MEDIA_RESOLUTION_HIGH"
-						| undefined;
+				value={opts?.mediaResolution ?? null}
+				onChange={(selected) => {
 					setOpts({
 						...opts,
-						mediaResolution: selected,
+						mediaResolution: selected as
+							| "MEDIA_RESOLUTION_UNSPECIFIED"
+							| "MEDIA_RESOLUTION_LOW"
+							| "MEDIA_RESOLUTION_MEDIUM"
+							| "MEDIA_RESOLUTION_HIGH"
+							| undefined,
 					});
 				}}
 			>
-				<SelectItem key="MEDIA_RESOLUTION_UNSPECIFIED">Unspecified</SelectItem>
-				<SelectItem key="MEDIA_RESOLUTION_LOW">Low</SelectItem>
-				<SelectItem key="MEDIA_RESOLUTION_MEDIUM">Medium</SelectItem>
-				<SelectItem key="MEDIA_RESOLUTION_HIGH">High</SelectItem>
+				<Label>Media Resolution</Label>
+				<Select.Trigger>
+					<Select.Value />
+					<Select.Indicator />
+				</Select.Trigger>
+				<Description>
+					Controls the resolution for processing media inputs
+				</Description>
+				<Select.Popover>
+					<ListBox>
+						<ListBox.Item
+							id="MEDIA_RESOLUTION_UNSPECIFIED"
+							textValue="Unspecified"
+						>
+							Unspecified
+						</ListBox.Item>
+						<ListBox.Item id="MEDIA_RESOLUTION_LOW" textValue="Low">
+							Low
+						</ListBox.Item>
+						<ListBox.Item id="MEDIA_RESOLUTION_MEDIUM" textValue="Medium">
+							Medium
+						</ListBox.Item>
+						<ListBox.Item id="MEDIA_RESOLUTION_HIGH" textValue="High">
+							High
+						</ListBox.Item>
+					</ListBox>
+				</Select.Popover>
 			</Select>
 		</>
 	);
@@ -179,71 +219,85 @@ export function ProviderOptions({
 
 	return (
 		<>
-			<Divider className="my-2" />
+			<Separator className="my-2" />
 
 			{/* OpenAI / Azure reasoning options */}
 			{(providerType === "openai" || providerType === "azure") && (
 				<>
 					<Select
-						isClearable
-						variant="bordered"
-						label="Reasoning Effort"
 						placeholder="Not set"
-						selectedKeys={
-							value?.openai?.reasoningEffort
-								? [value.openai.reasoningEffort]
-								: []
-						}
-						onSelectionChange={(keys) => {
-							const selected = Array.from(keys)[0] as
-								| "minimal"
-								| "low"
-								| "medium"
-								| "high"
-								| undefined;
+						value={value?.openai?.reasoningEffort ?? null}
+						onChange={(selected) => {
 							onValueChange({
 								...value,
 								openai: {
 									...value?.openai,
-									reasoningEffort: selected,
+									reasoningEffort: selected as
+										| "minimal"
+										| "low"
+										| "medium"
+										| "high"
+										| undefined,
 								},
 							});
 						}}
 					>
-						<SelectItem key="minimal">Minimal</SelectItem>
-						<SelectItem key="low">Low</SelectItem>
-						<SelectItem key="medium">Medium</SelectItem>
-						<SelectItem key="high">High</SelectItem>
+						<Label>Reasoning Effort</Label>
+						<Select.Trigger>
+							<Select.Value />
+							<Select.Indicator />
+						</Select.Trigger>
+						<Select.Popover>
+							<ListBox>
+								<ListBox.Item id="minimal" textValue="Minimal">
+									Minimal
+								</ListBox.Item>
+								<ListBox.Item id="low" textValue="Low">
+									Low
+								</ListBox.Item>
+								<ListBox.Item id="medium" textValue="Medium">
+									Medium
+								</ListBox.Item>
+								<ListBox.Item id="high" textValue="High">
+									High
+								</ListBox.Item>
+							</ListBox>
+						</Select.Popover>
 					</Select>
 					<Select
-						isClearable
-						variant="bordered"
-						label="Reasoning Summary"
 						placeholder="Not set"
-						description="Controls whether the model returns its reasoning process"
-						selectedKeys={
-							value?.openai?.reasoningSummary
-								? [value.openai.reasoningSummary]
-								: []
-						}
-						onSelectionChange={(keys) => {
-							const selected = Array.from(keys)[0] as
-								| "auto"
-								| "detailed"
-								| undefined;
+						value={value?.openai?.reasoningSummary ?? null}
+						onChange={(selected) => {
 							onValueChange({
 								...value,
 								openai: {
 									...value?.openai,
-									reasoningSummary: selected,
+									reasoningSummary: selected as "auto" | "detailed" | undefined,
 								},
 							});
 						}}
 					>
-						<SelectItem key="auto">Auto (condensed summary)</SelectItem>
-						<SelectItem key="detailed">
-							Detailed (comprehensive reasoning)
-						</SelectItem>
+						<Label>Reasoning Summary</Label>
+						<Select.Trigger>
+							<Select.Value />
+							<Select.Indicator />
+						</Select.Trigger>
+						<Description>
+							Controls whether the model returns its reasoning process
+						</Description>
+						<Select.Popover>
+							<ListBox>
+								<ListBox.Item id="auto" textValue="Auto (condensed summary)">
+									Auto (condensed summary)
+								</ListBox.Item>
+								<ListBox.Item
+									id="detailed"
+									textValue="Detailed (comprehensive reasoning)"
+								>
+									Detailed (comprehensive reasoning)
+								</ListBox.Item>
+							</ListBox>
+						</Select.Popover>
 					</Select>
 				</>
 			)}
@@ -251,28 +305,39 @@ export function ProviderOptions({
 			{/* xAI reasoning effort */}
 			{providerType === "xai" && (
 				<Select
-					isClearable
-					variant="bordered"
-					label="Reasoning Effort"
 					placeholder="Not set"
-					selectedKeys={
-						value?.xai?.reasoningEffort ? [value.xai.reasoningEffort] : []
-					}
-					onSelectionChange={(keys) => {
-						const selected = Array.from(keys)[0] as
-							| "low"
-							| "medium"
-							| "high"
-							| undefined;
+					value={value?.xai?.reasoningEffort ?? null}
+					onChange={(selected) => {
 						onValueChange({
 							...value,
-							xai: { reasoningEffort: selected },
+							xai: {
+								reasoningEffort: selected as
+									| "low"
+									| "medium"
+									| "high"
+									| undefined,
+							},
 						});
 					}}
 				>
-					<SelectItem key="low">Low</SelectItem>
-					<SelectItem key="medium">Medium</SelectItem>
-					<SelectItem key="high">High</SelectItem>
+					<Label>Reasoning Effort</Label>
+					<Select.Trigger>
+						<Select.Value />
+						<Select.Indicator />
+					</Select.Trigger>
+					<Select.Popover>
+						<ListBox>
+							<ListBox.Item id="low" textValue="Low">
+								Low
+							</ListBox.Item>
+							<ListBox.Item id="medium" textValue="Medium">
+								Medium
+							</ListBox.Item>
+							<ListBox.Item id="high" textValue="High">
+								High
+							</ListBox.Item>
+						</ListBox>
+					</Select.Popover>
 				</Select>
 			)}
 

@@ -1,4 +1,4 @@
-import { Chip } from "@heroui/react";
+import { Chip, CloseButton } from "@heroui/react";
 
 interface TagChipProps {
 	name: string;
@@ -25,17 +25,14 @@ export function TagChip({ name, color, size = "sm", onRemove }: TagChipProps) {
 	return (
 		<Chip
 			size={size}
-			variant="flat"
+			variant="tertiary"
 			style={{
 				backgroundColor: bgColor,
 				color: color,
 			}}
-			classNames={{
-				content: "font-medium",
-			}}
-			onClose={onRemove}
 		>
-			{name}
+			<Chip.Label className="font-medium">{name}</Chip.Label>
+			{onRemove && <CloseButton aria-label="Remove tag" onPress={onRemove} />}
 		</Chip>
 	);
 }

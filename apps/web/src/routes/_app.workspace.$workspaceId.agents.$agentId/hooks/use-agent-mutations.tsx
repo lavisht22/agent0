@@ -1,4 +1,4 @@
-import { addToast } from "@heroui/react";
+import { toast } from "@heroui/react";
 import type { Json, Tables } from "@repo/database";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -37,12 +37,14 @@ export const useAgentMutations = ({
 			if (agentError) throw agentError;
 
 			// Create first version
-			const { error: versionError } = await supabase.from("agent_versions").insert({
-				id: newVersionId,
-				agent_id: newAgentId,
-				data: values as unknown as Json,
-				is_deployed: false,
-			});
+			const { error: versionError } = await supabase
+				.from("agent_versions")
+				.insert({
+					id: newVersionId,
+					agent_id: newAgentId,
+					data: values as unknown as Json,
+					is_deployed: false,
+				});
 
 			if (versionError) throw versionError;
 
@@ -50,21 +52,16 @@ export const useAgentMutations = ({
 		},
 		onSuccess: (newAgentId) => {
 			queryClient.invalidateQueries({ queryKey: ["agents", workspaceId] });
-			addToast({
-				description: "Agent created successfully.",
-				color: "success",
-			});
+			toast.success("Agent created successfully.");
 			navigate({
 				to: "/workspace/$workspaceId/agents/$agentId",
 				params: { workspaceId, agentId: newAgentId },
 			});
 		},
 		onError: (error) => {
-			addToast({
-				description:
-					error instanceof Error ? error.message : "Failed to create agent.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error ? error.message : "Failed to create agent.",
+			);
 		},
 	});
 
@@ -93,19 +90,14 @@ export const useAgentMutations = ({
 			queryClient.invalidateQueries({ queryKey: ["agents", workspaceId] });
 			queryClient.invalidateQueries({ queryKey: ["agent-versions", agentId] });
 			setVersion(data);
-			addToast({
-				description: "New version created successfully.",
-				color: "success",
-			});
+			toast.success("New version created successfully.");
 		},
 		onError: (error) => {
-			addToast({
-				description:
-					error instanceof Error
-						? error.message
-						: "Failed to create new version.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error
+					? error.message
+					: "Failed to create new version.",
+			);
 		},
 	});
 
@@ -123,13 +115,9 @@ export const useAgentMutations = ({
 			queryClient.invalidateQueries({ queryKey: ["agent", agentId] });
 		},
 		onError: (error) => {
-			addToast({
-				description:
-					error instanceof Error
-						? error.message
-						: "Failed to update agent name.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error ? error.message : "Failed to update agent name.",
+			);
 		},
 	});
 
@@ -161,17 +149,14 @@ export const useAgentMutations = ({
 		onSuccess: (_, variables) => {
 			queryClient.invalidateQueries({ queryKey: ["agent", agentId] });
 			queryClient.invalidateQueries({ queryKey: ["agent-versions", agentId] });
-			addToast({
-				description: `Version deployed to ${variables.environment} successfully.`,
-				color: "success",
-			});
+			toast.success(
+				`Version deployed to ${variables.environment} successfully.`,
+			);
 		},
 		onError: (error) => {
-			addToast({
-				description:
-					error instanceof Error ? error.message : "Failed to deploy version.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error ? error.message : "Failed to deploy version.",
+			);
 		},
 	});
 
@@ -235,11 +220,9 @@ export const useAgentMutations = ({
 					context.previousAgentTags,
 				);
 			}
-			addToast({
-				description:
-					error instanceof Error ? error.message : "Failed to update tags.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error ? error.message : "Failed to update tags.",
+			);
 		},
 		onSettled: () => {
 			// Always refetch after error or success to ensure consistency

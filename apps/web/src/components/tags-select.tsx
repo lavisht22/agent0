@@ -1,14 +1,13 @@
 import {
 	Button,
 	Input,
+	Label,
+	ListBox,
 	Modal,
-	ModalBody,
-	ModalContent,
-	ModalFooter,
-	ModalHeader,
 	Select,
-	SelectItem,
-	useDisclosure,
+	Spinner,
+	TextField,
+	useOverlayState,
 } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LucidePlus, LucideTag } from "lucide-react";
@@ -58,7 +57,7 @@ export function TagsSelect({
 }: TagsSelectProps) {
 	const queryClient = useQueryClient();
 	const { data: tags } = useQuery(tagsQuery(workspaceId));
-	const { isOpen, onOpen, onOpenChange } = useDisclosure();
+	const state = useOverlayState();
 
 	// State for new tag creation
 	const [newTagName, setNewTagName] = useState("");
@@ -66,10 +65,10 @@ export function TagsSelect({
 
 	// Pre-select a random color when modal opens
 	useEffect(() => {
-		if (isOpen) {
+		if (state.isOpen) {
 			setSelectedColor(getRandomColor());
 		}
-	}, [isOpen]);
+	}, [state.isOpen]);
 
 	// Get selected tag objects for rendering
 	const selectedTagObjects = tags?.filter((tag) =>
@@ -96,7 +95,7 @@ export function TagsSelect({
 			queryClient.invalidateQueries({ queryKey: ["tags", workspaceId] });
 			onTagsChange([...selectedTags, tagId]);
 			setNewTagName("");
-			onOpenChange();
+			state.close();
 		},
 	});
 
@@ -110,119 +109,136 @@ export function TagsSelect({
 			<Select
 				aria-label="Select tags"
 				placeholder="Tags"
-				size="sm"
-				listboxProps={{
-					variant: "flat",
-					bottomContent: allowCreate ? (
+				selectionMode="multiple"
+				value={selectedTags}
+				onChange={(keys) => {
+					onTagsChange(keys as string[]);
+				}}
+				isDisabled={!tags || tags.length === 0}
+			>
+				<Select.Trigger>
+					<LucideTag className="size-3.5 text-default-500" />
+					<Select.Value>
+						{() => {
+							if (!selectedTagObjects || selectedTagObjects.length === 0) {
+								return <span className="text-default-500">Tags</span>;
+							}
+
+							return (
+								<div className="flex gap-1 flex-wrap">
+									{selectedTagObjects.map((tag) => (
+										<TagChip
+											key={tag.id}
+											name={tag.name}
+											color={tag.color}
+											onRemove={() => {
+												onTagsChange(
+													selectedTags.filter((id) => id !== tag.id),
+												);
+											}}
+										/>
+									))}
+								</div>
+							);
+						}}
+					</Select.Value>
+					<Select.Indicator />
+				</Select.Trigger>
+				<Select.Popover>
+					<ListBox items={tags || []}>
+						{(tag) => (
+							<ListBox.Item id={tag.id} textValue={tag.name}>
+								<TagChip name={tag.name} color={tag.color} />
+								<ListBox.ItemIndicator />
+							</ListBox.Item>
+						)}
+					</ListBox>
+					{allowCreate && (
 						<Button
 							size="sm"
-							variant="light"
+							variant="tertiary"
 							className="w-full"
-							onPress={onOpen}
-							startContent={<LucidePlus className="size-3.5" />}
+							onPress={state.open}
 						>
+							<LucidePlus className="size-3.5" />
 							Create Tag
 						</Button>
-					) : undefined,
-				}}
-				selectionMode="multiple"
-				isMultiline
-				startContent={<LucideTag className="size-3.5 text-default-500" />}
-				selectedKeys={new Set(selectedTags)}
-				onSelectionChange={(keys) => {
-					const newTags = Array.from(keys) as string[];
-					onTagsChange(newTags);
-				}}
-				items={tags || []}
-				isDisabled={!tags || tags.length === 0}
-				renderValue={() => {
-					if (!selectedTagObjects || selectedTagObjects.length === 0) {
-						return <span className="text-default-500">Tags</span>;
-					}
-
-					return (
-						<div className="flex gap-1 flex-wrap">
-							{selectedTagObjects.map((tag) => (
-								<TagChip
-									key={tag.id}
-									name={tag.name}
-									color={tag.color}
-									onRemove={() => {
-										onTagsChange(selectedTags.filter((id) => id !== tag.id));
-									}}
-								/>
-							))}
-						</div>
-					);
-				}}
-			>
-				{(tag) => (
-					<SelectItem key={tag.id} textValue={tag.name}>
-						<TagChip name={tag.name} color={tag.color} />
-					</SelectItem>
-				)}
+					)}
+				</Select.Popover>
 			</Select>
 
 			{/* Create new tag modal - only rendered if allowCreate is true */}
 			{allowCreate && (
-				<Modal isOpen={isOpen} onOpenChange={onOpenChange} size="sm">
-					<ModalContent>
-						{(onClose) => (
-							<>
-								<ModalHeader>Create Tag</ModalHeader>
-								<ModalBody>
-									<div className="flex flex-col gap-4">
-										<Input
-											label="Tag Name"
-											placeholder="e.g., Production, ChatBot, Support"
-											value={newTagName}
-											onValueChange={setNewTagName}
-											autoFocus
-										/>
-										<div className="flex flex-col gap-2">
-											<span className="text-sm font-medium">Color</span>
-											<div className="flex flex-wrap gap-2">
-												{TAG_COLORS.map((color) => (
-													<button
-														key={color}
-														type="button"
-														className={`w-8 h-8 rounded-full border-2 transition-all ${
-															selectedColor === color
-																? "border-foreground scale-110"
-																: "border-transparent hover:scale-105"
-														}`}
-														style={{ backgroundColor: color }}
-														onClick={() => setSelectedColor(color)}
-													/>
-												))}
+				<Modal state={state}>
+					<Modal.Backdrop>
+						<Modal.Container size="sm">
+							<Modal.Dialog>
+								{({ close }) => (
+									<>
+										<Modal.Header>
+											<Modal.Heading>Create Tag</Modal.Heading>
+										</Modal.Header>
+										<Modal.Body>
+											<div className="flex flex-col gap-4">
+												<TextField
+													value={newTagName}
+													onChange={setNewTagName}
+													autoFocus
+												>
+													<Label>Tag Name</Label>
+													<Input placeholder="e.g., Production, ChatBot, Support" />
+												</TextField>
+												<div className="flex flex-col gap-2">
+													<span className="text-sm font-medium">Color</span>
+													<div className="flex flex-wrap gap-2">
+														{TAG_COLORS.map((color) => (
+															<button
+																key={color}
+																type="button"
+																className={`w-8 h-8 rounded-full border-2 transition-all ${
+																	selectedColor === color
+																		? "border-foreground scale-110"
+																		: "border-transparent hover:scale-105"
+																}`}
+																style={{ backgroundColor: color }}
+																onClick={() => setSelectedColor(color)}
+															/>
+														))}
+													</div>
+												</div>
+												{newTagName && (
+													<div className="flex items-center gap-2">
+														<span className="text-sm text-default-500">
+															Preview:
+														</span>
+														<TagChip name={newTagName} color={selectedColor} />
+													</div>
+												)}
 											</div>
-										</div>
-										{newTagName && (
-											<div className="flex items-center gap-2">
-												<span className="text-sm text-default-500">
-													Preview:
-												</span>
-												<TagChip name={newTagName} color={selectedColor} />
-											</div>
-										)}
-									</div>
-								</ModalBody>
-								<ModalFooter>
-									<Button variant="light" onPress={onClose}>
-										Cancel
-									</Button>
-									<Button
-										color="primary"
-										onPress={handleCreateTag}
-										isLoading={createTagMutation.isPending}
-										isDisabled={!newTagName.trim()}
-									>
-										Create
-									</Button>
-								</ModalFooter>
-							</>
-						)}
-					</ModalContent>
+										</Modal.Body>
+										<Modal.Footer>
+											<Button variant="tertiary" onPress={close}>
+												Cancel
+											</Button>
+											<Button
+												variant="primary"
+												onPress={handleCreateTag}
+												isPending={createTagMutation.isPending}
+												isDisabled={!newTagName.trim()}
+											>
+												{({ isPending }) => (
+													<>
+														{isPending && <Spinner color="current" size="sm" />}
+														Create
+													</>
+												)}
+											</Button>
+										</Modal.Footer>
+									</>
+								)}
+							</Modal.Dialog>
+						</Modal.Container>
+					</Modal.Backdrop>
 				</Modal>
 			)}
 		</>

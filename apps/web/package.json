@@ -12,9 +12,9 @@
 		"check": "biome check"
 	},
 	"dependencies": {
-		"@heroui/react": "^2.8.5",
-		"@heroui/use-theme": "^2.1.10",
-		"@internationalized/date": "^3.10.0",
+		"@heroui/react": "^3.0.3",
+		"@heroui/styles": "^3.0.3",
+		"@internationalized/date": "^3.12.1",
 		"@monaco-editor/react": "^4.7.0",
 		"@repo/database": "workspace:*",
 		"@supabase/supabase-js": "^2.84.0",

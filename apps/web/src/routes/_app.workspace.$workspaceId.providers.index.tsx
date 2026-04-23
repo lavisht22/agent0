@@ -1,17 +1,10 @@
 import {
-	addToast,
 	Button,
 	Dropdown,
-	DropdownItem,
-	DropdownMenu,
-	DropdownTrigger,
+	Label,
 	Table,
-	TableBody,
-	TableCell,
-	TableColumn,
-	TableHeader,
-	TableRow,
-	useDisclosure,
+	toast,
+	useOverlayState,
 } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -36,7 +29,7 @@ function RouteComponent() {
 	const queryClient = useQueryClient();
 
 	// Delete confirmation modal state
-	const { isOpen, onOpen, onOpenChange } = useDisclosure();
+	const deleteState = useOverlayState();
 	const [providerToDelete, setProviderToDelete] = useState<{
 		id: string;
 		name: string;
@@ -58,19 +51,14 @@ function RouteComponent() {
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["providers", workspaceId] });
-			addToast({
-				description: "Provider deleted successfully.",
-				color: "success",
-			});
-			onOpenChange();
+			toast.success("Provider deleted successfully.");
+			deleteState.close();
 			setProviderToDelete(null);
 		},
 		onError: (error) => {
-			addToast({
-				description:
-					error instanceof Error ? error.message : "Failed to delete provider.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error ? error.message : "Failed to delete provider.",
+			);
 		},
 	});
 
@@ -81,8 +69,7 @@ function RouteComponent() {
 
 				{user?.role === "admin" && (
 					<Button
-						color="primary"
-						startContent={<Plus size={18} />}
+						variant="primary"
 						onPress={() =>
 							navigate({
 								to: "/workspace/$workspaceId/providers/$providerId",
@@ -90,100 +77,114 @@ function RouteComponent() {
 							})
 						}
 					>
+						<Plus size={18} />
 						Create
 					</Button>
 				)}
 			</div>
 
-			<Table
-				aria-label="Providers Table"
-				shadow="none"
-				classNames={{
-					wrapper: "bg-background",
-					base: "overflow-y-auto flex-1",
-				}}
-				isHeaderSticky
-			>
-				<TableHeader>
-					<TableColumn>Name</TableColumn>
-					<TableColumn>Type</TableColumn>
-					<TableColumn>ID</TableColumn>
-					<TableColumn>Last Updated</TableColumn>
-					<TableColumn className="w-20" hideHeader>
-						Actions
-					</TableColumn>
-				</TableHeader>
-				<TableBody
-					items={providers || []}
-					isLoading={isLoading}
-					emptyContent="You haven't added any providers yet."
-				>
-					{(item) => {
-						const provider = PROVIDER_TYPES.find((p) => p.key === item.type);
+			<Table>
+				<Table.ScrollContainer className="flex-1 overflow-y-auto">
+					<Table.Content aria-label="Providers Table">
+						<Table.Header>
+							<Table.Column>Name</Table.Column>
+							<Table.Column>Type</Table.Column>
+							<Table.Column>ID</Table.Column>
+							<Table.Column>Last Updated</Table.Column>
+							<Table.Column className="w-20">Actions</Table.Column>
+						</Table.Header>
+						<Table.Body
+							items={providers || []}
+							renderEmptyState={() =>
+								isLoading ? (
+									<p className="text-center text-default-400 p-6">Loading...</p>
+								) : (
+									<p className="text-center text-default-400 p-6">
+										You haven't added any providers yet.
+									</p>
+								)
+							}
+						>
+							{(item) => {
+								const provider = PROVIDER_TYPES.find(
+									(p) => p.key === item.type,
+								);
 
-						return (
-							<TableRow
-								key={item.id}
-								className="hover:bg-default-100"
-								href={
-									user?.role === "admin"
-										? `/workspace/${workspaceId}/providers/${item.id}`
-										: undefined
-								}
-							>
-								<TableCell>{item.name}</TableCell>
-								<TableCell>
-									<div className="flex items-center gap-2">
-										{provider?.icon && <provider.icon className="size-5" />}
-										{provider?.label}
-									</div>
-								</TableCell>
-								<TableCell>
-									<IDCopy id={item.id} />
-								</TableCell>
-								<TableCell>
-									{format(item.updated_at, "d LLL, hh:mm a")}
-								</TableCell>
-								<TableCell className="flex justify-end">
-									<Dropdown isDisabled={user?.role !== "admin"}>
-										<DropdownTrigger>
-											<Button isIconOnly variant="light">
-												<LucideEllipsisVertical className="size-4" />
-											</Button>
-										</DropdownTrigger>
-										<DropdownMenu>
-											<DropdownItem
-												key="edit"
-												onPress={() => navigate({ to: item.id })}
-											>
-												Edit
-											</DropdownItem>
-											<DropdownItem
-												key="delete"
-												className="text-danger"
-												color="danger"
-												onPress={() => {
-													setProviderToDelete({
-														id: item.id,
-														name: item.name,
-													});
-													onOpen();
-												}}
-											>
-												Delete
-											</DropdownItem>
-										</DropdownMenu>
-									</Dropdown>
-								</TableCell>
-							</TableRow>
-						);
-					}}
-				</TableBody>
+								return (
+									<Table.Row
+										key={item.id}
+										id={item.id}
+										className="hover:bg-default-100 cursor-pointer"
+										onAction={
+											user?.role === "admin"
+												? () =>
+														navigate({
+															to: "/workspace/$workspaceId/providers/$providerId",
+															params: { workspaceId, providerId: item.id },
+														})
+												: undefined
+										}
+									>
+										<Table.Cell>{item.name}</Table.Cell>
+										<Table.Cell>
+											<div className="flex items-center gap-2">
+												{provider?.icon && <provider.icon className="size-5" />}
+												{provider?.label}
+											</div>
+										</Table.Cell>
+										<Table.Cell>
+											<IDCopy id={item.id} />
+										</Table.Cell>
+										<Table.Cell>
+											{format(item.updated_at, "d LLL, hh:mm a")}
+										</Table.Cell>
+										<Table.Cell className="flex justify-end">
+											<Dropdown>
+												<Button
+													isIconOnly
+													variant="tertiary"
+													isDisabled={user?.role !== "admin"}
+												>
+													<LucideEllipsisVertical className="size-4" />
+												</Button>
+												<Dropdown.Popover>
+													<Dropdown.Menu>
+														<Dropdown.Item
+															id="edit"
+															textValue="Edit"
+															onAction={() => navigate({ to: item.id })}
+														>
+															<Label>Edit</Label>
+														</Dropdown.Item>
+														<Dropdown.Item
+															id="delete"
+															textValue="Delete"
+															variant="danger"
+															onAction={() => {
+																setProviderToDelete({
+																	id: item.id,
+																	name: item.name,
+																});
+																deleteState.open();
+															}}
+														>
+															<Label>Delete</Label>
+														</Dropdown.Item>
+													</Dropdown.Menu>
+												</Dropdown.Popover>
+											</Dropdown>
+										</Table.Cell>
+									</Table.Row>
+								);
+							}}
+						</Table.Body>
+					</Table.Content>
+				</Table.ScrollContainer>
 			</Table>
 
 			<ConfirmationModal
-				isOpen={isOpen}
-				onOpenChange={onOpenChange}
+				isOpen={deleteState.isOpen}
+				onOpenChange={deleteState.setOpen}
 				title="Delete Provider"
 				description={`Are you sure you want to delete "${providerToDelete?.name}"? This action cannot be undone and may affect agents using this provider.`}
 				onConfirm={() => {

@@ -1,12 +1,14 @@
 import {
-	addToast,
 	Button,
+	Description,
+	FieldError,
 	Input,
+	InputGroup,
+	Label,
 	Modal,
-	ModalBody,
-	ModalContent,
-	ModalFooter,
-	ModalHeader,
+	Spinner,
+	TextField,
+	toast,
 } from "@heroui/react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -63,11 +65,9 @@ function RouteComponent() {
 			setCreatedKey(data);
 		},
 		onError: (error) => {
-			addToast({
-				description:
-					error instanceof Error ? error.message : "Failed to create API key.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error ? error.message : "Failed to create API key.",
+			);
 		},
 	});
 
@@ -86,16 +86,10 @@ function RouteComponent() {
 		try {
 			await navigator.clipboard.writeText(createdKey);
 			setCopied(true);
-			addToast({
-				description: "API key copied to clipboard",
-				color: "success",
-			});
+			toast.success("API key copied to clipboard");
 			setTimeout(() => setCopied(false), 2000);
 		} catch {
-			addToast({
-				description: "Failed to copy API key",
-				color: "danger",
-			});
+			toast.danger("Failed to copy API key");
 		}
 	};
 
@@ -111,45 +105,47 @@ function RouteComponent() {
 	// Show success modal with the created key
 	if (createdKey) {
 		return (
-			<Modal
-				isOpen={true}
-				onClose={handleDone}
-				isDismissable={false}
-				hideCloseButton
-			>
-				<ModalContent>
-					<ModalHeader className="flex flex-col gap-1">
-						API Key Created
-					</ModalHeader>
-					<ModalBody>
-						<div className="space-y-4">
-							<div>
-								<p className="text-sm text-default-500 mb-2">
-									Keep it safe. This API Key can be used to call the run API for
-									your workspace.
-								</p>
-								<Input
-									value={createdKey}
-									isReadOnly
-									endContent={
-										<Button variant="light" onPress={handleCopy} isIconOnly>
-											{copied ? (
-												<Check className="size-4" />
-											) : (
-												<Copy className="size-4" />
-											)}
-										</Button>
-									}
-								/>
-							</div>
-						</div>
-					</ModalBody>
-					<ModalFooter>
-						<Button color="primary" onPress={handleDone}>
-							Done
-						</Button>
-					</ModalFooter>
-				</ModalContent>
+			<Modal>
+				<Modal.Backdrop isOpen={true} isDismissable={false}>
+					<Modal.Container>
+						<Modal.Dialog>
+							<Modal.Header>
+								<Modal.Heading>API Key Created</Modal.Heading>
+							</Modal.Header>
+							<Modal.Body>
+								<div className="space-y-4">
+									<div>
+										<p className="text-sm text-default-500 mb-2">
+											Keep it safe. This API Key can be used to call the run API
+											for your workspace.
+										</p>
+										<InputGroup>
+											<InputGroup.Input value={createdKey} readOnly />
+											<InputGroup.Suffix>
+												<Button
+													variant="tertiary"
+													onPress={handleCopy}
+													isIconOnly
+												>
+													{copied ? (
+														<Check className="size-4" />
+													) : (
+														<Copy className="size-4" />
+													)}
+												</Button>
+											</InputGroup.Suffix>
+										</InputGroup>
+									</div>
+								</div>
+							</Modal.Body>
+							<Modal.Footer>
+								<Button variant="primary" onPress={handleDone}>
+									Done
+								</Button>
+							</Modal.Footer>
+						</Modal.Dialog>
+					</Modal.Container>
+				</Modal.Backdrop>
 			</Modal>
 		);
 	}
@@ -158,7 +154,7 @@ function RouteComponent() {
 		<div>
 			<div className="flex items-center p-2">
 				<Button
-					variant="light"
+					variant="tertiary"
 					isIconOnly
 					onPress={() =>
 						navigate({
@@ -191,23 +187,30 @@ function RouteComponent() {
 						}}
 					>
 						{(field) => (
-							<Input
-								label="Name"
-								placeholder="e.g., Production API Key"
-								value={field.state.value}
-								onValueChange={field.handleChange}
+							<TextField
+								name="name"
 								isRequired
-								variant="bordered"
-								description="A friendly name to identify this API key"
 								isInvalid={field.state.meta.errors.length > 0}
-								errorMessage={field.state.meta.errors[0]}
-							/>
+							>
+								<Label>Name</Label>
+								<Input
+									placeholder="e.g., Production API Key"
+									value={field.state.value}
+									onChange={(e) => field.handleChange(e.target.value)}
+								/>
+								<Description>
+									A friendly name to identify this API key
+								</Description>
+								{field.state.meta.errors.length > 0 && (
+									<FieldError>{field.state.meta.errors[0]}</FieldError>
+								)}
+							</TextField>
 						)}
 					</form.Field>
 
 					<div className="flex justify-end gap-3 mt-6">
 						<Button
-							variant="light"
+							variant="tertiary"
 							onPress={() =>
 								navigate({
 									to: "/workspace/$workspaceId/api-keys",
@@ -227,11 +230,16 @@ function RouteComponent() {
 							{(state) => (
 								<Button
 									type="submit"
-									color="primary"
-									isLoading={isLoading || state.isSubmitting}
+									variant="primary"
+									isPending={isLoading || state.isSubmitting}
 									isDisabled={!state.canSubmit || isLoading}
 								>
-									Create
+									{({ isPending }) => (
+										<>
+											{isPending && <Spinner color="current" size="sm" />}
+											Create
+										</>
+									)}
 								</Button>
 							)}
 						</form.Subscribe>

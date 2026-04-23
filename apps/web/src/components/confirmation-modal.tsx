@@ -1,15 +1,8 @@
-import {
-	Button,
-	Modal,
-	ModalBody,
-	ModalContent,
-	ModalFooter,
-	ModalHeader,
-} from "@heroui/react";
+import { Button, Modal, Spinner } from "@heroui/react";
 
 interface ConfirmationModalProps {
 	isOpen: boolean;
-	onOpenChange: () => void;
+	onOpenChange: (isOpen: boolean) => void;
 	title: string;
 	description: string;
 	onConfirm: () => void;
@@ -18,6 +11,19 @@ interface ConfirmationModalProps {
 	cancelText?: string;
 	confirmColor?: "primary" | "secondary" | "success" | "warning" | "danger";
 }
+
+const variantForColor = (
+	color: "primary" | "secondary" | "success" | "warning" | "danger",
+) => {
+	switch (color) {
+		case "danger":
+			return "danger" as const;
+		case "secondary":
+			return "secondary" as const;
+		default:
+			return "primary" as const;
+	}
+};
 
 export function ConfirmationModal({
 	isOpen,
@@ -31,29 +37,40 @@ export function ConfirmationModal({
 	confirmColor = "primary",
 }: ConfirmationModalProps) {
 	return (
-		<Modal isOpen={isOpen} onOpenChange={onOpenChange}>
-			<ModalContent>
-				{(onClose) => (
-					<>
-						<ModalHeader className="flex flex-col gap-1">{title}</ModalHeader>
-						<ModalBody>
-							<p>{description}</p>
-						</ModalBody>
-						<ModalFooter>
-							<Button color="danger" variant="light" onPress={onClose}>
-								{cancelText}
-							</Button>
-							<Button
-								color={confirmColor}
-								onPress={onConfirm}
-								isLoading={isLoading}
-							>
-								{confirmText}
-							</Button>
-						</ModalFooter>
-					</>
-				)}
-			</ModalContent>
+		<Modal>
+			<Modal.Backdrop isOpen={isOpen} onOpenChange={onOpenChange}>
+				<Modal.Container>
+					<Modal.Dialog>
+						{({ close }) => (
+							<>
+								<Modal.Header className="flex flex-col gap-1">
+									<Modal.Heading>{title}</Modal.Heading>
+								</Modal.Header>
+								<Modal.Body>
+									<p>{description}</p>
+								</Modal.Body>
+								<Modal.Footer>
+									<Button variant="tertiary" onPress={close}>
+										{cancelText}
+									</Button>
+									<Button
+										variant={variantForColor(confirmColor)}
+										onPress={onConfirm}
+										isPending={isLoading}
+									>
+										{({ isPending }) => (
+											<>
+												{isPending && <Spinner color="current" size="sm" />}
+												{confirmText}
+											</>
+										)}
+									</Button>
+								</Modal.Footer>
+							</>
+						)}
+					</Modal.Dialog>
+				</Modal.Container>
+			</Modal.Backdrop>
 		</Modal>
 	);
 }

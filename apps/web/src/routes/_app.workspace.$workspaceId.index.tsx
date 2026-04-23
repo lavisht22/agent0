@@ -1,12 +1,9 @@
 import {
 	Button,
 	Card,
-	CardBody,
-	CardHeader,
 	Chip,
-	Divider,
-	Listbox,
-	ListboxItem,
+	ListBox,
+	Separator,
 	Skeleton,
 	Spinner,
 	Tooltip,
@@ -86,16 +83,16 @@ function StatCard({
 	isLoading?: boolean;
 }) {
 	const colorClasses = {
-		primary: "bg-primary-100 text-primary-600",
+		primary: "bg-accent-soft text-accent",
 		success: "bg-success-100 text-success-600",
 		warning: "bg-warning-100 text-warning-600",
 		danger: "bg-danger-100 text-danger-600",
-		secondary: "bg-secondary-100 text-secondary-600",
+		secondary: "bg-default-100 text-default-600",
 	};
 
 	return (
 		<Card>
-			<CardBody className="gap-2">
+			<Card.Content className="gap-2">
 				<div className="flex justify-between items-start">
 					<div className="flex-1">
 						<p className="text-sm text-default-500">{title}</p>
@@ -112,7 +109,7 @@ function StatCard({
 						<Icon className="size-5" />
 					</div>
 				</div>
-			</CardBody>
+			</Card.Content>
 		</Card>
 	);
 }
@@ -157,18 +154,21 @@ function RouteComponent() {
 				<h1 className="text-xl font-medium tracking-tight">Dashboard</h1>
 				<div className="flex items-center gap-2">
 					<DateRangePicker value={dateFilter} onValueChange={setDateFilter} />
-					<Tooltip content="Refresh">
-						<Button
-							size="sm"
-							isIconOnly
-							variant="flat"
-							onPress={handleRefresh}
-							isDisabled={statsFetching}
-						>
-							<RefreshCw
-								className={`size-3.5 ${statsFetching ? "animate-spin" : ""}`}
-							/>
-						</Button>
+					<Tooltip delay={0}>
+						<Tooltip.Trigger>
+							<Button
+								size="sm"
+								isIconOnly
+								variant="tertiary"
+								onPress={handleRefresh}
+								isDisabled={statsFetching}
+							>
+								<RefreshCw
+									className={`size-3.5 ${statsFetching ? "animate-spin" : ""}`}
+								/>
+							</Button>
+						</Tooltip.Trigger>
+						<Tooltip.Content>Refresh</Tooltip.Content>
 					</Tooltip>
 				</div>
 			</div>
@@ -223,197 +223,171 @@ function RouteComponent() {
 				<div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
 					{/* Top Agents */}
 					<Card className="lg:col-span-2">
-						<CardHeader className="flex justify-between items-center">
+						<Card.Header className="flex justify-between items-center">
 							<div className="flex items-center gap-2">
 								<Bot className="size-5 text-default-500" />
 								<span className="font-medium">Top Agents</span>
 							</div>
-							<Button
-								size="sm"
-								variant="light"
-								as={Link}
-								to={`/workspace/${workspaceId}/agents`}
+							<Link
+								to="/workspace/$workspaceId/agents"
+								params={{ workspaceId }}
+								search={{ page: 1 }}
 							>
-								View All
-							</Button>
-						</CardHeader>
-						<Divider />
-						<CardBody className="p-0">
+								<Button size="sm" variant="tertiary">
+									View All
+								</Button>
+							</Link>
+						</Card.Header>
+						<Separator />
+						<Card.Content className="p-0">
 							{agentsLoading ? (
 								<div className="flex items-center justify-center py-8">
 									<Spinner size="sm" />
 								</div>
+							) : !topAgents || topAgents.length === 0 ? (
+								<div className="flex flex-col items-center justify-center py-8 text-default-400">
+									<Bot className="size-8 mb-2" />
+									<p className="text-sm">No agent activity</p>
+									<p className="text-xs">Create and run an agent to start</p>
+								</div>
 							) : (
-								topAgents && (
-									<Listbox
-										variant="flat"
-										emptyContent={
-											<div className="flex flex-col items-center justify-center py-8 text-default-400">
-												<Bot className="size-8 mb-2" />
-												<p className="text-sm">No agent activity</p>
-												<p className="text-xs">
-													Create and run an agent to start
-												</p>
+								<ListBox aria-label="Top agents">
+									{topAgents.map((agent) => (
+										<ListBox.Item
+											key={agent.id}
+											id={agent.id}
+											textValue={agent.name}
+											className="px-4 py-3"
+											onAction={() =>
+												navigate({
+													to: `/workspace/${workspaceId}/agents/${agent.id}`,
+												})
+											}
+										>
+											<div className="flex items-center justify-between w-full gap-3">
+												<div className="flex flex-col min-w-0">
+													<span className="text-sm font-medium truncate">
+														{agent.name}
+													</span>
+													<span className="text-xs text-default-500 truncate">
+														{`${agent.runs} runs • ${
+															agent.runs > 0
+																? (
+																		((agent.runs - agent.errors) / agent.runs) *
+																		100
+																	).toFixed(0)
+																: 0
+														}% success`}
+													</span>
+												</div>
+												<div className="text-right shrink-0">
+													<p className="text-sm">{formatCost(agent.cost)}</p>
+													{agent.errors > 0 && (
+														<p className="text-xs text-danger-500">
+															{agent.errors} errors
+														</p>
+													)}
+												</div>
 											</div>
-										}
-									>
-										{/** biome-ignore lint/complexity/noUselessFragments: <HeroUI Issue> */}
-										<>
-											{topAgents?.map((agent) => (
-												<ListboxItem
-													key={agent.id}
-													classNames={{
-														title: "font-medium",
-														base: "px-4 py-3",
-													}}
-													onPress={() =>
-														navigate({
-															to: `/workspace/${workspaceId}/agents/${agent.id}`,
-														})
-													}
-													title={agent.name}
-													description={`${agent.runs} runs •
-													${
-														agent.runs > 0
-															? (
-																	((agent.runs - agent.errors) / agent.runs) *
-																	100
-																).toFixed(0)
-															: 0
-													}
-													% success`}
-													endContent={
-														<div className="text-right shrink-0">
-															<p className="text-sm">
-																{formatCost(agent.cost)}
-															</p>
-															{agent.errors > 0 && (
-																<p className="text-xs text-danger-500">
-																	{agent.errors} errors
-																</p>
-															)}
-														</div>
-													}
-												/>
-											))}
-										</>
-									</Listbox>
-								)
+										</ListBox.Item>
+									))}
+								</ListBox>
 							)}
-						</CardBody>
+						</Card.Content>
 					</Card>
 
 					{/* Recent Runs */}
 					<Card className="lg:col-span-2">
-						<CardHeader className="flex justify-between items-center">
+						<Card.Header className="flex justify-between items-center">
 							<div className="flex items-center gap-2">
 								<PlayCircle className="size-5 text-default-500" />
 								<span className="font-medium">Recent Runs</span>
 							</div>
-							<Button
-								size="sm"
-								variant="light"
-								as={Link}
-								to={`/workspace/${workspaceId}/runs`}
+							<Link
+								to="/workspace/$workspaceId/runs"
+								params={{ workspaceId }}
+								search={{ page: 1 }}
 							>
-								View All
-							</Button>
-						</CardHeader>
-						<Divider />
-						<CardBody className="p-0">
+								<Button size="sm" variant="tertiary">
+									View All
+								</Button>
+							</Link>
+						</Card.Header>
+						<Separator />
+						<Card.Content className="p-0">
 							{runsLoading ? (
 								<div className="flex items-center justify-center py-8">
 									<Spinner size="sm" />
 								</div>
+							) : !recentRuns || recentRuns.length === 0 ? (
+								<div className="flex flex-col items-center justify-center py-8 text-default-400">
+									<PlayCircle className="size-8 mb-2" />
+									<p className="text-sm">No runs yet</p>
+									<p className="text-xs">Run an agent to see activity here</p>
+								</div>
 							) : (
-								recentRuns && (
-									<Listbox
-										variant="flat"
-										emptyContent={
-											<div className="flex flex-col items-center justify-center py-8 text-default-400">
-												<PlayCircle className="size-8 mb-2" />
-												<p className="text-sm">No runs yet</p>
-												<p className="text-xs">
-													Run an agent to see activity here
-												</p>
+								<ListBox aria-label="Recent runs">
+									{recentRuns.map((run) => (
+										<ListBox.Item
+											key={run.id}
+											id={run.id}
+											textValue={
+												run.agent_versions?.agents?.name || "Unknown Agent"
+											}
+											className="px-4 py-3"
+											onAction={() =>
+												navigate({
+													to: `/workspace/${workspaceId}/runs/${run.id}`,
+												})
+											}
+										>
+											<div className="flex items-center justify-between w-full gap-3">
+												<div className="flex items-center gap-2 min-w-0">
+													{run.is_error ? (
+														<Chip variant="soft" color="danger" size="sm">
+															<AlertCircle className="size-3" />
+															Error
+														</Chip>
+													) : (
+														<Chip variant="soft" color="success" size="sm">
+															<CheckCircle2 className="size-3" />
+															Success
+														</Chip>
+													)}
+													{run.is_test && (
+														<Chip variant="soft" color="warning" size="sm">
+															<FlaskConical className="size-3" />
+															Test
+														</Chip>
+													)}
+													<div className="flex flex-col min-w-0">
+														<span className="text-sm font-medium truncate">
+															{run.agent_versions?.agents?.name ||
+																"Unknown Agent"}
+														</span>
+														<span className="text-xs text-default-500 truncate">
+															{format(run.created_at, "MMM d, h:mm a")}
+														</span>
+													</div>
+												</div>
+												<div className="text-right shrink-0">
+													<p className="text-sm">
+														{run.cost ? formatCost(run.cost) : "-"}
+													</p>
+													<p className="text-xs text-default-400">
+														{formatTime(
+															(run.pre_processing_time || 0) +
+																(run.first_token_time || 0) +
+																(run.response_time || 0),
+														)}
+													</p>
+												</div>
 											</div>
-										}
-									>
-										{/** biome-ignore lint/complexity/noUselessFragments: <HeroUI Issue> */}
-										<>
-											{recentRuns?.map((run) => (
-												<ListboxItem
-													key={run.id}
-													classNames={{
-														base: "px-4 py-3",
-													}}
-													onPress={() =>
-														navigate({
-															to: `/workspace/${workspaceId}/runs/${run.id}`,
-														})
-													}
-													startContent={
-														<div className="flex items-center gap-2">
-															{run.is_error ? (
-																<Chip
-																	startContent={
-																		<AlertCircle className="size-3" />
-																	}
-																	color="danger"
-																	variant="flat"
-																	size="sm"
-																>
-																	Error
-																</Chip>
-															) : (
-																<Chip
-																	startContent={
-																		<CheckCircle2 className="size-3" />
-																	}
-																	color="success"
-																	variant="flat"
-																	size="sm"
-																>
-																	Success
-																</Chip>
-															)}
-															{run.is_test && (
-																<Chip
-																	startContent={
-																		<FlaskConical className="size-3" />
-																	}
-																	color="warning"
-																	variant="flat"
-																	size="sm"
-																>
-																	Test
-																</Chip>
-															)}
-														</div>
-													}
-													title={run.agent_versions?.agents?.name || "Unknown Agent"}
-													description={format(run.created_at, "MMM d, h:mm a")}
-													endContent={
-														<div className="text-right shrink-0">
-															<p className="text-sm">
-																{run.cost ? formatCost(run.cost) : "-"}
-															</p>
-															<p className="text-xs text-default-400">
-																{formatTime(
-																	(run.pre_processing_time || 0) +
-																		(run.first_token_time || 0) +
-																		(run.response_time || 0),
-																)}
-															</p>
-														</div>
-													}
-												/>
-											))}
-										</>
-									</Listbox>
-								)
+										</ListBox.Item>
+									))}
+								</ListBox>
 							)}
-						</CardBody>
+						</Card.Content>
 					</Card>
 				</div>
 			</div>

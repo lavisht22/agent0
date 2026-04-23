@@ -1,3 +1,5 @@
+import { Toast } from "@heroui/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
@@ -6,8 +8,6 @@ import ReactDOM from "react-dom/client";
 import { routeTree } from "./routeTree.gen";
 
 import "./styles.css";
-import { HeroUIProvider, ToastProvider } from "@heroui/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import reportWebVitals from "./reportWebVitals.ts";
 
 const queryClient = new QueryClient({
@@ -42,12 +42,10 @@ if (rootElement && !rootElement.innerHTML) {
 	root.render(
 		<StrictMode>
 			<QueryClientProvider client={queryClient}>
-				<HeroUIProvider navigate={(path) => router.navigate({ to: path })}>
-					<main>
-						<ToastProvider />
-						<RouterProvider router={router} />
-					</main>
-				</HeroUIProvider>
+				<main>
+					<Toast.Provider />
+					<RouterProvider router={router} />
+				</main>
 			</QueryClientProvider>
 		</StrictMode>,
 	);

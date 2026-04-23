@@ -1,6 +1,6 @@
-import { useTheme } from "@heroui/use-theme";
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useTheme } from "@/lib/use-theme";
 
 interface MonacoJsonEditorProps {
 	value: string;

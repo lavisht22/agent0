@@ -2,16 +2,9 @@ import {
 	Button,
 	Chip,
 	Dropdown,
-	DropdownItem,
-	DropdownMenu,
-	DropdownTrigger,
+	Label,
 	Spinner,
 	Table,
-	TableBody,
-	TableCell,
-	TableColumn,
-	TableHeader,
-	TableRow,
 	Tooltip,
 } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
@@ -102,64 +95,57 @@ function RouteComponent() {
 				<h1 className="text-xl font-medium tracking-tight">Runs</h1>
 			</div>
 
-			<Table
-				aria-label="Runs Table"
-				shadow="none"
-				classNames={{
-					wrapper: "bg-background",
-					base: "overflow-y-auto flex-1",
-				}}
-				isHeaderSticky
-				topContent={
-					<div className="w-full flex justify-between items-center">
-						<div className="flex items-center gap-2">
-							<DateRangePicker
-								value={dateValues}
-								onValueChange={(value) =>
-									navigate({
-										search: {
-											...value,
-											agentId,
-											status,
-											page: 1,
-										},
-									})
-								}
-							/>
-							<AgentFilter
-								workspaceId={workspaceId}
-								value={agentId}
-								onValueChange={(newAgentId) =>
-									navigate({
-										search: {
-											...dateValues,
-											agentId: newAgentId,
-											status,
-											page: 1,
-										},
-									})
-								}
-							/>
-							<StatusFilter
-								value={status}
-								onValueChange={(newStatus) =>
-									navigate({
-										search: {
-											...dateValues,
-											agentId,
-											status: newStatus,
-											page: 1,
-										},
-									})
-								}
-							/>
-						</div>
-						<div className="flex gap-2">
-							<Tooltip content="Refresh">
+			<div className="flex-1 overflow-y-auto flex flex-col">
+				<div className="w-full flex justify-between items-center p-3 border-b border-default-200">
+					<div className="flex items-center gap-2">
+						<DateRangePicker
+							value={dateValues}
+							onValueChange={(value) =>
+								navigate({
+									search: {
+										...value,
+										agentId,
+										status,
+										page: 1,
+									},
+								})
+							}
+						/>
+						<AgentFilter
+							workspaceId={workspaceId}
+							value={agentId}
+							onValueChange={(newAgentId) =>
+								navigate({
+									search: {
+										...dateValues,
+										agentId: newAgentId,
+										status,
+										page: 1,
+									},
+								})
+							}
+						/>
+						<StatusFilter
+							value={status}
+							onValueChange={(newStatus) =>
+								navigate({
+									search: {
+										...dateValues,
+										agentId,
+										status: newStatus,
+										page: 1,
+									},
+								})
+							}
+						/>
+					</div>
+					<div className="flex gap-2">
+						<Tooltip delay={0}>
+							<Tooltip.Trigger>
 								<Button
 									size="sm"
 									isIconOnly
-									variant="flat"
+									variant="tertiary"
 									onPress={() => refetch()}
 									isDisabled={isFetching}
 								>
@@ -167,12 +153,15 @@ function RouteComponent() {
 										className={`size-3.5 ${isFetching ? "animate-spin" : ""}`}
 									/>
 								</Button>
-							</Tooltip>
-							<Tooltip content="Previous">
+							</Tooltip.Trigger>
+							<Tooltip.Content>Refresh</Tooltip.Content>
+						</Tooltip>
+						<Tooltip delay={0}>
+							<Tooltip.Trigger>
 								<Button
 									size="sm"
 									isIconOnly
-									variant="flat"
+									variant="tertiary"
 									isDisabled={page === 1}
 									onPress={() =>
 										navigate({
@@ -187,12 +176,15 @@ function RouteComponent() {
 								>
 									<LucideChevronLeft className="size-3.5" />
 								</Button>
-							</Tooltip>
-							<Tooltip content="Next">
+							</Tooltip.Trigger>
+							<Tooltip.Content>Previous</Tooltip.Content>
+						</Tooltip>
+						<Tooltip delay={0}>
+							<Tooltip.Trigger>
 								<Button
 									size="sm"
 									isIconOnly
-									variant="flat"
+									variant="tertiary"
 									isDisabled={!runs || runs.length < 20}
 									onPress={() =>
 										navigate({
@@ -207,116 +199,127 @@ function RouteComponent() {
 								>
 									<LucideChevronRight className="size-3.5" />
 								</Button>
-							</Tooltip>
-						</div>
+							</Tooltip.Trigger>
+							<Tooltip.Content>Next</Tooltip.Content>
+						</Tooltip>
 					</div>
-				}
-			>
-				<TableHeader>
-					<TableColumn>Created At</TableColumn>
-					<TableColumn>Status</TableColumn>
-					<TableColumn>Time</TableColumn>
-					<TableColumn>Cost</TableColumn>
-					<TableColumn>Agent</TableColumn>
-					<TableColumn>ID</TableColumn>
-					<TableColumn className="w-20" hideHeader>
-						Actions
-					</TableColumn>
-				</TableHeader>
-				<TableBody
-					items={runs || []}
-					isLoading={isLoading}
-					loadingContent={<Spinner />}
-					emptyContent="No runs found."
-				>
-					{(item) => {
-						return (
-							<TableRow
-								key={item.id}
-								className="hover:bg-default-100"
-								href={`/workspace/${workspaceId}/runs/${item.id}`}
+				</div>
+
+				<Table>
+					<Table.ScrollContainer className="flex-1 overflow-y-auto">
+						<Table.Content aria-label="Runs Table">
+							<Table.Header>
+								<Table.Column>Created At</Table.Column>
+								<Table.Column>Status</Table.Column>
+								<Table.Column>Time</Table.Column>
+								<Table.Column>Cost</Table.Column>
+								<Table.Column>Agent</Table.Column>
+								<Table.Column>ID</Table.Column>
+								<Table.Column className="w-20">Actions</Table.Column>
+							</Table.Header>
+							<Table.Body
+								items={runs || []}
+								renderEmptyState={() =>
+									isLoading ? (
+										<div className="flex items-center justify-center p-6">
+											<Spinner />
+										</div>
+									) : (
+										<p className="text-center text-default-400 p-6">
+											No runs found.
+										</p>
+									)
+								}
 							>
-								<TableCell>
-									{format(item.created_at, "d LLL, hh:mm a")}
-								</TableCell>
-								<TableCell>
-									<div className="flex items-center gap-2">
-										{item.is_error ? (
-											<Chip
-												startContent={<AlertCircle className="size-3" />}
-												color="danger"
-												variant="flat"
-												size="sm"
-											>
-												Error
-											</Chip>
-										) : (
-											<Chip
-												startContent={<CheckCircle2 className="size-3" />}
-												color="success"
-												variant="flat"
-												size="sm"
-											>
-												Success
-											</Chip>
-										)}
-										{item.is_test && (
-											<Chip
-												startContent={<FlaskConical className="size-3" />}
-												color="warning"
-												variant="flat"
-												size="sm"
-											>
-												Test
-											</Chip>
-										)}
-									</div>
-								</TableCell>
+								{(item) => (
+									<Table.Row
+										key={item.id}
+										id={item.id}
+										className="hover:bg-default-100 cursor-pointer"
+										onAction={() =>
+											navigate({
+												to: "$runId",
+												params: { runId: item.id },
+											})
+										}
+									>
+										<Table.Cell>
+											{format(item.created_at, "d LLL, hh:mm a")}
+										</Table.Cell>
+										<Table.Cell>
+											<div className="flex items-center gap-2">
+												{item.is_error ? (
+													<Chip variant="soft" color="danger" size="sm">
+														<AlertCircle className="size-3" />
+														Error
+													</Chip>
+												) : (
+													<Chip variant="soft" color="success" size="sm">
+														<CheckCircle2 className="size-3" />
+														Success
+													</Chip>
+												)}
+												{item.is_test && (
+													<Chip variant="soft" color="warning" size="sm">
+														<FlaskConical className="size-3" />
+														Test
+													</Chip>
+												)}
+											</div>
+										</Table.Cell>
 
-								<TableCell>
-									{(item.pre_processing_time +
-										item.first_token_time +
-										item.response_time) /
-										1000}
-									<span className="font-semibold text-xs text-default-500 ml-0.5">
-										s
-									</span>
-								</TableCell>
-								<TableCell>
-									{item.cost
-										? `$${item.cost.toFixed(5)} (${formatTokens(item.tokens ?? 0)} tokens)`
-										: "-"}
-								</TableCell>
+										<Table.Cell>
+											{(item.pre_processing_time +
+												item.first_token_time +
+												item.response_time) /
+												1000}
+											<span className="font-semibold text-xs text-default-500 ml-0.5">
+												s
+											</span>
+										</Table.Cell>
+										<Table.Cell>
+											{item.cost
+												? `$${item.cost.toFixed(5)} (${formatTokens(item.tokens ?? 0)} tokens)`
+												: "-"}
+										</Table.Cell>
 
-								<TableCell>{item.agent_versions?.agents?.name || "-"}</TableCell>
-								<TableCell>
-									<IDCopy id={item.id} />
-								</TableCell>
+										<Table.Cell>
+											{item.agent_versions?.agents?.name || "-"}
+										</Table.Cell>
+										<Table.Cell>
+											<IDCopy id={item.id} />
+										</Table.Cell>
 
-								<TableCell className="flex justify-end">
-									<Dropdown>
-										<DropdownTrigger>
-											<Button isIconOnly variant="light">
-												<LucideEllipsisVertical className="size-4" />
-											</Button>
-										</DropdownTrigger>
-										<DropdownMenu>
-											<DropdownItem
-												key={item.id}
-												onPress={() =>
-													navigate({ to: "$runId", params: { runId: item.id } })
-												}
-											>
-												View
-											</DropdownItem>
-										</DropdownMenu>
-									</Dropdown>
-								</TableCell>
-							</TableRow>
-						);
-					}}
-				</TableBody>
-			</Table>
+										<Table.Cell className="flex justify-end">
+											<Dropdown>
+												<Button isIconOnly variant="tertiary">
+													<LucideEllipsisVertical className="size-4" />
+												</Button>
+												<Dropdown.Popover>
+													<Dropdown.Menu>
+														<Dropdown.Item
+															id="view"
+															textValue="View"
+															onAction={() =>
+																navigate({
+																	to: "$runId",
+																	params: { runId: item.id },
+																})
+															}
+														>
+															<Label>View</Label>
+														</Dropdown.Item>
+													</Dropdown.Menu>
+												</Dropdown.Popover>
+											</Dropdown>
+										</Table.Cell>
+									</Table.Row>
+								)}
+							</Table.Body>
+						</Table.Content>
+					</Table.ScrollContainer>
+				</Table>
+			</div>
 		</div>
 	);
 }

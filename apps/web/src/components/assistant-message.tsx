@@ -1,13 +1,4 @@
-import {
-	Button,
-	Card,
-	CardBody,
-	CardHeader,
-	Dropdown,
-	DropdownItem,
-	DropdownMenu,
-	DropdownTrigger,
-} from "@heroui/react";
+import { Button, Card, Dropdown, Label } from "@heroui/react";
 import { Reorder, useDragControls } from "framer-motion";
 import { LucideGripVertical, LucidePlus, LucideTrash2 } from "lucide-react";
 import { useMemo } from "react";
@@ -103,7 +94,7 @@ function AssistantMessagePart({
 
 	if (value.type === "tool-call") {
 		return (
-			<div className="w-full space-y-2 rounded-large border border-default-200 overflow-hidden">
+			<div className="w-full space-y-2 rounded-[14px] border border-default-200 overflow-hidden">
 				<MonacoJsonEditor
 					readOnly={isReadOnly}
 					value={JSON.stringify(value, null, 2)}
@@ -149,7 +140,7 @@ export function AssistantMessage({
 			dragControls={controls}
 		>
 			<Card>
-				<CardHeader className="flex items-center justify-between pl-1 pr-1 h-10 z-0">
+				<Card.Header className="flex items-center justify-between pl-1 pr-1 h-10 z-0">
 					<div className="flex items-center">
 						{!isReadOnly && (
 							<div
@@ -167,70 +158,65 @@ export function AssistantMessage({
 					</div>
 					{!isReadOnly && (
 						<Dropdown>
-							<DropdownTrigger>
-								<Button size="sm" isIconOnly variant="light">
-									<LucidePlus className="size-3.5" />
-								</Button>
-							</DropdownTrigger>
-							<DropdownMenu>
-								<DropdownItem
-									key="text"
-									onPress={() =>
-										onValueChange({
-											...value,
-											content: [
-												...value.content,
-												{
-													type: "text",
-													text: "",
-												},
-											],
-										})
-									}
+							<Button size="sm" isIconOnly variant="tertiary">
+								<LucidePlus className="size-3.5" />
+							</Button>
+							<Dropdown.Popover>
+								<Dropdown.Menu
+									onAction={(key) => {
+										if (key === "text") {
+											onValueChange({
+												...value,
+												content: [
+													...value.content,
+													{
+														type: "text",
+														text: "",
+													},
+												],
+											});
+										} else if (key === "reasoning") {
+											onValueChange({
+												...value,
+												content: [
+													...value.content,
+													{
+														type: "reasoning",
+														text: "",
+													},
+												],
+											});
+										} else if (key === "tool-call") {
+											onValueChange({
+												...value,
+												content: [
+													...value.content,
+													{
+														type: "tool-call",
+														toolCallId: "",
+														toolName: "",
+														input: {},
+													},
+												],
+											});
+										}
+									}}
 								>
-									Text Part
-								</DropdownItem>
-								<DropdownItem
-									key="reasoning"
-									onPress={() =>
-										onValueChange({
-											...value,
-											content: [
-												...value.content,
-												{
-													type: "reasoning",
-													text: "",
-												},
-											],
-										})
-									}
-								>
-									Reasoning Part
-								</DropdownItem>
-								<DropdownItem
-									key="tool-call"
-									onPress={() =>
-										onValueChange({
-											...value,
-											content: [
-												...value.content,
-												{
-													type: "tool-call",
-													toolCallId: "",
-													toolName: "",
-													input: {},
-												},
-											],
-										})
-									}
-								>
-									Tool Call Part
-								</DropdownItem>
-							</DropdownMenu>
+									<Dropdown.Item id="text" textValue="Text Part">
+										<Label>Text Part</Label>
+									</Dropdown.Item>
+									<Dropdown.Item id="reasoning" textValue="Reasoning Part">
+										<Label>Reasoning Part</Label>
+									</Dropdown.Item>
+									<Dropdown.Item id="tool-call" textValue="Tool Call Part">
+										<Label>Tool Call Part</Label>
+									</Dropdown.Item>
+								</Dropdown.Menu>
+							</Dropdown.Popover>
 						</Dropdown>
 					)}
-				</CardHeader>
-				<CardBody className="p-3 border-t border-default-200 flex flex-col gap-3">
+				</Card.Header>
+				<Card.Content className="p-3 border-t border-default-200 flex flex-col gap-3">
 					{value.content.map((part, index) => {
 						return (
 							<div key={`${index + 1}`} className="flex">
@@ -248,7 +234,7 @@ export function AssistantMessage({
 										className="-mr-2"
 										size="sm"
 										isIconOnly
-										variant="light"
+										variant="tertiary"
 										onPress={() => {
 											const newContent = [...value.content];
 											newContent.splice(index, 1);
@@ -273,7 +259,7 @@ export function AssistantMessage({
 							onVariablePress={onVariablePress}
 						/>
 					)}
-				</CardBody>
+				</Card.Content>
 			</Card>
 		</Reorder.Item>
 	);

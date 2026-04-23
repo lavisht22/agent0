@@ -1,15 +1,4 @@
-import {
-	Button,
-	Chip,
-	cn,
-	Dropdown,
-	DropdownItem,
-	DropdownMenu,
-	DropdownSection,
-	DropdownTrigger,
-	User,
-} from "@heroui/react";
-import { useTheme } from "@heroui/use-theme";
+import { Avatar, Chip, cn, Dropdown, Label, Separator } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
@@ -28,9 +17,22 @@ import {
 import { useMemo } from "react";
 import { workspacesQuery, workspaceUserQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
+import { useTheme } from "@/lib/use-theme";
 
 interface SidebarProps {
 	workspaceId: string;
+}
+
+function getInitials(name: string | undefined | null): string {
+	if (!name) return "?";
+	return (
+		name
+			.split(" ")
+			.map((s) => s[0])
+			.join("")
+			.slice(0, 2)
+			.toUpperCase() || "?"
+	);
 }
 
 export function Sidebar({ workspaceId }: SidebarProps) {
@@ -103,48 +105,53 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 	return (
 		<div className={`border-r border-default-200 flex flex-col w-52`}>
 			<div className="border-b border-default-200">
-				<Dropdown
-					size="lg"
-					classNames={{
-						trigger: "scale-100!",
-						content: "w-full w-56",
-					}}
-				>
-					<DropdownTrigger>
-						<div className="w-full flex justify-between items-center px-4 h-16 hover:bg-default-100 cursor-pointer">
-							<div>
-								<span className="block text-[10px] text-default-500 leading-tight">
-									WORKSPACE
-								</span>
-								<span className="font-medium">
-									{currentWorkspace?.name || ""}
-								</span>
-							</div>
-							<LucideChevronsUpDown className="size-4" />
+				<Dropdown>
+					<button
+						type="button"
+						className="w-full flex justify-between items-center px-4 h-16 hover:bg-default-100 cursor-pointer text-left"
+					>
+						<div>
+							<span className="block text-[10px] text-default-500 leading-tight">
+								WORKSPACE
+							</span>
+							<span className="font-medium">
+								{currentWorkspace?.name || ""}
+							</span>
 						</div>
-					</DropdownTrigger>
-					<DropdownMenu aria-label="Workspace selection">
-						<DropdownSection showDivider>
-							{(workspaces || []).map((workspace) => (
-								<DropdownItem
-									key={workspace.id}
-									onPress={() => {
-										navigate({ to: `/workspace/${workspace.id}` });
-										localStorage.setItem("lastAccessedWorkspace", workspace.id);
-									}}
-								>
-									{workspace.name}
-								</DropdownItem>
-							))}
-						</DropdownSection>
-						<DropdownItem
-							key="create"
-							startContent={<LucidePlusSquare className="size-4" />}
-							onPress={() => navigate({ to: "/create-workspace" })}
-						>
-							Create Workspace
-						</DropdownItem>
-					</DropdownMenu>
+						<LucideChevronsUpDown className="size-4" />
+					</button>
+					<Dropdown.Popover className="w-56">
+						<Dropdown.Menu aria-label="Workspace selection">
+							<Dropdown.Section>
+								{(workspaces || []).map((workspace) => (
+									<Dropdown.Item
+										key={workspace.id}
+										id={workspace.id}
+										textValue={workspace.name}
+										onAction={() => {
+											navigate({ to: `/workspace/${workspace.id}` });
+											localStorage.setItem(
+												"lastAccessedWorkspace",
+												workspace.id,
+											);
+										}}
+									>
+										<Label>{workspace.name}</Label>
+									</Dropdown.Item>
+								))}
+							</Dropdown.Section>
+							<Separator />
+							<Dropdown.Item
+								key="create"
+								id="create"
+								textValue="Create Workspace"
+								onAction={() => navigate({ to: "/create-workspace" })}
+							>
+								<LucidePlusSquare className="size-4" />
+								<Label>Create Workspace</Label>
+							</Dropdown.Item>
+						</Dropdown.Menu>
+					</Dropdown.Popover>
 				</Dropdown>
 			</div>
 
@@ -153,71 +160,82 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 					const Icon = item.icon;
 
 					return (
-						<Button
+						<Link
 							key={item.label}
-							variant="light"
-							className={cn(
-								"w-full justify-start px-2.5 hover:text-default-900",
-								!item.active && "text-default-500",
-								item.active && "bg-default-100",
-							)}
-							startContent={<Icon className="size-5" />}
-							as={Link}
 							to={item.path}
+							className={cn(
+								"flex items-center gap-2 w-full justify-start px-2.5 py-1.5 rounded-md text-sm transition-colors hover:bg-default-100 hover:text-default-900",
+								!item.active && "text-default-500",
+								item.active && "bg-default-100 text-default-900",
+							)}
 						>
+							<Icon className="size-5" />
 							{item.label}
-						</Button>
+						</Link>
 					);
 				})}
 			</nav>
 
 			<div className="border-t border-default-200 p-4">
-				<Dropdown placement="top-start">
-					<DropdownTrigger className="cursor-pointer">
-						<User
-							name={user?.name || ""}
-							description={user?.email || ""}
-							avatarProps={{
-								size: "sm",
-								src: `https://api.dicebear.com/9.x/initials/svg?seed=${user?.name}`,
-							}}
-						/>
-					</DropdownTrigger>
-					<DropdownMenu className="w-64">
-						<DropdownItem
-							closeOnSelect={false}
-							key="theme"
-							startContent={<LucidePalette className="size-4" />}
-							endContent={
-								<Chip size="sm" variant="bordered">
+				<Dropdown>
+					<button
+						type="button"
+						className="flex items-center gap-2 w-full text-left cursor-pointer"
+					>
+						<Avatar size="sm">
+							<Avatar.Image
+								src={`https://api.dicebear.com/9.x/initials/svg?seed=${user?.name}`}
+								alt={user?.name || ""}
+							/>
+							<Avatar.Fallback>{getInitials(user?.name)}</Avatar.Fallback>
+						</Avatar>
+						<div className="flex flex-col min-w-0">
+							<span className="text-sm font-medium truncate">
+								{user?.name || ""}
+							</span>
+							<span className="text-xs text-default-500 truncate">
+								{user?.email || ""}
+							</span>
+						</div>
+					</button>
+					<Dropdown.Popover className="w-64" placement="top start">
+						<Dropdown.Menu>
+							<Dropdown.Item
+								key="theme"
+								id="theme"
+								textValue="Switch Theme"
+								onAction={() => {
+									// Cycle through: light → dark → system → light
+									if (theme === "light") {
+										setTheme("dark");
+									} else if (theme === "dark") {
+										setTheme("system");
+									} else {
+										setTheme("light");
+									}
+								}}
+							>
+								<LucidePalette className="size-4" />
+								<Label>Switch Theme</Label>
+								<Chip size="sm" variant="secondary">
 									{theme}
 								</Chip>
-							}
-							onPress={() => {
-								// Cycle through: light → dark → system → light
-								if (theme === "light") {
-									setTheme("dark");
-								} else if (theme === "dark") {
-									setTheme("system");
-								} else {
-									setTheme("light");
-								}
-							}}
-						>
-							Switch Theme
-						</DropdownItem>
-						<DropdownItem
-							key="logout"
-							color="danger"
-							startContent={<LucideLogOut className="size-4" />}
-							onPress={() => {
-								supabase.auth.signOut();
-								navigate({ to: "/" });
-							}}
-						>
-							Logout
-						</DropdownItem>
-					</DropdownMenu>
+							</Dropdown.Item>
+							<Dropdown.Item
+								key="logout"
+								id="logout"
+								textValue="Logout"
+								variant="danger"
+								onAction={() => {
+									supabase.auth.signOut();
+									navigate({ to: "/" });
+								}}
+							>
+								<LucideLogOut className="size-4" />
+								<Label>Logout</Label>
+							</Dropdown.Item>
+						</Dropdown.Menu>
+					</Dropdown.Popover>
 				</Dropdown>
 			</div>
 		</div>

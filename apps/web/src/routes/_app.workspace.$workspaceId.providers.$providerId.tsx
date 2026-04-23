@@ -1,4 +1,15 @@
-import { addToast, Button, Input, Select, SelectItem } from "@heroui/react";
+import {
+	Button,
+	Description,
+	FieldError,
+	Input,
+	Label,
+	ListBox,
+	Select,
+	Spinner,
+	TextField,
+	toast,
+} from "@heroui/react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -73,21 +84,16 @@ function RouteComponent() {
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["providers", workspaceId] });
-			addToast({
-				description: "Provider created successfully.",
-				color: "success",
-			});
+			toast.success("Provider created successfully.");
 			navigate({
 				to: "/workspace/$workspaceId/providers",
 				params: { workspaceId },
 			});
 		},
 		onError: (error) => {
-			addToast({
-				description:
-					error instanceof Error ? error.message : "Failed to create provider.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error ? error.message : "Failed to create provider.",
+			);
 		},
 	});
 
@@ -124,21 +130,16 @@ function RouteComponent() {
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["providers", workspaceId] });
-			addToast({
-				description: "Provider updated successfully.",
-				color: "success",
-			});
+			toast.success("Provider updated successfully.");
 			navigate({
 				to: "/workspace/$workspaceId/providers",
 				params: { workspaceId },
 			});
 		},
 		onError: (error) => {
-			addToast({
-				description:
-					error instanceof Error ? error.message : "Failed to update provider.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error ? error.message : "Failed to update provider.",
+			);
 		},
 	});
 
@@ -170,7 +171,7 @@ function RouteComponent() {
 		<div>
 			<div className="flex items-center p-2">
 				<Button
-					variant="light"
+					variant="tertiary"
 					isIconOnly
 					onPress={() =>
 						navigate({
@@ -206,17 +207,24 @@ function RouteComponent() {
 						}}
 					>
 						{(field) => (
-							<Input
-								label="Name"
-								placeholder="e.g., My OpenAI Provider"
-								value={field.state.value}
-								onValueChange={field.handleChange}
+							<TextField
+								name="name"
 								isRequired
-								variant="bordered"
-								description="A friendly name to identify this provider"
 								isInvalid={field.state.meta.errors.length > 0}
-								errorMessage={field.state.meta.errors[0]}
-							/>
+							>
+								<Label>Name</Label>
+								<Input
+									placeholder="e.g., My OpenAI Provider"
+									value={field.state.value}
+									onChange={(e) => field.handleChange(e.target.value)}
+								/>
+								<Description>
+									A friendly name to identify this provider
+								</Description>
+								{field.state.meta.errors.length > 0 && (
+									<FieldError>{field.state.meta.errors[0]}</FieldError>
+								)}
+							</TextField>
 						)}
 					</form.Field>
 
@@ -232,28 +240,39 @@ function RouteComponent() {
 					>
 						{(field) => (
 							<Select
-								label="Type"
+								value={field.state.value || null}
+								onChange={(value) =>
+									field.handleChange((value as string) || "")
+								}
 								placeholder="Select a provider type"
-								selectedKeys={field.state.value ? [field.state.value] : []}
-								onSelectionChange={(keys) => {
-									const selected = Array.from(keys)[0];
-									field.handleChange(selected as string);
-								}}
 								isRequired
-								variant="bordered"
-								description="The AI provider service you want to use"
 								isInvalid={field.state.meta.errors.length > 0}
-								errorMessage={field.state.meta.errors[0]}
 							>
-								{PROVIDER_TYPES.map((provider) => (
-									<SelectItem
-										key={provider.key}
-										variant="flat"
-										startContent={<provider.icon className="size-5" />}
-									>
-										{provider.label}
-									</SelectItem>
-								))}
+								<Label>Type</Label>
+								<Select.Trigger>
+									<Select.Value />
+									<Select.Indicator />
+								</Select.Trigger>
+								<Description>
+									The AI provider service you want to use
+								</Description>
+								{field.state.meta.errors.length > 0 && (
+									<FieldError>{field.state.meta.errors[0]}</FieldError>
+								)}
+								<Select.Popover>
+									<ListBox>
+										{PROVIDER_TYPES.map((provider) => (
+											<ListBox.Item
+												key={provider.key}
+												id={provider.key}
+												textValue={provider.label}
+											>
+												<provider.icon className="size-5" />
+												<Label>{provider.label}</Label>
+											</ListBox.Item>
+										))}
+									</ListBox>
+								</Select.Popover>
 							</Select>
 						)}
 					</form.Field>
@@ -281,7 +300,7 @@ function RouteComponent() {
 
 					<div className="flex justify-end gap-3">
 						<Button
-							variant="light"
+							variant="tertiary"
 							onPress={() =>
 								navigate({
 									to: "/workspace/$workspaceId/providers",
@@ -301,11 +320,16 @@ function RouteComponent() {
 							{(state) => (
 								<Button
 									type="submit"
-									color="primary"
-									isLoading={isLoading || state.isSubmitting}
+									variant="primary"
+									isPending={isLoading || state.isSubmitting}
 									isDisabled={!state.canSubmit || isLoading}
 								>
-									{isNewProvider ? "Create" : "Update"}
+									{({ isPending }) => (
+										<>
+											{isPending && <Spinner color="current" size="sm" />}
+											{isNewProvider ? "Create" : "Update"}
+										</>
+									)}
 								</Button>
 							)}
 						</form.Subscribe>

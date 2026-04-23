@@ -1,4 +1,4 @@
-import { Button, Card, CardBody, CardHeader, cn } from "@heroui/react";
+import { Button, Card, cn } from "@heroui/react";
 import { Reorder, useDragControls } from "framer-motion";
 import { LucideGripVertical, LucideTrash2 } from "lucide-react";
 import { useMemo } from "react";
@@ -37,7 +37,7 @@ function ToolMessagePart({
 		return (
 			<div
 				className={cn(
-					"border border-default-200 overflow-hidden rounded-large w-full space-y-2",
+					"border border-default-200 overflow-hidden rounded-[14px] w-full space-y-2",
 					(value.output as { type: string; value: unknown })?.type.startsWith(
 						"error",
 					)
@@ -90,7 +90,7 @@ export function ToolMessage({
 			dragControls={controls}
 		>
 			<Card>
-				<CardHeader className="flex items-center justify-between pl-1 pr-1 h-10 z-0">
+				<Card.Header className="flex items-center justify-between pl-1 pr-1 h-10 z-0">
 					<div className="flex items-center">
 						{!isReadOnly && (
 							<div
@@ -106,8 +106,8 @@ export function ToolMessage({
 							Tool
 						</span>
 					</div>
-				</CardHeader>
-				<CardBody className="p-3 border-t border-default-200 flex flex-col gap-3">
+				</Card.Header>
+				<Card.Content className="p-3 border-t border-default-200 flex flex-col gap-3">
 					{value.content.map((part, index) => {
 						return (
 							<div key={`${index + 1}`} className="flex">
@@ -125,7 +125,7 @@ export function ToolMessage({
 										className="-mr-2"
 										size="sm"
 										isIconOnly
-										variant="light"
+										variant="tertiary"
 										onPress={() => {
 											const newContent = [...value.content];
 											newContent.splice(index, 1);
@@ -150,7 +150,7 @@ export function ToolMessage({
 							onVariablePress={onVariablePress}
 						/>
 					)}
-				</CardBody>
+				</Card.Content>
 			</Card>
 		</Reorder.Item>
 	);

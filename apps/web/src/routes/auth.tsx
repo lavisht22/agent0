@@ -1,4 +1,13 @@
-import { addToast, Button, Form, Input, InputOtp } from "@heroui/react";
+import {
+	Button,
+	Form,
+	Input,
+	InputOTP,
+	Label,
+	Spinner,
+	TextField,
+	toast,
+} from "@heroui/react";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
@@ -36,13 +45,11 @@ function RouteComponent() {
 
 			setStep("otp");
 		} catch (error) {
-			addToast({
-				description:
-					error instanceof Error
-						? error.message
-						: "Unable to send OTP at the moment.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error
+					? error.message
+					: "Unable to send OTP at the moment.",
+			);
 		} finally {
 			setLoading(false);
 		}
@@ -63,13 +70,11 @@ function RouteComponent() {
 
 			navigate({ to: "/" });
 		} catch (error) {
-			addToast({
-				description:
-					error instanceof Error
-						? error.message
-						: "Unable to verify OTP at the moment.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error
+					? error.message
+					: "Unable to verify OTP at the moment.",
+			);
 		} finally {
 			setLoading(false);
 		}
@@ -90,23 +95,28 @@ function RouteComponent() {
 				</div>
 				{step === "email" ? (
 					<Form onSubmit={handleSendCode} className="flex flex-col gap-4">
-						<Input
-							type="email"
-							label="Email"
-							placeholder="you@example.com"
-							value={email}
-							onValueChange={setEmail}
-							isRequired
-							variant="bordered"
-						/>
+						<TextField name="email" isRequired className="w-full">
+							<Label>Email</Label>
+							<Input
+								type="email"
+								placeholder="you@example.com"
+								value={email}
+								onChange={(e) => setEmail(e.target.value)}
+							/>
+						</TextField>
 						<Button
 							type="submit"
-							color="primary"
-							isLoading={loading}
-							fullWidth
+							variant="primary"
 							size="lg"
+							isPending={loading}
+							className="w-full"
 						>
-							Send Code
+							{({ isPending }) => (
+								<>
+									{isPending && <Spinner color="current" size="sm" />}
+									Send Code
+								</>
+							)}
 						</Button>
 					</Form>
 				) : (
@@ -114,29 +124,41 @@ function RouteComponent() {
 						onSubmit={handleVerifyCode}
 						className="flex flex-col gap-4 items-center"
 					>
-						<InputOtp
+						<InputOTP
 							autoFocus
-							length={6}
+							maxLength={6}
 							value={otp}
-							onValueChange={setOtp}
-							isRequired
-							variant="bordered"
-							size="lg"
-						/>
+							onChange={setOtp}
+							required
+						>
+							<InputOTP.Group>
+								<InputOTP.Slot index={0} />
+								<InputOTP.Slot index={1} />
+								<InputOTP.Slot index={2} />
+								<InputOTP.Slot index={3} />
+								<InputOTP.Slot index={4} />
+								<InputOTP.Slot index={5} />
+							</InputOTP.Group>
+						</InputOTP>
 						<Button
 							type="submit"
-							color="primary"
-							isLoading={loading}
-							fullWidth
+							variant="primary"
 							size="lg"
+							isPending={loading}
+							className="w-full"
 						>
-							Verify Code
+							{({ isPending }) => (
+								<>
+									{isPending && <Spinner color="current" size="sm" />}
+									Verify Code
+								</>
+							)}
 						</Button>
 						<Button
-							variant="light"
-							onPress={() => setStep("email")}
-							fullWidth
+							variant="tertiary"
 							size="lg"
+							onPress={() => setStep("email")}
+							className="w-full"
 						>
 							Back to Email
 						</Button>

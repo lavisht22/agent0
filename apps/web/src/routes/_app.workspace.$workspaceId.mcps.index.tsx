@@ -1,17 +1,10 @@
 import {
-	addToast,
 	Button,
 	Dropdown,
-	DropdownItem,
-	DropdownMenu,
-	DropdownTrigger,
+	Label,
 	Table,
-	TableBody,
-	TableCell,
-	TableColumn,
-	TableHeader,
-	TableRow,
-	useDisclosure,
+	toast,
+	useOverlayState,
 } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -33,7 +26,7 @@ function RouteComponent() {
 	const queryClient = useQueryClient();
 
 	// Delete confirmation modal state
-	const { isOpen, onOpen, onOpenChange } = useDisclosure();
+	const deleteState = useOverlayState();
 	const [mcpToDelete, setMcpToDelete] = useState<{
 		id: string;
 		name: string;
@@ -52,21 +45,14 @@ function RouteComponent() {
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });
-			addToast({
-				description: "MCP server deleted successfully.",
-				color: "success",
-			});
-			onOpenChange();
+			toast.success("MCP server deleted successfully.");
+			deleteState.close();
 			setMcpToDelete(null);
 		},
 		onError: (error) => {
-			addToast({
-				description:
-					error instanceof Error
-						? error.message
-						: "Failed to delete MCP server.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error ? error.message : "Failed to delete MCP server.",
+			);
 		},
 	});
 
@@ -97,17 +83,12 @@ function RouteComponent() {
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });
-			addToast({
-				description: "MCP server tools refreshed successfully.",
-				color: "success",
-			});
+			toast.success("MCP server tools refreshed successfully.");
 		},
 		onError: (error) => {
-			addToast({
-				title:
-					error instanceof Error ? error.message : "Failed to refresh MCP.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error ? error.message : "Failed to refresh MCP.",
+			);
 		},
 	});
 
@@ -118,8 +99,7 @@ function RouteComponent() {
 
 				{user?.role === "admin" && (
 					<Button
-						color="primary"
-						startContent={<Plus size={18} />}
+						variant="primary"
 						onPress={() =>
 							navigate({
 								to: "/workspace/$workspaceId/mcps/$mcpId",
@@ -127,99 +107,112 @@ function RouteComponent() {
 							})
 						}
 					>
+						<Plus size={18} />
 						Create
 					</Button>
 				)}
 			</div>
 
-			<Table
-				aria-label="MCP Servers Table"
-				shadow="none"
-				classNames={{
-					wrapper: "bg-background",
-					base: "overflow-y-auto flex-1",
-				}}
-				isHeaderSticky
-			>
-				<TableHeader>
-					<TableColumn>Name</TableColumn>
-					<TableColumn>ID</TableColumn>
-					<TableColumn>Last Updated</TableColumn>
-					<TableColumn className="w-20" hideHeader>
-						Actions
-					</TableColumn>
-				</TableHeader>
-				<TableBody
-					items={mcps || []}
-					isLoading={isLoading}
-					emptyContent="You haven't added any MCP servers yet."
-				>
-					{(item) => {
-						return (
-							<TableRow
-								key={item.id}
-								className="hover:bg-default-100"
-								href={
-									user?.role === "admin"
-										? `/workspace/${workspaceId}/mcps/${item.id}`
-										: undefined
-								}
-							>
-								<TableCell>{item.name}</TableCell>
-								<TableCell>
-									<IDCopy id={item.id} />
-								</TableCell>
-								<TableCell>
-									{format(item.updated_at, "d LLL, hh:mm a")}
-								</TableCell>
-								<TableCell className="flex justify-end">
-									<Dropdown isDisabled={user?.role !== "admin" && user?.role !== "writer"}>
-										<DropdownTrigger>
-											<Button isIconOnly variant="light">
+			<Table>
+				<Table.ScrollContainer className="flex-1 overflow-y-auto">
+					<Table.Content aria-label="MCP Servers Table">
+						<Table.Header>
+							<Table.Column>Name</Table.Column>
+							<Table.Column>ID</Table.Column>
+							<Table.Column>Last Updated</Table.Column>
+							<Table.Column className="w-20">Actions</Table.Column>
+						</Table.Header>
+						<Table.Body
+							items={mcps || []}
+							renderEmptyState={() =>
+								isLoading ? (
+									<p className="text-center text-default-400 p-6">Loading...</p>
+								) : (
+									<p className="text-center text-default-400 p-6">
+										You haven't added any MCP servers yet.
+									</p>
+								)
+							}
+						>
+							{(item) => (
+								<Table.Row
+									key={item.id}
+									id={item.id}
+									className="hover:bg-default-100 cursor-pointer"
+									onAction={
+										user?.role === "admin"
+											? () =>
+													navigate({
+														to: "/workspace/$workspaceId/mcps/$mcpId",
+														params: { workspaceId, mcpId: item.id },
+													})
+											: undefined
+									}
+								>
+									<Table.Cell>{item.name}</Table.Cell>
+									<Table.Cell>
+										<IDCopy id={item.id} />
+									</Table.Cell>
+									<Table.Cell>
+										{format(item.updated_at, "d LLL, hh:mm a")}
+									</Table.Cell>
+									<Table.Cell className="flex justify-end">
+										<Dropdown>
+											<Button
+												isIconOnly
+												variant="tertiary"
+												isDisabled={
+													user?.role !== "admin" && user?.role !== "writer"
+												}
+											>
 												<LucideEllipsisVertical className="size-4" />
 											</Button>
-										</DropdownTrigger>
-										<DropdownMenu>
-											<DropdownItem
-												key="refresh"
-												onPress={() => refreshMcpMutation.mutate(item.id)}
-											>
-												Refresh
-											</DropdownItem>
-											<DropdownItem
-												key="edit"
-												isDisabled={user?.role !== "admin"}
-												onPress={() => navigate({ to: item.id })}
-											>
-												Edit
-											</DropdownItem>
-											<DropdownItem
-												key="delete"
-												className="text-danger"
-												color="danger"
-												isDisabled={user?.role !== "admin"}
-												onPress={() => {
-													setMcpToDelete({
-														id: item.id,
-														name: item.name,
-													});
-													onOpen();
-												}}
-											>
-												Delete
-											</DropdownItem>
-										</DropdownMenu>
-									</Dropdown>
-								</TableCell>
-							</TableRow>
-						);
-					}}
-				</TableBody>
+											<Dropdown.Popover>
+												<Dropdown.Menu>
+													<Dropdown.Item
+														id="refresh"
+														textValue="Refresh"
+														onAction={() => refreshMcpMutation.mutate(item.id)}
+													>
+														<Label>Refresh</Label>
+													</Dropdown.Item>
+													<Dropdown.Item
+														id="edit"
+														textValue="Edit"
+														isDisabled={user?.role !== "admin"}
+														onAction={() => navigate({ to: item.id })}
+													>
+														<Label>Edit</Label>
+													</Dropdown.Item>
+													<Dropdown.Item
+														id="delete"
+														textValue="Delete"
+														variant="danger"
+														isDisabled={user?.role !== "admin"}
+														onAction={() => {
+															setMcpToDelete({
+																id: item.id,
+																name: item.name,
+															});
+															deleteState.open();
+														}}
+													>
+														<Label>Delete</Label>
+													</Dropdown.Item>
+												</Dropdown.Menu>
+											</Dropdown.Popover>
+										</Dropdown>
+									</Table.Cell>
+								</Table.Row>
+							)}
+						</Table.Body>
+					</Table.Content>
+				</Table.ScrollContainer>
 			</Table>
 
 			<ConfirmationModal
-				isOpen={isOpen}
-				onOpenChange={onOpenChange}
+				isOpen={deleteState.isOpen}
+				onOpenChange={deleteState.setOpen}
 				title="Delete MCP Server"
 				description={`Are you sure you want to delete "${mcpToDelete?.name}"? This action cannot be undone and may affect agents using this MCP server.`}
 				onConfirm={() => {

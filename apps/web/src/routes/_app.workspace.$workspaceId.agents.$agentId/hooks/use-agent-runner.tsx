@@ -1,4 +1,4 @@
-import { addToast } from "@heroui/react";
+import { toast } from "@heroui/react";
 import type { Tables } from "@repo/database";
 import type { TextStreamPart, Tool } from "ai";
 import { events } from "fetch-event-stream";
@@ -38,10 +38,7 @@ export const useAgentRunner = ({
 				} = await supabase.auth.getSession();
 
 				if (!session) {
-					addToast({
-						description: "You must be logged in to run agents.",
-						color: "danger",
-					});
+					toast.danger("You must be logged in to run agents.");
 					return;
 				}
 
@@ -61,9 +58,7 @@ export const useAgentRunner = ({
 						version_id: version?.id,
 						mcp_options: Object.fromEntries(
 							Object.entries(mcpHeaderValues)
-								.filter(([, headers]) =>
-									Object.values(headers).some((v) => v),
-								)
+								.filter(([, headers]) => Object.values(headers).some((v) => v))
 								.map(([id, headers]) => [id, { headers }]),
 						),
 					}),
@@ -188,11 +183,9 @@ export const useAgentRunner = ({
 					setGeneratedMessages([...generatedMessageState]);
 				}
 			} catch (error) {
-				addToast({
-					description:
-						error instanceof Error ? error.message : "Failed to run agent.",
-					color: "danger",
-				});
+				toast.danger(
+					error instanceof Error ? error.message : "Failed to run agent.",
+				);
 			} finally {
 				setIsRunning(false);
 			}

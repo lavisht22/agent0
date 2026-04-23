@@ -90,10 +90,7 @@ export const PROVIDER_TYPES = [
 		key: "anthropic-vertex",
 		icon: AnthropicIcon,
 		label: "Anthropic Vertex AI",
-		models: [
-			"claude-opus-4-6",
-			"claude-sonnet-4-6",
-		],
+		models: ["claude-opus-4-6", "claude-sonnet-4-6"],
 	},
 	{
 		key: "bedrock",

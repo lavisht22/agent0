@@ -1,4 +1,13 @@
-import { addToast, Button, Input } from "@heroui/react";
+import {
+	Button,
+	Description,
+	FieldError,
+	Input,
+	Label,
+	Spinner,
+	TextField,
+	toast,
+} from "@heroui/react";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -92,10 +101,7 @@ function RouteComponent() {
 		},
 		onSuccess: async ({ id }) => {
 			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });
-			addToast({
-				description: "MCP server created successfully.",
-				color: "success",
-			});
+			toast.success("MCP server created successfully.");
 			navigate({
 				to: "/workspace/$workspaceId/mcps",
 				params: { workspaceId },
@@ -121,13 +127,9 @@ function RouteComponent() {
 			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });
 		},
 		onError: (error) => {
-			addToast({
-				description:
-					error instanceof Error
-						? error.message
-						: "Failed to create MCP server.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error ? error.message : "Failed to create MCP server.",
+			);
 		},
 	});
 
@@ -169,10 +171,7 @@ function RouteComponent() {
 		onSuccess: async () => {
 			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });
 
-			addToast({
-				description: "MCP server updated successfully.",
-				color: "success",
-			});
+			toast.success("MCP server updated successfully.");
 
 			navigate({
 				to: "/workspace/$workspaceId/mcps",
@@ -199,13 +198,9 @@ function RouteComponent() {
 			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });
 		},
 		onError: (error) => {
-			addToast({
-				description:
-					error instanceof Error
-						? error.message
-						: "Failed to update MCP server.",
-				color: "danger",
-			});
+			toast.danger(
+				error instanceof Error ? error.message : "Failed to update MCP server.",
+			);
 		},
 	});
 
@@ -234,7 +229,7 @@ function RouteComponent() {
 		<div>
 			<div className="flex items-center p-2">
 				<Button
-					variant="light"
+					variant="tertiary"
 					isIconOnly
 					onPress={() =>
 						navigate({
@@ -270,31 +265,42 @@ function RouteComponent() {
 						}}
 					>
 						{(field) => (
-							<Input
-								label="Name"
-								placeholder="e.g., my-mcp-server"
-								value={field.state.value}
-								onValueChange={field.handleChange}
+							<TextField
+								name="name"
 								isRequired
-								variant="bordered"
-								description="A friendly name to identify this MCP server"
 								isInvalid={field.state.meta.errors.length > 0}
-								errorMessage={field.state.meta.errors[0]}
-							/>
+							>
+								<Label>Name</Label>
+								<Input
+									placeholder="e.g., my-mcp-server"
+									value={field.state.value}
+									onChange={(e) => field.handleChange(e.target.value)}
+								/>
+								<Description>
+									A friendly name to identify this MCP server
+								</Description>
+								{field.state.meta.errors.length > 0 && (
+									<FieldError>{field.state.meta.errors[0]}</FieldError>
+								)}
+							</TextField>
 						)}
 					</form.Field>
 
 					{/* Custom Headers Field */}
 					<form.Field name="custom_headers">
 						{(field) => (
-							<Input
-								label="Custom Headers"
-								placeholder="e.g., X-User-Token, X-Tenant-Id"
-								value={field.state.value}
-								onValueChange={field.handleChange}
-								variant="bordered"
-								description="Comma-separated list of header names that callers can provide at runtime."
-							/>
+							<TextField name="custom_headers">
+								<Label>Custom Headers</Label>
+								<Input
+									placeholder="e.g., X-User-Token, X-Tenant-Id"
+									value={field.state.value}
+									onChange={(e) => field.handleChange(e.target.value)}
+								/>
+								<Description>
+									Comma-separated list of header names that callers can provide
+									at runtime.
+								</Description>
+							</TextField>
 						)}
 					</form.Field>
 
@@ -325,8 +331,8 @@ function RouteComponent() {
 							<div className="flex items-center gap-2 rounded-lg bg-warning-50 px-3 py-2 text-warning-700 text-sm">
 								<ShieldAlert className="size-4 shrink-0" />
 								<span>
-									You are updating the server configuration. This will
-									overwrite the existing encrypted config.
+									You are updating the server configuration. This will overwrite
+									the existing encrypted config.
 								</span>
 							</div>
 							<form.Field
@@ -357,16 +363,16 @@ function RouteComponent() {
 										Server Configuration
 									</p>
 									<p className="text-xs text-default-400 mt-1">
-										The configuration is stored encrypted. Click edit to
-										replace it with a new config.
+										The configuration is stored encrypted. Click edit to replace
+										it with a new config.
 									</p>
 								</div>
 								<Button
 									size="sm"
-									variant="flat"
-									startContent={<Pencil className="size-3" />}
+									variant="tertiary"
 									onPress={() => setShowConfigEditor(true)}
 								>
+									<Pencil className="size-3" />
 									Edit Config
 								</Button>
 							</div>
@@ -375,7 +381,7 @@ function RouteComponent() {
 
 					<div className="flex justify-end gap-3">
 						<Button
-							variant="light"
+							variant="tertiary"
 							onPress={() =>
 								navigate({
 									to: "/workspace/$workspaceId/mcps",
@@ -395,11 +401,16 @@ function RouteComponent() {
 							{(state) => (
 								<Button
 									type="submit"
-									color="primary"
-									isLoading={isLoading || state.isSubmitting}
+									variant="primary"
+									isPending={isLoading || state.isSubmitting}
 									isDisabled={!state.canSubmit || isLoading}
 								>
-									{isNewMcp ? "Create" : "Update"}
+									{({ isPending }) => (
+										<>
+											{isPending && <Spinner color="current" size="sm" />}
+											{isNewMcp ? "Create" : "Update"}
+										</>
+									)}
 								</Button>
 							)}
 						</form.Subscribe>
