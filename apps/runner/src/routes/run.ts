@@ -170,7 +170,7 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 				.send({ message: `No ${environment} version found for this agent` });
 		}
 
-		const data = version.data as VersionData;
+		const data = JSON.parse(JSON.stringify(version.data)) as VersionData;
 
 		// Apply runtime overrides if provided
 		if (overrides) {
