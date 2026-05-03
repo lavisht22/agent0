@@ -47,6 +47,7 @@ import { AddMessage } from "./components/add-message";
 import { Alerts } from "./components/alerts";
 import { ModelSelector } from "./components/model-selector";
 import { ProviderOptions } from "./components/provider-options";
+import SkillsSection from "./components/skills-section";
 import ToolsSection from "./components/tools-section";
 import { VariablesDrawer } from "./components/variables-drawer";
 import { VersionHistory } from "./components/version-history";
@@ -168,6 +169,7 @@ function RouteComponent() {
 				},
 			] as MessageT[],
 			tools: [] as AgentFormValues["tools"],
+			skills: [] as AgentFormValues["skills"],
 			providerOptions: {} as AgentFormValues["providerOptions"],
 		},
 		validators: {
@@ -215,6 +217,7 @@ function RouteComponent() {
 				maxStepCount: data.maxStepCount || 10,
 				messages: messagesWithIds,
 				tools: data.tools || [],
+				skills: data.skills || [],
 				providerOptions: data.providerOptions || {},
 			},
 			{ keepDefaultValues: true },
@@ -626,6 +629,16 @@ function RouteComponent() {
 						</div>
 					</div>
 					<div className="flex-1 overflow-y-auto p-4 space-y-4">
+						<form.Field name="skills">
+							{(field) => (
+								<SkillsSection
+									value={field.state.value}
+									onValueChange={field.handleChange}
+									isInvalid={field.state.meta.errors.length > 0}
+								/>
+							)}
+						</form.Field>
+
 						<form.Field name="tools">
 							{(field) => (
 								<ToolsSection
