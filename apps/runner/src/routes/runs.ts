@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { supabase } from "../lib/db.js";
+import { requireScope } from "../lib/scopes.js";
 
 const AgentRefSchema = {
 	type: "object" as const,
@@ -45,6 +46,7 @@ const ErrorSchema = {
 
 export async function registerRunsRoutes(fastify: FastifyInstance) {
 	fastify.get("/api/v1/runs", {
+		preHandler: requireScope("runs:read:*"),
 		schema: {
 			tags: ["Runs"],
 			summary: "List runs",
@@ -157,6 +159,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 	});
 
 	fastify.get("/api/v1/runs/:runId", {
+		preHandler: requireScope("runs:read:*"),
 		schema: {
 			tags: ["Runs"],
 			summary: "Get run details",

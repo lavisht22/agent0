@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { supabase } from "../lib/db.js";
+import { checkScope, requireScope } from "../lib/scopes.js";
 
 const TagSchema = {
 	type: "object" as const,
@@ -54,6 +55,10 @@ const ErrorSchema = {
 
 export async function registerAgentRoutes(fastify: FastifyInstance) {
 	fastify.get("/api/v1/agents/:agentId", {
+		preHandler: async (request, reply) => {
+			const { agentId } = request.params as { agentId: string };
+			checkScope(request, reply, `agents:read:${agentId}`);
+		},
 		schema: {
 			tags: ["Agents"],
 			summary: "Get a single agent",
@@ -107,6 +112,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 	});
 
 	fastify.get("/api/v1/agents", {
+		preHandler: requireScope("agents:read:*"),
 		schema: {
 			tags: ["Agents"],
 			summary: "List agents",
@@ -227,6 +233,10 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 
 	// List versions for an agent (excludes version data/content for lighter response)
 	fastify.get("/api/v1/agents/:agentId/versions", {
+		preHandler: async (request, reply) => {
+			const { agentId } = request.params as { agentId: string };
+			checkScope(request, reply, `agents:read:${agentId}`);
+		},
 		schema: {
 			tags: ["Versions"],
 			summary: "List versions for an agent",
@@ -302,6 +312,10 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 
 	// Get a single version with full content
 	fastify.get("/api/v1/agents/:agentId/versions/:versionId", {
+		preHandler: async (request, reply) => {
+			const { agentId } = request.params as { agentId: string };
+			checkScope(request, reply, `agents:read:${agentId}`);
+		},
 		schema: {
 			tags: ["Versions"],
 			summary: "Get a single version with full content",
