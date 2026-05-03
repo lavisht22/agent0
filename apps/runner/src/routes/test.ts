@@ -4,9 +4,11 @@ import { nanoid } from "nanoid";
 import { calculateModelCost } from "../lib/cost.js";
 import { supabase } from "../lib/db.js";
 import {
+	applySkillCatalog,
 	createSSEStream,
 	prepareMCPServers,
 	prepareProviderAndMessages,
+	prepareSkills,
 	uploadRunData,
 } from "../lib/helpers.js";
 import type { RunData, VersionData } from "../lib/types.js";
@@ -76,15 +78,27 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			providerOptions,
 		} = versionData;
 
-		const [{ model, processedMessages }, { tools, closeAll }] =
-			await Promise.all([
-				prepareProviderAndMessages(versionData, variables, environment),
-				prepareMCPServers(versionData, environment, mcp_options),
-			]);
+		const [
+			{ model, processedMessages },
+			{ tools, closeAll },
+			{ systemAddendum, skillTools },
+		] = await Promise.all([
+			prepareProviderAndMessages(versionData, variables, environment),
+			prepareMCPServers(versionData, environment, mcp_options),
+			prepareSkills(versionData),
+		]);
+
+		const messagesWithSkills = applySkillCatalog(
+			processedMessages,
+			systemAddendum,
+		);
+
+		// Skills win on name collision (see run.ts for rationale).
+		const allTools = { ...tools, ...skillTools };
 
 		runData.request = {
 			...versionData,
-			messages: processedMessages,
+			messages: messagesWithSkills,
 		};
 
 		const preProcessingTime = Date.now() - startTime;
@@ -95,8 +109,8 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			maxOutputTokens,
 			temperature,
 			stopWhen: stepCountIs(maxStepCount || 10),
-			messages: processedMessages,
-			tools: tools as ToolSet,
+			messages: messagesWithSkills,
+			tools: allTools as ToolSet,
 			output: outputFormat === "json" ? Output.json() : Output.text(),
 			providerOptions,
 			onChunk: () => {

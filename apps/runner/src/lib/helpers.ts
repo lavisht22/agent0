@@ -6,6 +6,7 @@ import {
 	type ModelMessage,
 	type streamText,
 	type Tool,
+	type ToolSet,
 } from "ai";
 import { supabase } from "./db.js";
 import { decryptMessage } from "./openpgp.js";
@@ -243,6 +244,104 @@ export const createSSEStream = (
 			}
 		},
 	});
+};
+
+const READ_SKILL_TOOL_NAME = "read_skill";
+
+type RuntimeSkill = { name: string; description: string; body: string };
+
+const isRuntimeSkill = (s: unknown): s is RuntimeSkill =>
+	typeof s === "object" &&
+	s !== null &&
+	typeof (s as { name?: unknown }).name === "string" &&
+	typeof (s as { description?: unknown }).description === "string" &&
+	typeof (s as { body?: unknown }).body === "string";
+
+export const prepareSkills = (data: VersionData) => {
+	const rawSkills = data.skills;
+
+	if (!rawSkills || rawSkills.length === 0) {
+		return { systemAddendum: "", skillTools: {} as ToolSet };
+	}
+
+	// Defensive filter: tolerate malformed entries from any in-flight schema
+	// changes (e.g. legacy string-ID references from the workspace-skill prototype).
+	const validSkills = rawSkills.filter(isRuntimeSkill);
+
+	if (validSkills.length === 0) {
+		return { systemAddendum: "", skillTools: {} as ToolSet };
+	}
+
+	const catalog = validSkills
+		.map((s) => `- ${s.name}: ${s.description}`)
+		.join("\n");
+
+	const systemAddendum = `You have access to the following skills. If a skill is relevant to the user's request, call \`${READ_SKILL_TOOL_NAME}\` with its name to load the full instructions before acting.\n\n${catalog}`;
+
+	const bodyByName = new Map(validSkills.map((s) => [s.name, s.body]));
+	const availableNames = validSkills.map((s) => s.name).join(", ");
+
+	const readSkillTool: Tool = {
+		description:
+			"Read the full instructions for a skill by name. Returns the markdown body of the skill. Available skill names are listed in the system prompt.",
+		inputSchema: jsonSchema({
+			type: "object",
+			properties: {
+				name: {
+					type: "string",
+					description: "The exact name of the skill to read.",
+				},
+			},
+			required: ["name"],
+		}),
+		execute: async (input: unknown) => {
+			const name = (input as { name?: string })?.name;
+			if (!name) {
+				return `Error: missing required "name" parameter. Available skills: ${availableNames}`;
+			}
+			const body = bodyByName.get(name);
+			if (!body) {
+				return `Error: skill "${name}" not found. Available skills: ${availableNames}`;
+			}
+			return body;
+		},
+	};
+
+	return {
+		systemAddendum,
+		skillTools: { [READ_SKILL_TOOL_NAME]: readSkillTool } as ToolSet,
+	};
+};
+
+// Append the skill-catalog addendum to the messages list. If a system message
+// already exists at the top, append to its content; otherwise prepend a new
+// system message. No-op when the addendum is empty.
+export const applySkillCatalog = (
+	messages: ModelMessage[],
+	systemAddendum: string,
+): ModelMessage[] => {
+	if (!systemAddendum) return messages;
+
+	const first = messages[0];
+	if (first && first.role === "system") {
+		const existingContent =
+			typeof first.content === "string"
+				? first.content
+				: JSON.stringify(first.content);
+		const merged: ModelMessage = {
+			...first,
+			content: existingContent
+				? `${existingContent}\n\n${systemAddendum}`
+				: systemAddendum,
+		};
+		return [merged, ...messages.slice(1)];
+	}
+
+	const systemMessage: ModelMessage = {
+		role: "system",
+		content: systemAddendum,
+	};
+	return [systemMessage, ...messages];
 };
 
 export const uploadRunData = async (id: string, data: unknown) => {

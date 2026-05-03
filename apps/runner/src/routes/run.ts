@@ -11,9 +11,11 @@ import { nanoid } from "nanoid";
 import { calculateModelCost } from "../lib/cost.js";
 import { supabase } from "../lib/db.js";
 import {
+	applySkillCatalog,
 	createSSEStream,
 	prepareMCPServers,
 	prepareProviderAndMessages,
+	prepareSkills,
 	uploadRunData,
 } from "../lib/helpers.js";
 import type { RunData, RunOverrides, VersionData } from "../lib/types.js";
@@ -201,11 +203,15 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 			data.tools = [...(data.tools || []), ...customTools];
 		}
 
-		const [{ model, processedMessages }, { tools, closeAll }] =
-			await Promise.all([
-				prepareProviderAndMessages(data, variables, environment),
-				prepareMCPServers(data, environment, mcp_options),
-			]);
+		const [
+			{ model, processedMessages },
+			{ tools, closeAll },
+			{ systemAddendum, skillTools },
+		] = await Promise.all([
+			prepareProviderAndMessages(data, variables, environment),
+			prepareMCPServers(data, environment, mcp_options),
+			prepareSkills(data),
+		]);
 
 		// Wrap all remaining logic in try-finally to ensure MCP clients are always closed
 		try {
@@ -217,10 +223,21 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 				providerOptions,
 			} = data;
 
+			// Inject the skills catalog into the system message (no-op when no
+			// skills are attached) before appending any extra messages.
+			const messagesWithSkills = applySkillCatalog(
+				processedMessages,
+				systemAddendum,
+			);
+
 			// Append extra messages if provided (used as-is, no variable substitution)
 			const finalMessages = extra_messages
-				? [...processedMessages, ...extra_messages]
-				: processedMessages;
+				? [...messagesWithSkills, ...extra_messages]
+				: messagesWithSkills;
+
+			// Skills win on name collision so the catalog's `read_skill` reference
+			// always routes to the built-in handler.
+			const allTools = { ...tools, ...skillTools };
 
 			runData.request = { ...data, messages: finalMessages, overrides };
 			const preProcessingTime = Date.now() - startTime;
@@ -239,7 +256,7 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 					temperature,
 					stopWhen: stepCountIs(maxStepCount || 10),
 					messages: finalMessages,
-					tools: tools as ToolSet,
+					tools: allTools as ToolSet,
 					output: outputFormat === "json" ? Output.json() : Output.text(),
 					providerOptions,
 					abortSignal: controller.signal,
@@ -348,7 +365,7 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 					temperature,
 					stopWhen: stepCountIs(maxStepCount || 10),
 					messages: finalMessages,
-					tools: tools as ToolSet,
+					tools: allTools as ToolSet,
 					output: outputFormat === "json" ? Output.json() : Output.text(),
 					providerOptions,
 				});

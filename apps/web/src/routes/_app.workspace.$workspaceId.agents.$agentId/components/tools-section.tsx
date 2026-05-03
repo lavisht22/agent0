@@ -3,6 +3,7 @@ import {
 	Card,
 	Chip,
 	CloseButton,
+	cn,
 	Description,
 	Drawer,
 	Dropdown,
@@ -25,7 +26,7 @@ import {
 	LucideWrench,
 } from "lucide-react";
 import { useState } from "react";
-import { MonacoJsonField } from "@/components/monaco-json-field";
+import { MonacoJsonEditor } from "@/components/monaco-json-editor";
 import { mcpsQuery } from "@/lib/queries";
 import type { CustomTool, MCPTool } from "@/lib/types";
 
@@ -519,7 +520,7 @@ export default function ToolsSection({
 			<Drawer state={customToolModalState}>
 				<Drawer.Backdrop>
 					<Drawer.Content placement="right">
-						<Drawer.Dialog>
+						<Drawer.Dialog style={{ width: 640, maxWidth: "85vw" }}>
 							<Drawer.CloseTrigger />
 							<Drawer.Header>
 								<Drawer.Heading>
@@ -551,29 +552,53 @@ export default function ToolsSection({
 										tool
 									</Description>
 								</TextField>
-								<MonacoJsonField
-									label="Input Schema"
-									isRequired
-									description="Define the parameters this tool accepts using JSON Schema format."
-									value={customToolInputSchema}
-									onValueChange={(val) => {
-										setCustomToolInputSchema(val);
-										// Validate JSON on change
-										if (val.trim()) {
-											try {
-												JSON.parse(val);
-												setInputSchemaError(null);
-											} catch {
-												setInputSchemaError("Invalid JSON format");
-											}
-										} else {
-											setInputSchemaError(null);
-										}
-									}}
-									isInvalid={!!inputSchemaError}
-									errorMessage={inputSchemaError}
-									editorMinHeight={250}
-								/>
+								<div className="flex flex-col gap-1.5">
+									<Label>
+										Input Schema
+										<span className="text-danger ml-0.5">*</span>
+									</Label>
+									<div
+										className={cn(
+											"h-96 overflow-hidden border border-[var(--color-field-border)] bg-[var(--color-default)] transition-[background-color,border-color,box-shadow] duration-150",
+											"rounded-[var(--field-radius,calc(var(--radius)*1.5))]",
+											"focus-within:ring-2 focus-within:ring-[var(--focus)]",
+											inputSchemaError &&
+												"border-danger focus-within:ring-danger",
+											// Match Monaco's editor bg to HeroUI's secondary-input bg.
+											"[&_.monaco-editor]:!bg-[var(--color-default)]",
+											"[&_.monaco-editor_.overflow-guard]:!bg-[var(--color-default)]",
+											"[&_.monaco-editor_.monaco-editor-background]:!bg-[var(--color-default)]",
+											"[&_.monaco-editor_.margin]:!bg-[var(--color-default)]",
+										)}
+									>
+										<MonacoJsonEditor
+											value={customToolInputSchema}
+											onValueChange={(val) => {
+												setCustomToolInputSchema(val);
+												if (val.trim()) {
+													try {
+														JSON.parse(val);
+														setInputSchemaError(null);
+													} catch {
+														setInputSchemaError("Invalid JSON format");
+													}
+												} else {
+													setInputSchemaError(null);
+												}
+											}}
+											fillHeight
+										/>
+									</div>
+									<p
+										className={cn(
+											"ml-1 text-xs text-muted",
+											inputSchemaError && "text-danger",
+										)}
+									>
+										{inputSchemaError ??
+											"Define the parameters this tool accepts using JSON Schema format."}
+									</p>
+								</div>
 							</Drawer.Body>
 							<Drawer.Footer>
 								<Button

@@ -40,6 +40,17 @@ export type CustomTool = {
  */
 export type ToolDefinition = MCPTool | CustomTool;
 
+/**
+ * A skill embedded inside the agent version. Versioned along with the rest
+ * of the agent's config — no separate table.
+ */
+export type Skill = {
+	id: string;
+	name: string;
+	description: string;
+	body: string;
+};
+
 export type VersionData = {
 	model: { provider_id: string; name: string };
 	messages: ModelMessage[];
@@ -48,6 +59,7 @@ export type VersionData = {
 	temperature?: number;
 	maxStepCount?: number;
 	tools?: ToolDefinition[];
+	skills?: Skill[];
 	providerOptions?: ProviderOptions;
 };
 

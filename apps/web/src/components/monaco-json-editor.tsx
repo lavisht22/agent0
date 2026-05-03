@@ -7,17 +7,24 @@ interface MonacoJsonEditorProps {
 	onValueChange?: (value: string) => void;
 	readOnly?: boolean;
 	minHeight?: number;
+	language?: string;
+	// When true, the editor fills its parent's height instead of auto-sizing
+	// to content (useful for long-form editing). Parent must give it height.
+	fillHeight?: boolean;
 }
 
 /**
- * A Monaco-based JSON editor with automatic theme switching,
- * auto-height adjustment, and validation.
+ * A Monaco-based editor with automatic theme switching. Defaults to JSON
+ * with content-based auto-height; pass `language` and `fillHeight` to use
+ * it for other languages (e.g. markdown) and long-form documents.
  */
 export function MonacoJsonEditor({
 	value,
 	onValueChange,
 	readOnly = false,
 	minHeight = 100,
+	language = "json",
+	fillHeight = false,
 }: MonacoJsonEditorProps) {
 	const { theme: appTheme } = useTheme();
 	const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
@@ -50,6 +57,8 @@ export function MonacoJsonEditor({
 		(editor) => {
 			editorRef.current = editor;
 
+			if (fillHeight) return;
+
 			// Update height on content change
 			editor.onDidContentSizeChange(() => {
 				updateEditorHeight();
@@ -58,7 +67,7 @@ export function MonacoJsonEditor({
 			// Initial height adjustment
 			updateEditorHeight();
 		},
-		[updateEditorHeight],
+		[updateEditorHeight, fillHeight],
 	);
 
 	// Handle content change
@@ -72,10 +81,13 @@ export function MonacoJsonEditor({
 	);
 
 	return (
-		<div className="w-full overflow-hidden" style={{ height: editorHeight }}>
+		<div
+			className="w-full overflow-hidden"
+			style={fillHeight ? { height: "100%" } : { height: editorHeight }}
+		>
 			<Editor
 				height="100%"
-				language="json"
+				language={language}
 				theme={monacoTheme}
 				value={value}
 				onChange={handleChange}

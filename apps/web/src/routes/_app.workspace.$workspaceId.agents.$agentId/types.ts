@@ -1,6 +1,15 @@
 import z from "zod";
 import { messageSchema } from "@/components/messages";
 
+export const skillSchema = z.object({
+	id: z.string(),
+	name: z.string().min(1),
+	description: z.string().min(1),
+	body: z.string().min(1),
+});
+
+export type Skill = z.infer<typeof skillSchema>;
+
 // Zod schema for form validation
 export const agentFormSchema = z.object({
 	model: z.object({
@@ -29,6 +38,7 @@ export const agentFormSchema = z.object({
 			}),
 		]),
 	),
+	skills: z.array(skillSchema),
 	providerOptions: z.object({
 		openai: z
 			.object({
