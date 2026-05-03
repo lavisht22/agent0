@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { supabase } from "../lib/db.js";
 import { decryptMessage } from "../lib/openpgp.js";
 import { getAIProvider } from "../lib/providers.js";
+import { requireScope } from "../lib/scopes.js";
 
 /**
  * Model specification for Agent0 embedding requests.
@@ -61,6 +62,7 @@ async function getProvider(
 export async function registerEmbedRoutes(fastify: FastifyInstance) {
 	// Single embedding endpoint
 	fastify.post("/api/v1/embed", {
+		preHandler: requireScope("embeddings:run:*"),
 		schema: {
 			tags: ["Embeddings"],
 			summary: "Generate a single embedding",
@@ -152,6 +154,7 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 
 	// Multiple embeddings endpoint
 	fastify.post("/api/v1/embed-many", {
+		preHandler: requireScope("embeddings:run:*"),
 		schema: {
 			tags: ["Embeddings"],
 			summary: "Generate multiple embeddings",
