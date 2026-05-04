@@ -20,6 +20,7 @@ import {
 } from "../lib/helpers.js";
 import type { RunData, RunOverrides, VersionData } from "../lib/types.js";
 import { cachedQuery } from "../lib/cache.js";
+import { hasScope } from "../lib/scopes.js";
 
 export async function registerRunRoute(fastify: FastifyInstance) {
 	fastify.post("/api/v1/run", {
@@ -80,6 +81,7 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 				},
 				400: { type: "object" as const, properties: { message: { type: "string" as const } } },
 				404: { type: "object" as const, properties: { message: { type: "string" as const } } },
+				403: { type: "object" as const, properties: { message: { type: "string" as const } } },
 				500: { type: "object" as const, properties: { message: { type: "string" as const } } },
 			},
 		},
@@ -115,6 +117,14 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 		// Validate request body
 		if (!agent_id) {
 			return reply.code(400).send({ message: "agent_id is required" });
+		}
+
+		// Scope check (depends on body.agent_id, so done here rather than in a
+		// preHandler).
+		if (!hasScope(request.scopes, `agents:run:${agent_id}`)) {
+			return reply
+				.code(403)
+				.send({ message: `Missing required scope: agents:run:${agent_id}` });
 		}
 
 		const { workspaceId } = request;

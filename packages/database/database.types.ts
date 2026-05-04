@@ -126,26 +126,32 @@ export type Database = {
       }
       api_keys: {
         Row: {
+          allowed_origins: string[] | null
           created_at: string
           id: string
           key: string
           name: string
+          scopes: string[]
           user_id: string
           workspace_id: string
         }
         Insert: {
+          allowed_origins?: string[] | null
           created_at?: string
           id: string
           key: string
           name: string
+          scopes?: string[]
           user_id: string
           workspace_id: string
         }
         Update: {
+          allowed_origins?: string[] | null
           created_at?: string
           id?: string
           key?: string
           name?: string
+          scopes?: string[]
           user_id?: string
           workspace_id?: string
         }
