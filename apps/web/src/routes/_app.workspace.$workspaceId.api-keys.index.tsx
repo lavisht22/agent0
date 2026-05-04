@@ -10,7 +10,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
-import { LucideEllipsisVertical, Plus } from "lucide-react";
+import { LucideEllipsisVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { ConfirmationModal } from "@/components/confirmation-modal";
 import IDCopy from "@/components/id-copy";
@@ -80,8 +80,8 @@ function RouteComponent() {
 					variant="primary"
 					onPress={() =>
 						navigate({
-							to: "/workspace/$workspaceId/api-keys/new",
-							params: { workspaceId },
+							to: "/workspace/$workspaceId/api-keys/$apiKeyId",
+							params: { workspaceId, apiKeyId: "new" },
 						})
 					}
 				>
@@ -120,7 +120,17 @@ function RouteComponent() {
 									const userName = user?.name || "Unknown";
 
 									return (
-										<Table.Row key={item.id} id={item.id}>
+										<Table.Row
+											key={item.id}
+											id={item.id}
+											className="hover:bg-surface-hover cursor-pointer"
+											onAction={() =>
+												navigate({
+													to: "/workspace/$workspaceId/api-keys/$apiKeyId",
+													params: { workspaceId, apiKeyId: item.id },
+												})
+											}
+										>
 											<Table.Cell>{item.name}</Table.Cell>
 											<Table.Cell>
 												<IDCopy id={item.key} redacted={redactKey(item.key)} />
@@ -160,6 +170,22 @@ function RouteComponent() {
 													<Dropdown.Popover>
 														<Dropdown.Menu>
 															<Dropdown.Item
+																id="edit"
+																textValue="Edit"
+																onAction={() =>
+																	navigate({
+																		to: "/workspace/$workspaceId/api-keys/$apiKeyId",
+																		params: {
+																			workspaceId,
+																			apiKeyId: item.id,
+																		},
+																	})
+																}
+															>
+																<Pencil className="size-4" />
+																<Label>Edit</Label>
+															</Dropdown.Item>
+															<Dropdown.Item
 																id="delete"
 																textValue="Delete"
 																variant="danger"
@@ -171,6 +197,7 @@ function RouteComponent() {
 																	deleteState.open();
 																}}
 															>
+																<Trash2 className="size-4" />
 																<Label>Delete</Label>
 															</Dropdown.Item>
 														</Dropdown.Menu>

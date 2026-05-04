@@ -24,7 +24,7 @@ import { Route as AppWorkspaceWorkspaceIdAgentsIndexRouteImport } from './routes
 import { Route as AppWorkspaceWorkspaceIdRunsRunIdRouteImport } from './routes/_app.workspace.$workspaceId.runs.$runId'
 import { Route as AppWorkspaceWorkspaceIdProvidersProviderIdRouteImport } from './routes/_app.workspace.$workspaceId.providers.$providerId'
 import { Route as AppWorkspaceWorkspaceIdMcpsMcpIdRouteImport } from './routes/_app.workspace.$workspaceId.mcps.$mcpId'
-import { Route as AppWorkspaceWorkspaceIdApiKeysNewRouteImport } from './routes/_app.workspace.$workspaceId.api-keys.new'
+import { Route as AppWorkspaceWorkspaceIdApiKeysApiKeyIdRouteImport } from './routes/_app.workspace.$workspaceId.api-keys.$apiKeyId'
 import { Route as AppWorkspaceWorkspaceIdAgentsAgentIdIndexRouteImport } from './routes/_app.workspace.$workspaceId.agents.$agentId/index'
 
 const AuthRoute = AuthRouteImport.update({
@@ -111,10 +111,10 @@ const AppWorkspaceWorkspaceIdMcpsMcpIdRoute =
     path: '/mcps/$mcpId',
     getParentRoute: () => AppWorkspaceWorkspaceIdRoute,
   } as any)
-const AppWorkspaceWorkspaceIdApiKeysNewRoute =
-  AppWorkspaceWorkspaceIdApiKeysNewRouteImport.update({
-    id: '/api-keys/new',
-    path: '/api-keys/new',
+const AppWorkspaceWorkspaceIdApiKeysApiKeyIdRoute =
+  AppWorkspaceWorkspaceIdApiKeysApiKeyIdRouteImport.update({
+    id: '/api-keys/$apiKeyId',
+    path: '/api-keys/$apiKeyId',
     getParentRoute: () => AppWorkspaceWorkspaceIdRoute,
   } as any)
 const AppWorkspaceWorkspaceIdAgentsAgentIdIndexRoute =
@@ -131,7 +131,7 @@ export interface FileRoutesByFullPath {
   '/workspace/$workspaceId': typeof AppWorkspaceWorkspaceIdRouteWithChildren
   '/workspace/$workspaceId/settings': typeof AppWorkspaceWorkspaceIdSettingsRoute
   '/workspace/$workspaceId/': typeof AppWorkspaceWorkspaceIdIndexRoute
-  '/workspace/$workspaceId/api-keys/new': typeof AppWorkspaceWorkspaceIdApiKeysNewRoute
+  '/workspace/$workspaceId/api-keys/$apiKeyId': typeof AppWorkspaceWorkspaceIdApiKeysApiKeyIdRoute
   '/workspace/$workspaceId/mcps/$mcpId': typeof AppWorkspaceWorkspaceIdMcpsMcpIdRoute
   '/workspace/$workspaceId/providers/$providerId': typeof AppWorkspaceWorkspaceIdProvidersProviderIdRoute
   '/workspace/$workspaceId/runs/$runId': typeof AppWorkspaceWorkspaceIdRunsRunIdRoute
@@ -148,7 +148,7 @@ export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/workspace/$workspaceId/settings': typeof AppWorkspaceWorkspaceIdSettingsRoute
   '/workspace/$workspaceId': typeof AppWorkspaceWorkspaceIdIndexRoute
-  '/workspace/$workspaceId/api-keys/new': typeof AppWorkspaceWorkspaceIdApiKeysNewRoute
+  '/workspace/$workspaceId/api-keys/$apiKeyId': typeof AppWorkspaceWorkspaceIdApiKeysApiKeyIdRoute
   '/workspace/$workspaceId/mcps/$mcpId': typeof AppWorkspaceWorkspaceIdMcpsMcpIdRoute
   '/workspace/$workspaceId/providers/$providerId': typeof AppWorkspaceWorkspaceIdProvidersProviderIdRoute
   '/workspace/$workspaceId/runs/$runId': typeof AppWorkspaceWorkspaceIdRunsRunIdRoute
@@ -168,7 +168,7 @@ export interface FileRoutesById {
   '/_app/workspace/$workspaceId': typeof AppWorkspaceWorkspaceIdRouteWithChildren
   '/_app/workspace/$workspaceId/settings': typeof AppWorkspaceWorkspaceIdSettingsRoute
   '/_app/workspace/$workspaceId/': typeof AppWorkspaceWorkspaceIdIndexRoute
-  '/_app/workspace/$workspaceId/api-keys/new': typeof AppWorkspaceWorkspaceIdApiKeysNewRoute
+  '/_app/workspace/$workspaceId/api-keys/$apiKeyId': typeof AppWorkspaceWorkspaceIdApiKeysApiKeyIdRoute
   '/_app/workspace/$workspaceId/mcps/$mcpId': typeof AppWorkspaceWorkspaceIdMcpsMcpIdRoute
   '/_app/workspace/$workspaceId/providers/$providerId': typeof AppWorkspaceWorkspaceIdProvidersProviderIdRoute
   '/_app/workspace/$workspaceId/runs/$runId': typeof AppWorkspaceWorkspaceIdRunsRunIdRoute
@@ -188,7 +188,7 @@ export interface FileRouteTypes {
     | '/workspace/$workspaceId'
     | '/workspace/$workspaceId/settings'
     | '/workspace/$workspaceId/'
-    | '/workspace/$workspaceId/api-keys/new'
+    | '/workspace/$workspaceId/api-keys/$apiKeyId'
     | '/workspace/$workspaceId/mcps/$mcpId'
     | '/workspace/$workspaceId/providers/$providerId'
     | '/workspace/$workspaceId/runs/$runId'
@@ -205,7 +205,7 @@ export interface FileRouteTypes {
     | '/'
     | '/workspace/$workspaceId/settings'
     | '/workspace/$workspaceId'
-    | '/workspace/$workspaceId/api-keys/new'
+    | '/workspace/$workspaceId/api-keys/$apiKeyId'
     | '/workspace/$workspaceId/mcps/$mcpId'
     | '/workspace/$workspaceId/providers/$providerId'
     | '/workspace/$workspaceId/runs/$runId'
@@ -224,7 +224,7 @@ export interface FileRouteTypes {
     | '/_app/workspace/$workspaceId'
     | '/_app/workspace/$workspaceId/settings'
     | '/_app/workspace/$workspaceId/'
-    | '/_app/workspace/$workspaceId/api-keys/new'
+    | '/_app/workspace/$workspaceId/api-keys/$apiKeyId'
     | '/_app/workspace/$workspaceId/mcps/$mcpId'
     | '/_app/workspace/$workspaceId/providers/$providerId'
     | '/_app/workspace/$workspaceId/runs/$runId'
@@ -348,11 +348,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppWorkspaceWorkspaceIdMcpsMcpIdRouteImport
       parentRoute: typeof AppWorkspaceWorkspaceIdRoute
     }
-    '/_app/workspace/$workspaceId/api-keys/new': {
-      id: '/_app/workspace/$workspaceId/api-keys/new'
-      path: '/api-keys/new'
-      fullPath: '/workspace/$workspaceId/api-keys/new'
-      preLoaderRoute: typeof AppWorkspaceWorkspaceIdApiKeysNewRouteImport
+    '/_app/workspace/$workspaceId/api-keys/$apiKeyId': {
+      id: '/_app/workspace/$workspaceId/api-keys/$apiKeyId'
+      path: '/api-keys/$apiKeyId'
+      fullPath: '/workspace/$workspaceId/api-keys/$apiKeyId'
+      preLoaderRoute: typeof AppWorkspaceWorkspaceIdApiKeysApiKeyIdRouteImport
       parentRoute: typeof AppWorkspaceWorkspaceIdRoute
     }
     '/_app/workspace/$workspaceId/agents/$agentId/': {
@@ -368,7 +368,7 @@ declare module '@tanstack/react-router' {
 interface AppWorkspaceWorkspaceIdRouteChildren {
   AppWorkspaceWorkspaceIdSettingsRoute: typeof AppWorkspaceWorkspaceIdSettingsRoute
   AppWorkspaceWorkspaceIdIndexRoute: typeof AppWorkspaceWorkspaceIdIndexRoute
-  AppWorkspaceWorkspaceIdApiKeysNewRoute: typeof AppWorkspaceWorkspaceIdApiKeysNewRoute
+  AppWorkspaceWorkspaceIdApiKeysApiKeyIdRoute: typeof AppWorkspaceWorkspaceIdApiKeysApiKeyIdRoute
   AppWorkspaceWorkspaceIdMcpsMcpIdRoute: typeof AppWorkspaceWorkspaceIdMcpsMcpIdRoute
   AppWorkspaceWorkspaceIdProvidersProviderIdRoute: typeof AppWorkspaceWorkspaceIdProvidersProviderIdRoute
   AppWorkspaceWorkspaceIdRunsRunIdRoute: typeof AppWorkspaceWorkspaceIdRunsRunIdRoute
@@ -384,8 +384,8 @@ const AppWorkspaceWorkspaceIdRouteChildren: AppWorkspaceWorkspaceIdRouteChildren
   {
     AppWorkspaceWorkspaceIdSettingsRoute: AppWorkspaceWorkspaceIdSettingsRoute,
     AppWorkspaceWorkspaceIdIndexRoute: AppWorkspaceWorkspaceIdIndexRoute,
-    AppWorkspaceWorkspaceIdApiKeysNewRoute:
-      AppWorkspaceWorkspaceIdApiKeysNewRoute,
+    AppWorkspaceWorkspaceIdApiKeysApiKeyIdRoute:
+      AppWorkspaceWorkspaceIdApiKeysApiKeyIdRoute,
     AppWorkspaceWorkspaceIdMcpsMcpIdRoute:
       AppWorkspaceWorkspaceIdMcpsMcpIdRoute,
     AppWorkspaceWorkspaceIdProvidersProviderIdRoute:
