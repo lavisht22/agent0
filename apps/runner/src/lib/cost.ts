@@ -150,6 +150,11 @@ const MODEL_COSTS: {
 	},
 
 	// Vertex AI Claude
+	"claude-opus-4-7": {
+		noCacheInput: 5,
+		cacheInput: 0.5,
+		output: 25,
+	},
 	"claude-opus-4-6": {
 		noCacheInput: 5,
 		cacheInput: 0.5,
