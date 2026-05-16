@@ -26,6 +26,10 @@ export interface ProviderOptions {
 	vertex?: GoogleGenerativeAIProviderOptions;
 	/** Amazon Bedrock thinking configuration */
 	bedrock?: BedrockProviderOptions;
+	/** Anthropic (including Vertex Anthropic) effort configuration */
+	anthropic?: {
+		effort?: "low" | "medium" | "high" | "max";
+	};
 }
 
 /**
