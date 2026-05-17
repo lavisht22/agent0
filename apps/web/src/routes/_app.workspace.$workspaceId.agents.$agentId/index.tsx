@@ -1,4 +1,5 @@
 import {
+	Alert,
 	Button,
 	Dropdown,
 	Input,
@@ -35,6 +36,7 @@ import { Messages, type MessageT } from "@/components/messages";
 import { PageHeader } from "@/components/page-header";
 import { TagsSelect } from "@/components/tags-select";
 import { copyToClipboard } from "@/lib/clipboard";
+import { getModelStatus } from "@/lib/providers";
 import {
 	agentQuery,
 	agentTagsQuery,
@@ -437,7 +439,7 @@ function RouteComponent() {
 			</Modal>
 			<div className="flex flex-1 overflow-hidden">
 				<div className="basis-1/2 grow-0 shrink-0 min-w-0 flex flex-col border-r border-border min-h-0">
-					<div className="flex gap-2 justify-between items-center p-4 border-b border-border">
+					<div className="flex gap-2 justify-between items-center p-4">
 						<div className="flex gap-2 min-w-0">
 							<form.Field name="model">
 								{(field) => (
@@ -627,6 +629,33 @@ function RouteComponent() {
 								)}
 							</Button>
 						</div>
+					</div>
+					<div className="border-b border-border">
+						<form.Subscribe selector={(state) => state.values.model}>
+							{(model) => {
+								const providerType = providers?.find(
+									(p) => p.id === model.provider_id,
+								)?.type;
+								const status = getModelStatus(providerType, model.name);
+								if (status !== "deprecated" && status !== "retired")
+									return null;
+								const isRetired = status === "retired";
+								return (
+									<div className="px-4 pb-4">
+										<Alert status={isRetired ? "danger" : "warning"}>
+											<Alert.Indicator />
+											<Alert.Content>
+												<Alert.Title>
+													{isRetired
+														? `${model.name} has been retired and will fail to run. Choose a replacement.`
+														: `${model.name} is deprecated and will be retired soon. Choose a replacement.`}
+												</Alert.Title>
+											</Alert.Content>
+										</Alert>
+									</div>
+								);
+							}}
+						</form.Subscribe>
 					</div>
 					<div className="flex-1 overflow-y-auto p-4 space-y-4">
 						<form.Field name="skills">

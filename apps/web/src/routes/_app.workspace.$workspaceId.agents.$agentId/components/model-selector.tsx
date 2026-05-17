@@ -100,7 +100,7 @@ export function ModelSelector({
 					<ListBox
 						aria-label="Models"
 						selectionMode="single"
-						className="w-64 max-h-64 overflow-y-auto"
+						className="w-80 max-h-64 overflow-y-auto"
 						selectedKeys={selectedModel ? [selectedModel] : []}
 						onSelectionChange={(keys) => {
 							const selected = Array.from(keys)[0] as string;
@@ -118,8 +118,19 @@ export function ModelSelector({
 						}}
 					>
 						{availableModels.map((model) => (
-							<ListBox.Item key={model} id={model} textValue={model}>
-								<Label>{model}</Label>
+							<ListBox.Item key={model.id} id={model.id} textValue={model.id}>
+								<Label>{model.id}</Label>
+								{model.status !== "active" && (
+									<span
+										className={`ml-auto text-[10px] uppercase tracking-wide font-medium px-1.5 py-0.5 rounded ${
+											model.status === "retired"
+												? "text-red-700 bg-red-50"
+												: "text-yellow-700 bg-yellow-50"
+										}`}
+									>
+										{model.status === "retired" ? "Retired" : "Deprecated"}
+									</span>
+								)}
 								<ListBox.ItemIndicator />
 							</ListBox.Item>
 						))}
