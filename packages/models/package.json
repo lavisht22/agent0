@@ -1,6 +1,7 @@
 {
 	"name": "@repo/models",
 	"version": "1.0.0",
+	"type": "module",
 	"main": "index.ts",
 	"devDependencies": {
 		"typescript": "^5.0.0"
