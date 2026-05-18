@@ -25,8 +25,110 @@ import IDCopy from "@/components/id-copy";
 import { PageHeader } from "@/components/page-header";
 import { TagChip } from "@/components/tag-chip";
 import { TagsSelect } from "@/components/tags-select";
-import { agentsQuery } from "@/lib/queries";
+import { agentsQuery, providersQuery } from "@/lib/queries";
+import { getModelStatus, PROVIDER_TYPES } from "@/lib/providers";
 import { supabase } from "@/lib/supabase";
+
+type ProviderForCell = { id: string; type: string };
+
+function extractModel(
+	data: unknown,
+): { provider_id: string; name: string } | null {
+	if (!data || typeof data !== "object") return null;
+	const model = (data as { model?: unknown }).model;
+	if (!model || typeof model !== "object") return null;
+	const { provider_id, name } = model as {
+		provider_id?: unknown;
+		name?: unknown;
+	};
+	if (typeof provider_id !== "string" || typeof name !== "string") return null;
+	if (!provider_id || !name) return null;
+	return { provider_id, name };
+}
+
+function ModelLine({
+	model,
+	providers,
+	label,
+}: {
+	model: { provider_id: string; name: string };
+	providers: ProviderForCell[];
+	label?: string;
+}) {
+	const providerType = providers.find((p) => p.id === model.provider_id)?.type;
+	const Icon = PROVIDER_TYPES.find((p) => p.key === providerType)?.icon;
+	const status = getModelStatus(providerType, model.name);
+
+	return (
+		<div className="flex items-center gap-1.5 min-w-0">
+			{label && (
+				<span className="text-xs text-muted shrink-0">{label}:</span>
+			)}
+			{Icon && <Icon className="size-4 shrink-0" />}
+			<Tooltip delay={300}>
+				<Tooltip.Trigger>
+					<span className="truncate max-w-48 text-sm">{model.name}</span>
+				</Tooltip.Trigger>
+				<Tooltip.Content placement="top">{model.name}</Tooltip.Content>
+			</Tooltip>
+			{status === "deprecated" && (
+				<span className="text-[10px] uppercase tracking-wide font-medium px-1.5 py-0.5 rounded text-yellow-700 bg-yellow-50 shrink-0">
+					Deprecated
+				</span>
+			)}
+			{status === "retired" && (
+				<span className="text-[10px] uppercase tracking-wide font-medium px-1.5 py-0.5 rounded text-red-700 bg-red-50 shrink-0">
+					Retired
+				</span>
+			)}
+		</div>
+	);
+}
+
+function AgentModelCell({
+	agent,
+	providers,
+}: {
+	agent: {
+		staging_version?: { data: unknown } | null;
+		production_version?: { data: unknown } | null;
+	};
+	providers: ProviderForCell[];
+}) {
+	const prod = extractModel(agent.production_version?.data);
+	const stg = extractModel(agent.staging_version?.data);
+
+	if (!prod && !stg) {
+		return <span className="text-muted text-sm">Not deployed</span>;
+	}
+
+	const same =
+		prod &&
+		stg &&
+		prod.provider_id === stg.provider_id &&
+		prod.name === stg.name;
+
+	if (same || (prod && !stg)) {
+		return <ModelLine model={prod as NonNullable<typeof prod>} providers={providers} />;
+	}
+	if (stg && !prod) {
+		return <ModelLine model={stg} providers={providers} label="Staging" />;
+	}
+	return (
+		<div className="flex flex-col gap-1">
+			<ModelLine
+				model={prod as NonNullable<typeof prod>}
+				providers={providers}
+				label="Production"
+			/>
+			<ModelLine
+				model={stg as NonNullable<typeof stg>}
+				providers={providers}
+				label="Staging"
+			/>
+		</div>
+	);
+}
 
 export const Route = createFileRoute("/_app/workspace/$workspaceId/agents/")({
 	component: RouteComponent,
@@ -60,6 +162,10 @@ function RouteComponent() {
 	const { data: agents } = useQuery(
 		agentsQuery(workspaceId, page, searchQuery, selectedTags),
 	);
+
+	// Fetch providers (used to map deployed-version provider_id -> provider type
+	// for icon + status lookup in the Model column).
+	const { data: providers } = useQuery(providersQuery(workspaceId));
 
 	// Local state for search input with debounce
 	const [localSearch, setLocalSearch] = useState(searchQuery || "");
@@ -218,6 +324,7 @@ function RouteComponent() {
 							<Table.Header className="sticky top-0 z-10">
 								<Table.Column id="name">Name</Table.Column>
 								<Table.Column id="tags">Tags</Table.Column>
+								<Table.Column id="model">Model</Table.Column>
 								<Table.Column id="id">ID</Table.Column>
 								<Table.Column id="createdAt">Created At</Table.Column>
 								<Table.Column id="actions" className="w-20"></Table.Column>
@@ -252,6 +359,12 @@ function RouteComponent() {
 													) : null,
 												)}
 											</div>
+										</Table.Cell>
+										<Table.Cell>
+											<AgentModelCell
+												agent={item}
+												providers={providers ?? []}
+											/>
 										</Table.Cell>
 										<Table.Cell>
 											<IDCopy id={item.id} />

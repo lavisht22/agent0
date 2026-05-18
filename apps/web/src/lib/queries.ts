@@ -153,7 +153,9 @@ export const agentsQuery = (
 
 			let query = supabase
 				.from("agents")
-				.select("*, agent_tags(*, tags(*))")
+				.select(
+					"*, agent_tags(*, tags(*)), staging_version:agent_versions!staging_version_id(data), production_version:agent_versions!production_version_id(data)",
+				)
 				.eq("workspace_id", workspaceId);
 
 			// Apply agent ID filter if we have matching agents from tags
