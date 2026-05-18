@@ -46,6 +46,9 @@ importers:
       '@repo/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@repo/models':
+        specifier: workspace:*
+        version: link:../../packages/models
       '@supabase/supabase-js':
         specifier: ^2.84.0
         version: 2.84.0
@@ -104,6 +107,9 @@ importers:
       '@repo/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@repo/models':
+        specifier: workspace:*
+        version: link:../../packages/models
       '@supabase/supabase-js':
         specifier: ^2.84.0
         version: 2.84.0
@@ -238,6 +244,12 @@ importers:
       supabase:
         specifier: ^2.76.8
         version: 2.76.8
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+
+  packages/models:
+    devDependencies:
       typescript:
         specifier: ^5.0.0
         version: 5.9.3

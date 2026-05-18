@@ -7,7 +7,7 @@ import {
 } from "@heroui/react";
 import { LucideServer } from "lucide-react";
 import { useEffect, useState } from "react";
-import { PROVIDER_TYPES } from "@/lib/providers";
+import { MODELS, PROVIDER_TYPES, type ProviderType } from "@/lib/providers";
 
 interface Provider {
 	id: string;
@@ -38,8 +38,11 @@ export function ModelSelector({
 		(p) => p.id === selectedProvider,
 	)?.type;
 
-	const availableModels =
-		PROVIDER_TYPES.find((p) => p.key === selectedProviderType)?.models || [];
+	const availableModels = selectedProviderType
+		? MODELS.filter((m) =>
+				m.providers.includes(selectedProviderType as ProviderType),
+			)
+		: [];
 
 	useEffect(() => {
 		setSelectedProvider(value.provider_id);
