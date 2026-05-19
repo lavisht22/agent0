@@ -2,7 +2,9 @@
 	"name": "runner",
 	"type": "module",
 	"scripts": {
+		"predev": "pnpm --filter @repo/models build",
 		"dev": "tsx watch src/index.ts",
+		"prebuild": "pnpm --filter @repo/models build",
 		"build": "tsc && cp src/lib/openpgp.js src/lib/openpgp.d.ts dist/lib/",
 		"start": "node dist/index.js"
 	},

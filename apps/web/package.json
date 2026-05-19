@@ -3,7 +3,9 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
+		"predev": "pnpm --filter @repo/models build",
 		"dev": "vite --port 2222",
+		"prebuild": "pnpm --filter @repo/models build",
 		"build": "vite build && tsc",
 		"serve": "vite preview",
 		"test": "vitest run",
