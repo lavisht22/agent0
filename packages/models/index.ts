@@ -134,6 +134,12 @@ export const MODELS: Model[] = [
 		cost: { noCacheInput: 2, cacheInput: 0.2, output: 12 },
 	},
 	{
+		id: "gemini-3.5-flash",
+		providers: ["google", "google-vertex"],
+		status: "active",
+		cost: { noCacheInput: 1.5, cacheInput: 0.15, output: 9 },
+	},
+	{
 		id: "gemini-3.1-flash-lite",
 		providers: ["google", "google-vertex"],
 		status: "active",
