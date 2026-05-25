@@ -11,11 +11,12 @@ import { nanoid } from "nanoid";
 import { calculateModelCost } from "../lib/cost.js";
 import { supabase } from "../lib/db.js";
 import {
+	applyMessageVariables,
 	applySkillCatalog,
 	createSSEStream,
 	prepareMCPServers,
-	prepareProviderAndMessages,
 	prepareSkills,
+	resolveProviderModel,
 	uploadRunData,
 } from "../lib/helpers.js";
 import type { RunData, RunOverrides, VersionData } from "../lib/types.js";
@@ -213,12 +214,13 @@ export async function registerRunRoute(fastify: FastifyInstance) {
 			data.tools = [...(data.tools || []), ...customTools];
 		}
 
+		const processedMessages = applyMessageVariables(data, variables);
 		const [
-			{ model, processedMessages },
+			{ model },
 			{ tools, closeAll },
 			{ systemAddendum, skillTools },
 		] = await Promise.all([
-			prepareProviderAndMessages(data, variables, environment),
+			resolveProviderModel(data, environment),
 			prepareMCPServers(data, environment, mcp_options),
 			prepareSkills(data),
 		]);

@@ -7,8 +7,10 @@ import {
 	type streamText,
 	type Tool,
 	type ToolSet,
+	wrapLanguageModel,
 } from "ai";
 import { supabase } from "./db.js";
+import { vertexAnthropicCacheMiddleware } from "./middleware.js";
 import { decryptMessage } from "./openpgp.js";
 import { getAIProvider } from "./providers.js";
 import type { Environment, MCPConfig, MCPOptions, VersionData } from "./types.js";
@@ -27,18 +29,18 @@ const pickEncrypted = (
 	return row.encrypted_data_production as string;
 };
 
-// Helper to prepare provider and messages - shared logic between generate and stream
-export const prepareProviderAndMessages = async (
+// Resolve the AI provider for a version: fetch the provider row, decrypt
+// credentials for the environment, and instantiate the SDK adapter. The full
+// pipeline is cached for 5 min since credentials change rarely.
+export const resolveProviderModel = async (
 	data: VersionData,
-	variables: Record<string, string>,
 	environment: Environment,
 ) => {
-	const { model, messages } = data;
+	const { model } = data;
 
-	// Cache the entire provider pipeline: DB fetch + decryption + provider init
 	const { provider, aiProvider } = await cachedQuery(
 		`provider-resolved:${model.provider_id}:${environment}`,
-		300_000, // 5 min TTL — credentials change rarely
+		300_000,
 		async () => {
 			const { data, error } = await supabase
 				.from("providers")
@@ -59,16 +61,29 @@ export const prepareProviderAndMessages = async (
 		},
 	);
 
-	const processedMessages = JSON.parse(
-		applyVariablesToMessages(JSON.stringify(messages), variables),
-	) as ModelMessage[];
+	const baseModel = aiProvider(model.name);
+	const wrappedModel =
+		provider.type === "anthropic-vertex"
+			? wrapLanguageModel({
+					model: baseModel,
+					middleware: vertexAnthropicCacheMiddleware,
+				})
+			: baseModel;
 
 	return {
-		model: aiProvider(model.name) as LanguageModel,
+		model: wrappedModel as LanguageModel,
 		provider,
-		processedMessages,
 	};
 };
+
+// Apply per-request variable substitution to the version's messages.
+export const applyMessageVariables = (
+	data: VersionData,
+	variables: Record<string, string>,
+): ModelMessage[] =>
+	JSON.parse(
+		applyVariablesToMessages(JSON.stringify(data.messages), variables),
+	) as ModelMessage[];
 
 type MCPClient = Awaited<ReturnType<typeof createMCPClient>>;
 type Tools = Awaited<ReturnType<MCPClient["tools"]>>;
