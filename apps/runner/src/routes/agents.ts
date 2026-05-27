@@ -695,4 +695,104 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			});
 		},
 	});
+
+	fastify.post("/agents/:agentId/versions", {
+		preHandler: [
+			async (request, reply) => {
+				const { agentId } = request.params as { agentId: string };
+				checkScope(request, reply, `agents:write:${agentId}`);
+			},
+			requireUserId,
+		],
+		schema: {
+			tags: ["Versions"],
+			summary: "Push a new prompt version",
+			params: {
+				type: "object" as const,
+				properties: {
+					agentId: { type: "string" as const, description: "Agent ID" },
+				},
+				required: ["agentId"],
+			},
+			querystring: {
+				type: "object" as const,
+				properties: {
+					deploy: { type: "string" as const, enum: ["staging", "production"], description: "Deploy this version to staging or production" },
+				},
+			},
+			body: {
+				type: "object" as const,
+				properties: {
+					data: { type: "object" as const, additionalProperties: true, description: "Opaque JSON prompt data" },
+				},
+				required: ["data"],
+			},
+			response: {
+				201: {
+					type: "object" as const,
+					properties: {
+						data: VersionDetailSchema,
+					},
+				},
+				400: ErrorSchema,
+				404: ErrorSchema,
+				500: ErrorSchema,
+			},
+		},
+		handler: async (request, reply) => {
+			const { workspaceId, agentId } = request.params as {
+				workspaceId: string;
+				agentId: string;
+			};
+			const { deploy } = request.query as { deploy?: "staging" | "production" };
+			const { data } = request.body as { data: Record<string, any> };
+
+			// Verify agent belongs to workspace
+			const { data: agent, error: agentError } = await supabase
+				.from("agents")
+				.select("id")
+				.eq("id", agentId)
+				.eq("workspace_id", workspaceId)
+				.single();
+
+			if (agentError || !agent) {
+				return reply.code(404).send({ message: "Agent not found" });
+			}
+
+			const versionId = nanoid();
+			const userId = request.userId; // guaranteed by requireUserId
+
+			// Start by inserting the new version
+			const { data: newVersion, error: versionError } = await supabase
+				.from("agent_versions")
+				.insert({
+					id: versionId,
+					agent_id: agentId,
+					data,
+					is_deployed: !!deploy,
+					user_id: userId,
+				})
+				.select("*")
+				.single();
+
+			if (versionError || !newVersion) {
+				return reply.code(500).send({ message: "Failed to create version" });
+			}
+
+			// If deploy is requested, update the agent
+			if (deploy) {
+				const updateField = deploy === "staging" ? { staging_version_id: versionId } : { production_version_id: versionId };
+				const { error: deployError } = await supabase
+					.from("agents")
+					.update(updateField)
+					.eq("id", agentId);
+
+				if (deployError) {
+					return reply.code(500).send({ message: "Version created but failed to deploy" });
+				}
+			}
+
+			return reply.code(201).send({ data: newVersion });
+		},
+	});
 }

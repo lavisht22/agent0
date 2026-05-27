@@ -131,7 +131,7 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
   - If `tag_ids` is present, replace the agent's tag set (delete + insert, matching `use-agent-mutations.tsx:164-183`).
   - Returns the updated agent.
 
-- [ ] **T1.3 — `POST /api/v1/workspaces/:workspaceId/agents/:id/versions` (push new prompt version). PAT-only.**
+- [x] **T1.3 — `POST /api/v1/workspaces/:workspaceId/agents/:id/versions` (push new prompt version). PAT-only.**
   - PreHandlers: `checkScope(agents:write:<id>)` inline + `requireUserId`.
   - Body: `{ data: object }` — opaque JSON, stored as-is.
   - Optional query: `?deploy=staging|production` — if set, also updates the corresponding `*_version_id` on the agent in the same response.
