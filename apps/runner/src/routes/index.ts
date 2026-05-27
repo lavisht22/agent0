@@ -18,7 +18,11 @@ export async function registerRoutes(fastify: FastifyInstance) {
 	// state should chain `requireUserId` to block API keys.
 	await fastify.register(async (scoped) => {
 		addAuth(scoped);
-		await registerRunRoute(scoped);
+		
+		await scoped.register(async (workspaceScoped) => {
+			await registerRunRoute(workspaceScoped);
+		}, { prefix: "/api/v1/workspaces/:workspaceId" });
+
 		await registerEmbedRoutes(scoped);
 		await registerAgentRoutes(scoped);
 		await registerRunsRoutes(scoped);

@@ -12,11 +12,13 @@ import type {
 
 export class Agent0 {
 	private apiKey: string;
+	private workspaceId: string;
 	private baseUrl: string;
 	private environment?: Environment;
 
 	constructor(config: Agent0Config) {
 		this.apiKey = config.apiKey;
+		this.workspaceId = config.workspaceId;
 		this.baseUrl = config.baseUrl || "https://app.agent0.com"; // Default URL, can be overridden
 		this.environment = config.environment;
 	}
@@ -54,7 +56,7 @@ export class Agent0 {
 	}
 
 	async generate(options: RunOptions): Promise<GenerateResponse> {
-		const response = await this.fetchApi("/api/v1/run", {
+		const response = await this.fetchApi(`/api/v1/workspaces/${this.workspaceId}/runs`, {
 			agent_id: options.agentId,
 			environment: this.resolveEnvironment(options.environment),
 			variables: options.variables,
@@ -71,7 +73,7 @@ export class Agent0 {
 	async *stream(
 		options: RunOptions,
 	): AsyncGenerator<TextStreamPart<ToolSet>, void, unknown> {
-		const response = await this.fetchApi("/api/v1/run", {
+		const response = await this.fetchApi(`/api/v1/workspaces/${this.workspaceId}/runs`, {
 			agent_id: options.agentId,
 			environment: this.resolveEnvironment(options.environment),
 			variables: options.variables,

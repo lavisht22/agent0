@@ -24,7 +24,7 @@ import { cachedQuery } from "../lib/cache.js";
 import { hasScope } from "../lib/scopes.js";
 
 export async function registerRunRoute(fastify: FastifyInstance) {
-	fastify.post("/api/v1/run", {
+	fastify.post("/runs", {
 		schema: {
 			tags: ["Run"],
 			summary: "Run an agent",

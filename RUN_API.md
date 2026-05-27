@@ -2,11 +2,11 @@
 
 ## Overview
 
-The RUN API (`/api/v1/run`) is a production-ready endpoint that allows downstream applications to execute agents using API key authentication.
+The RUN API (`/api/v1/workspaces/:workspaceId/runs`) is a production-ready endpoint that allows downstream applications to execute agents using API key authentication.
 ## Endpoint
 
 ```
-POST /api/v1/run
+POST /api/v1/workspaces/:workspaceId/runs
 ```
 
 ## Authentication
@@ -162,7 +162,7 @@ The API performs the following checks:
 ### cURL Example (Non-Streaming)
 
 ```bash
-curl -X POST https://your-domain.com/api/v1/run \
+curl -X POST https://your-domain.com/api/v1/workspaces/ws_123/runs \
   -H "Content-Type: application/json" \
   -H "x-api-key: your-api-key-here" \
   -d '{
@@ -178,7 +178,7 @@ curl -X POST https://your-domain.com/api/v1/run \
 ### cURL Example (Staging Environment)
 
 ```bash
-curl -X POST https://your-domain.com/api/v1/run \
+curl -X POST https://your-domain.com/api/v1/workspaces/ws_123/runs \
   -H "Content-Type: application/json" \
   -H "x-api-key: your-api-key-here" \
   -d '{
@@ -193,7 +193,7 @@ curl -X POST https://your-domain.com/api/v1/run \
 ### cURL Example (With Overrides)
 
 ```bash
-curl -X POST https://your-domain.com/api/v1/run \
+curl -X POST https://your-domain.com/api/v1/workspaces/ws_123/runs \
   -H "Content-Type: application/json" \
   -H "x-api-key: your-api-key-here" \
   -d '{
@@ -214,7 +214,7 @@ curl -X POST https://your-domain.com/api/v1/run \
 ### cURL Example (With Provider Options)
 
 ```bash
-curl -X POST https://your-domain.com/api/v1/run \
+curl -X POST https://your-domain.com/api/v1/workspaces/ws_123/runs \
   -H "Content-Type: application/json" \
   -H "x-api-key: your-api-key-here" \
   -d '{
@@ -233,7 +233,7 @@ curl -X POST https://your-domain.com/api/v1/run \
 ### cURL Example (Streaming)
 
 ```bash
-curl -X POST https://your-domain.com/api/v1/run \
+curl -X POST https://your-domain.com/api/v1/workspaces/ws_123/runs \
   -H "Content-Type: application/json" \
   -H "x-api-key: your-api-key-here" \
   -d '{
@@ -250,7 +250,7 @@ curl -X POST https://your-domain.com/api/v1/run \
 
 ```typescript
 // Non-streaming
-const response = await fetch('https://your-domain.com/api/v1/run', {
+const response = await fetch('https://your-domain.com/api/v1/workspaces/ws_123/runs', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -270,7 +270,7 @@ const data = await response.json();
 console.log(data.messages);
 
 // Streaming
-const response = await fetch('https://your-domain.com/api/v1/run', {
+const response = await fetch('https://your-domain.com/api/v1/workspaces/ws_123/runs', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',

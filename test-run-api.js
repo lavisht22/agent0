@@ -4,22 +4,23 @@
  * Test script for the RUN API
  *
  * Usage:
- *   node test-run-api.js <agent_id> <api_key> [stream]
+ *   node test-run-api.js <agent_id> <api_key> <workspace_id> [stream]
  *
  * Example:
- *   node test-run-api.js abc123 my-api-key true
+ *   node test-run-api.js abc123 my-api-key ws_123 true
  */
 
 const agent_id = process.argv[2];
 const api_key = process.argv[3];
-const stream = process.argv[4] === "true";
+const workspace_id = process.argv[4];
+const stream = process.argv[5] === "true";
 
-if (!agent_id || !api_key) {
-	console.error("Usage: node test-run-api.js <agent_id> <api_key> [stream]");
+if (!agent_id || !api_key || !workspace_id) {
+	console.error("Usage: node test-run-api.js <agent_id> <api_key> <workspace_id> [stream]");
 	process.exit(1);
 }
 
-const API_URL = "http://localhost:2223/api/v1/run";
+const API_URL = `http://localhost:2223/api/v1/workspaces/${workspace_id}/runs`;
 
 async function testRunAPI() {
 	console.log("Testing RUN API...");

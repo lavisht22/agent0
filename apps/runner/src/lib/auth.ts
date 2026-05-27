@@ -124,6 +124,11 @@ export function addAuth(fastify: FastifyInstance) {
 				return reply.code(403).send({ message: "Invalid API key" });
 			}
 
+			const pathWorkspaceId = (request.params as { workspaceId?: string })?.workspaceId;
+			if (pathWorkspaceId && pathWorkspaceId !== apiKeyData.workspace_id) {
+				return reply.code(403).send({ message: "API key is not scoped to this workspace" });
+			}
+
 			request.workspaceId = apiKeyData.workspace_id;
 			request.userId = undefined;
 			request.tokenId = undefined;
