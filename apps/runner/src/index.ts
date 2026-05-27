@@ -44,7 +44,7 @@ fastify.setNotFoundHandler((req, reply) => {
 await fastify.register(fastifySwagger, {
 	openapi: {
 		info: {
-			title: "Agent0 API",
+			title: "agent0 API",
 			description: "API for managing and running AI agents",
 			version: "1.0.0",
 		},
@@ -56,14 +56,24 @@ await fastify.register(fastifySwagger, {
 					in: "header",
 					description: "Workspace API key",
 				},
+				bearerAuth: {
+					type: "http",
+					scheme: "bearer",
+					bearerFormat: "PAT",
+					description: "Personal Access Token",
+				},
 			},
 		},
-		security: [{ apiKey: [] }],
+		security: [{ apiKey: [] }, { bearerAuth: [] }],
 	},
 });
 
+fastify.get("/api/v1/openapi.json", (req, reply) => {
+	reply.send(fastify.swagger());
+});
+
 await fastify.register(fastifySwaggerUi, {
-	routePrefix: "/docs",
+	routePrefix: "/api/v1/docs",
 });
 
 // 4. Register API Routes

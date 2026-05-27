@@ -160,7 +160,7 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
 
 ### Phase 2 — OpenAPI publishing
 
-- [ ] **T2.1 — Wire `@fastify/swagger` + `@fastify/swagger-ui`.**
+- [x] **T2.1 — Wire `@fastify/swagger` + `@fastify/swagger-ui`.**
   - Existing routes already have Fastify schemas (see `apps/runner/src/routes/agents.ts`). Make sure new routes from Phase 1 are schema-complete too.
   - Serve the spec at `/api/v1/openapi.json` and Swagger UI at `/api/v1/docs`.
   - Lets third parties generate clients and lets us auto-generate a future MCP wrapper.
