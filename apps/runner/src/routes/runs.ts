@@ -2,13 +2,14 @@ import {
 	generateText,
 	type ModelMessage,
 	Output,
+	type StepResult,
 	stepCountIs,
 	streamText,
 	type ToolSet,
 } from "ai";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
-import { calculateModelCost } from "../lib/cost.js";
+import { calculateModelCost, sumUsage } from "../lib/cost.js";
 import { supabase } from "../lib/db.js";
 import {
 	applyMessageVariables,
@@ -565,6 +566,48 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						});
 						await uploadRunData(id, runData);
 					},
+					onAbort: async ({ steps }) => {
+						if (streamCompleted) return;
+						streamCompleted = true;
+						closeAll();
+
+						if (!firstTokenTime) {
+							firstTokenTime = Date.now() - preProcessingTime - startTime;
+						}
+
+						const totalUsage = sumUsage(steps);
+
+						runData.steps = steps;
+						runData.totalUsage = totalUsage;
+						runData.error = {
+							name: "AbortError",
+							message: "Run aborted by client disconnect",
+						};
+
+						const id = nanoid();
+						await supabase.from("runs").insert({
+							id,
+							workspace_id: workspaceId,
+							version_id: version.id,
+							created_at: new Date(startTime).toISOString(),
+							is_error: true,
+							is_test: false,
+							is_stream: true,
+							pre_processing_time: preProcessingTime,
+							first_token_time: firstTokenTime,
+							response_time:
+								Date.now() -
+								(firstTokenTime || 0) -
+								preProcessingTime -
+								startTime,
+							tokens: totalUsage.totalTokens,
+							cost: calculateModelCost(
+								typeof model === "string" ? model : model.modelId,
+								totalUsage,
+							),
+						});
+						await uploadRunData(id, runData);
+					},
 				});
 
 				// Handle client disconnect - clean up MCP clients if stream didn't complete
@@ -587,6 +630,16 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 			}
 
 			// Non-streaming path
+			const controller = new AbortController();
+			let completed = false;
+			const collectedSteps: StepResult<ToolSet>[] = [];
+
+			request.raw.on("close", () => {
+				if (!completed) {
+					controller.abort();
+				}
+			});
+
 			try {
 				const result = await generateText({
 					model,
@@ -597,7 +650,12 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 					tools: allTools as ToolSet,
 					output: outputFormat === "json" ? Output.json() : Output.text(),
 					providerOptions,
+					abortSignal: controller.signal,
+					onStepFinish: (step) => {
+						collectedSteps.push(step as StepResult<ToolSet>);
+					},
 				});
+				completed = true;
 
 				const { response, text, steps, totalUsage } = result;
 				runData.steps = steps;
@@ -628,6 +686,42 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 					messages: response.messages,
 				});
 			} catch (error) {
+				completed = true;
+
+				if (controller.signal.aborted) {
+					// Client disconnected — log as error with partial cost from
+					// completed steps. Socket is gone, so don't try to send a reply.
+					const totalUsage = sumUsage(collectedSteps);
+
+					runData.steps = collectedSteps;
+					runData.totalUsage = totalUsage;
+					runData.error = {
+						name: "AbortError",
+						message: "Run aborted by client disconnect",
+					};
+
+					const id = nanoid();
+					await supabase.from("runs").insert({
+						id,
+						workspace_id: workspaceId,
+						version_id: version.id,
+						created_at: new Date(startTime).toISOString(),
+						is_error: true,
+						is_test: false,
+						is_stream: false,
+						pre_processing_time: preProcessingTime,
+						first_token_time: Date.now() - preProcessingTime - startTime,
+						response_time: 0,
+						tokens: totalUsage.totalTokens,
+						cost: calculateModelCost(
+							typeof model === "string" ? model : model.modelId,
+							totalUsage,
+						),
+					});
+					await uploadRunData(id, runData);
+					return;
+				}
+
 				runData.error = {
 					name: error instanceof Error ? error.name : "UnknownError",
 					message:
