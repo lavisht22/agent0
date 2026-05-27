@@ -32,7 +32,9 @@ const BUILT_IN_SCOPE_SUGGESTIONS = [
 	"agents:read:*",
 	"runs:read:*",
 	"embeddings:run:*",
+	"tags:read:*",
 ];
+
 
 interface FormValues {
 	name: string;

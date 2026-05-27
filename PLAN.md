@@ -139,7 +139,7 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
   - Returns the created version (same shape as `GET .../agents/:id/versions/:versionId`).
   - This is the headline endpoint for the CLI `prompt push` flow.
 
-- [ ] **T1.4 — Tags CRUD under `/api/v1/workspaces/:workspaceId/tags`.**
+- [x] **T1.4 — Tags CRUD under `/api/v1/workspaces/:workspaceId/tags`.**
   - `GET .../tags`: scope `tags:read:*`. API keys allowed.
   - `POST .../tags`, `DELETE .../tags/:id`: PAT-only (`requireUserId`). No new scope needed — PATs hold `*:*:*`.
   - Tag fields: `id`, `name`, `color`, `workspace_id`.

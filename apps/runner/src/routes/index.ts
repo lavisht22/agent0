@@ -8,6 +8,7 @@ import { registerRunsRoutes } from "./runs.js";
 import { registerTestRoute } from "./test.js";
 import { registerVersionRoute } from "./version.js";
 import { registerWorkspacesRoute } from "./workspaces.js";
+import { registerTagsRoutes } from "./tags.js";
 
 export async function registerRoutes(fastify: FastifyInstance) {
 	// Internal routes — JWT-authenticated, called by the frontend
@@ -28,6 +29,7 @@ export async function registerRoutes(fastify: FastifyInstance) {
 				await registerRunsRoutes(workspaceScoped);
 				await registerEmbedRoutes(workspaceScoped);
 				await registerAgentRoutes(workspaceScoped);
+				await registerTagsRoutes(workspaceScoped);
 			},
 			{ prefix: "/api/v1/workspaces/:workspaceId" },
 		);
