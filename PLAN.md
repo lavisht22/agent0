@@ -167,7 +167,7 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
 
 ### Phase 3 — CLI package scaffold (new `packages/cli`)
 
-- [ ] **T3.1 — Scaffold `packages/cli`, published as `agent0-cli`.**
+- [x] **T3.1 — Scaffold `packages/cli`, published as `agent0-cli`.**
   - New workspace package; binary name is `agent0` (so `npm i -g agent0-cli` installs the `agent0` command).
   - `package.json` with `bin: { agent0: "dist/index.js" }`, TypeScript build to `dist/`, shebang line.
   - Argv parser: `cac` (small, sufficient).
