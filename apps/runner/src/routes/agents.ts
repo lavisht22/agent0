@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
+import { nanoid } from "nanoid";
 import { supabase } from "../lib/db.js";
-import { checkScope, requireScope } from "../lib/scopes.js";
+import { checkScope, requireScope, requireUserId } from "../lib/scopes.js";
 
 const TagSchema = {
 	type: "object" as const,
@@ -228,6 +229,119 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			}));
 
 			return reply.send({ data: result, page: pageNum, limit: limitNum });
+		},
+	});
+
+	fastify.post("/api/v1/agents", {
+		preHandler: [requireScope("agents:write:*"), requireUserId],
+		schema: {
+			tags: ["Agents"],
+			summary: "Create an agent",
+			body: {
+				type: "object" as const,
+				properties: {
+					name: { type: "string" as const, minLength: 1, description: "Agent name" },
+					tag_ids: {
+						type: "array" as const,
+						items: { type: "string" as const },
+						description: "Optional tag IDs to attach. All must belong to the caller's workspace.",
+					},
+				},
+				required: ["name"],
+				additionalProperties: false,
+			},
+			response: {
+				201: {
+					type: "object" as const,
+					properties: {
+						data: AgentSchema,
+					},
+				},
+				400: ErrorSchema,
+				500: ErrorSchema,
+			},
+		},
+		handler: async (request, reply) => {
+			const { workspaceId } = request;
+			const { name, tag_ids } = request.body as {
+				name: string;
+				tag_ids?: string[];
+			};
+
+			const trimmedName = name.trim();
+			if (trimmedName.length === 0) {
+				return reply.code(400).send({ message: "name must not be empty" });
+			}
+
+			const uniqueTagIds = tag_ids ? Array.from(new Set(tag_ids)) : [];
+
+			if (uniqueTagIds.length > 0) {
+				const { data: workspaceTags, error: tagLookupError } = await supabase
+					.from("tags")
+					.select("id")
+					.eq("workspace_id", workspaceId)
+					.in("id", uniqueTagIds);
+
+				if (tagLookupError) {
+					return reply.code(500).send({ message: "Failed to validate tags" });
+				}
+
+				const foundIds = new Set(workspaceTags.map((t) => t.id));
+				const unknown = uniqueTagIds.filter((id) => !foundIds.has(id));
+				if (unknown.length > 0) {
+					return reply.code(400).send({
+						message: `Unknown tag_ids for this workspace: ${unknown.join(", ")}`,
+					});
+				}
+			}
+
+			const agentId = nanoid();
+			const { data: created, error: insertError } = await supabase
+				.from("agents")
+				.insert({
+					id: agentId,
+					name: trimmedName,
+					workspace_id: workspaceId,
+				})
+				.select("id, name, staging_version_id, production_version_id, created_at, updated_at")
+				.single();
+
+			if (insertError || !created) {
+				return reply.code(500).send({ message: "Failed to create agent" });
+			}
+
+			if (uniqueTagIds.length > 0) {
+				const { error: tagInsertError } = await supabase
+					.from("agent_tags")
+					.insert(uniqueTagIds.map((tagId) => ({ agent_id: agentId, tag_id: tagId })));
+
+				if (tagInsertError) {
+					// Roll back the agent so the caller doesn't end up with a half-created record.
+					await supabase.from("agents").delete().eq("id", agentId);
+					return reply.code(500).send({ message: "Failed to attach tags" });
+				}
+			}
+
+			const { data: tagRows, error: tagFetchError } = await supabase
+				.from("agent_tags")
+				.select("tags(id, name)")
+				.eq("agent_id", agentId);
+
+			if (tagFetchError) {
+				return reply.code(500).send({ message: "Failed to load agent tags" });
+			}
+
+			return reply.code(201).send({
+				data: {
+					id: created.id,
+					name: created.name,
+					staging_version_id: created.staging_version_id,
+					production_version_id: created.production_version_id,
+					tags: tagRows?.map((row) => row.tags).filter(Boolean) ?? [],
+					created_at: created.created_at,
+					updated_at: created.updated_at,
+				},
+			});
 		},
 	});
 
