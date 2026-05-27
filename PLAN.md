@@ -106,7 +106,7 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
   - **Dashboard**: move the tokens page from `/_app/workspace/$workspaceId/personal-access-tokens.*` to an account-level path (`/_app/account/personal-access-tokens.*`). Drop `workspace_id` from the insert in the mint form (`apps/web/src/routes/_app.workspace.$workspaceId.personal-access-tokens.$tokenId.tsx:78`). Drop the `workspace_id` filter from `personalAccessTokensQuery` (`apps/web/src/lib/queries.ts:236-253`). Move the sidebar entry to the user/account menu.
   - **`/api/v1/me`**: drop `workspace_id`, `workspace_name` from the response (those become per-request, supplied by the URL path on other endpoints). New shape: `{ user_id, user_email, user_name, token_id }`. The CLI calls `/api/v1/workspaces` separately (T0.5) to learn what workspaces the user can act in.
 
-- [ ] **T0.5 — Discovery endpoints: `GET /api/v1/workspaces` + `GET /api/v1/version`.**
+- [x] **T0.5 — Discovery endpoints: `GET /api/v1/workspaces` + `GET /api/v1/version`.**
   - **`GET /api/v1/workspaces`** (PAT-only, chains `requireUserId`): returns `{ data: Array<{ id, name, role, created_at }> }` listing every workspace the calling user is a member of. Powers `agent0 login`'s workspace-picker prompt and `agent0 workspaces list`.
   - **`GET /api/v1/version`** (unauthenticated): returns `{ name: "agent0", version: <package.json version>, api: "v1" }`. Lets `agent0 login` distinguish "wrong URL" (404, non-JSON, missing `name`) from "wrong token" (401 on a subsequent authed call). Cheap, ~10 lines.
   - Neither endpoint is workspace-scoped; both live at the top of `/api/v1/...`.
