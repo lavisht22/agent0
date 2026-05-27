@@ -232,6 +232,27 @@ export const apiKeysQuery = (workspaceId: string) =>
 		enabled: !!workspaceId,
 	});
 
+// RLS restricts this to the caller's own tokens.
+export const personalAccessTokensQuery = (workspaceId: string) =>
+	queryOptions({
+		queryKey: ["personal-access-tokens", workspaceId],
+		queryFn: async () => {
+			const { data, error } = await supabase
+				.from("personal_access_tokens")
+				.select(
+					"id, name, token_prefix, workspace_id, created_at, last_used_at, expires_at, revoked_at",
+				)
+				.eq("workspace_id", workspaceId)
+				.is("revoked_at", null)
+				.order("created_at", { ascending: false });
+
+			if (error) throw error;
+
+			return data;
+		},
+		enabled: !!workspaceId,
+	});
+
 export const runsQuery = (
 	workspaceId: string,
 	page: number,

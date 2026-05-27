@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
 	Bot,
+	KeyRound,
 	KeySquare,
 	LayoutDashboard,
 	LucideChevronsUpDown,
@@ -117,6 +118,16 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 				active: location.pathname === `/workspace/${workspaceId}/mcps`,
 			},
 		];
+
+		// PATs are user-scoped (RLS hides others') — everyone gets the link.
+		items.push({
+			label: "Personal Access Tokens",
+			icon: KeyRound,
+			path: `/workspace/${workspaceId}/personal-access-tokens`,
+			active:
+				location.pathname ===
+				`/workspace/${workspaceId}/personal-access-tokens`,
+		});
 
 		// Only show API Keys and Settings for admin users
 		if (user?.role === "admin") {

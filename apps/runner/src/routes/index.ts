@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { addAuth } from "../lib/auth.js";
 import { registerAgentRoutes } from "./agents.js";
+import { registerAuthRoutes } from "./auth.js";
 import { registerRunsRoutes } from "./runs.js";
 import { registerEmbedRoutes } from "./embed.js";
 import { registerRefreshMCPRoute } from "./refresh-mcp.js";
@@ -21,5 +22,6 @@ export async function registerRoutes(fastify: FastifyInstance) {
 		await registerEmbedRoutes(scoped);
 		await registerAgentRoutes(scoped);
 		await registerRunsRoutes(scoped);
+		await registerAuthRoutes(scoped);
 	});
 }

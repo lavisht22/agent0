@@ -7,6 +7,7 @@ declare module "fastify" {
 	interface FastifyRequest {
 		workspaceId: string;
 		userId: string | undefined;
+		tokenId: string | undefined;
 		scopes: string[];
 		allowedOrigins: string[] | null;
 	}
@@ -40,6 +41,7 @@ function sha256Hex(input: string): string {
 export function addAuth(fastify: FastifyInstance) {
 	fastify.decorateRequest("workspaceId", null as unknown as string);
 	fastify.decorateRequest("userId", undefined);
+	fastify.decorateRequest("tokenId", undefined);
 	fastify.decorateRequest("scopes", null as unknown as string[]);
 	fastify.decorateRequest("allowedOrigins", null);
 
@@ -92,6 +94,7 @@ export function addAuth(fastify: FastifyInstance) {
 
 				request.workspaceId = pat.workspace_id;
 				request.userId = pat.user_id;
+				request.tokenId = pat.id;
 				request.scopes = scopesForRole(membership.role);
 				request.allowedOrigins = null;
 
@@ -123,6 +126,7 @@ export function addAuth(fastify: FastifyInstance) {
 
 			request.workspaceId = apiKeyData.workspace_id;
 			request.userId = undefined;
+			request.tokenId = undefined;
 			request.scopes = apiKeyData.scopes ?? [];
 			request.allowedOrigins = apiKeyData.allowed_origins ?? null;
 
