@@ -17,13 +17,12 @@ import { personalAccessTokensQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute(
-	"/_app/workspace/$workspaceId/personal-access-tokens/",
+	"/_app/account/personal-access-tokens/",
 )({
 	component: RouteComponent,
 });
 
 function RouteComponent() {
-	const { workspaceId } = Route.useParams();
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 
@@ -33,9 +32,7 @@ function RouteComponent() {
 		name: string;
 	} | null>(null);
 
-	const { data: tokens, isLoading } = useQuery(
-		personalAccessTokensQuery(workspaceId),
-	);
+	const { data: tokens, isLoading } = useQuery(personalAccessTokensQuery);
 
 	const revokeMutation = useMutation({
 		mutationFn: async (tokenId: string) => {
@@ -48,7 +45,7 @@ function RouteComponent() {
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({
-				queryKey: ["personal-access-tokens", workspaceId],
+				queryKey: ["personal-access-tokens"],
 			});
 			toast.success("Token revoked.");
 			revokeState.close();
@@ -63,13 +60,18 @@ function RouteComponent() {
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
-			<PageHeader breadcrumbs={[{ label: "Personal Access Tokens" }]}>
+			<PageHeader
+				breadcrumbs={[
+					{ label: "Account", to: "/" },
+					{ label: "Personal Access Tokens" },
+				]}
+			>
 				<Button
 					variant="primary"
 					onPress={() =>
 						navigate({
-							to: "/workspace/$workspaceId/personal-access-tokens/$tokenId",
-							params: { workspaceId, tokenId: "new" },
+							to: "/account/personal-access-tokens/$tokenId",
+							params: { tokenId: "new" },
 						})
 					}
 				>
@@ -81,9 +83,9 @@ function RouteComponent() {
 			<div className="flex-1 flex flex-col overflow-hidden p-4 gap-4">
 				<p className="text-sm text-muted">
 					Personal tokens authenticate the agent0 CLI as you. They inherit your
-					current role in this workspace, so revoking your access also revokes
-					these tokens. Each token is shown exactly once at generation — store
-					it somewhere safe.
+					current role in whichever workspace the CLI targets, so removing your
+					access to a workspace revokes these tokens there. Each token is shown
+					exactly once at generation — store it somewhere safe.
 				</p>
 				<Table className="flex-1 overflow-hidden">
 					<Table.ScrollContainer className="flex-1 overflow-y-auto">

@@ -119,16 +119,6 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 			},
 		];
 
-		// PATs are user-scoped (RLS hides others') — everyone gets the link.
-		items.push({
-			label: "Personal Access Tokens",
-			icon: KeyRound,
-			path: `/workspace/${workspaceId}/personal-access-tokens`,
-			active:
-				location.pathname ===
-				`/workspace/${workspaceId}/personal-access-tokens`,
-		});
-
 		// Only show API Keys and Settings for admin users
 		if (user?.role === "admin") {
 			items.push({
@@ -260,6 +250,17 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 					</Dropdown.Trigger>
 					<Dropdown.Popover className="w-64" placement="top start">
 						<Dropdown.Menu>
+							<Dropdown.Item
+								key="personal-access-tokens"
+								id="personal-access-tokens"
+								textValue="Personal Access Tokens"
+								onAction={() =>
+									navigate({ to: "/account/personal-access-tokens" })
+								}
+							>
+								<KeyRound className="size-4" />
+								<Label>Personal Access Tokens</Label>
+							</Dropdown.Item>
 							<Dropdown.Item
 								key="theme"
 								id="theme"

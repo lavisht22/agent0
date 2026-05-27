@@ -20,7 +20,7 @@ import { PageHeader } from "@/components/page-header";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute(
-	"/_app/workspace/$workspaceId/personal-access-tokens/$tokenId",
+	"/_app/account/personal-access-tokens/$tokenId",
 )({
 	component: RouteComponent,
 });
@@ -52,7 +52,7 @@ async function sha256Hex(input: string): Promise<string> {
 }
 
 function RouteComponent() {
-	const { workspaceId, tokenId } = Route.useParams();
+	const { tokenId } = Route.useParams();
 	const isNew = tokenId === "new";
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
@@ -75,7 +75,6 @@ function RouteComponent() {
 				.insert({
 					id: nanoid(),
 					user_id: user.id,
-					workspace_id: workspaceId,
 					token_hash: tokenHash,
 					token_prefix: token.slice(0, PREFIX_DISPLAY_LEN),
 					name: values.name,
@@ -88,7 +87,7 @@ function RouteComponent() {
 		},
 		onSuccess: (token) => {
 			queryClient.invalidateQueries({
-				queryKey: ["personal-access-tokens", workspaceId],
+				queryKey: ["personal-access-tokens"],
 			});
 			setCreatedToken(token);
 		},
@@ -119,10 +118,7 @@ function RouteComponent() {
 	};
 
 	const handleDone = () => {
-		navigate({
-			to: "/workspace/$workspaceId/personal-access-tokens",
-			params: { workspaceId },
-		});
+		navigate({ to: "/account/personal-access-tokens" });
 	};
 
 	if (!isNew) {
@@ -131,10 +127,10 @@ function RouteComponent() {
 			<div className="h-screen flex flex-col">
 				<PageHeader
 					breadcrumbs={[
+						{ label: "Account", to: "/" },
 						{
 							label: "Personal Access Tokens",
-							to: "/workspace/$workspaceId/personal-access-tokens",
-							params: { workspaceId },
+							to: "/account/personal-access-tokens",
 						},
 					]}
 				/>
@@ -202,10 +198,10 @@ function RouteComponent() {
 		<div className="h-screen flex flex-col">
 			<PageHeader
 				breadcrumbs={[
+					{ label: "Account", to: "/" },
 					{
 						label: "Personal Access Tokens",
-						to: "/workspace/$workspaceId/personal-access-tokens",
-						params: { workspaceId },
+						to: "/account/personal-access-tokens",
 					},
 					{ label: "New" },
 				]}
@@ -256,10 +252,7 @@ function RouteComponent() {
 							<Button
 								variant="tertiary"
 								onPress={() =>
-									navigate({
-										to: "/workspace/$workspaceId/personal-access-tokens",
-										params: { workspaceId },
-									})
+									navigate({ to: "/account/personal-access-tokens" })
 								}
 								isDisabled={isLoading}
 							>

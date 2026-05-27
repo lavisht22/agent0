@@ -269,7 +269,6 @@ export type Database = {
           token_hash: string
           token_prefix: string
           user_id: string
-          workspace_id: string
         }
         Insert: {
           created_at?: string
@@ -281,7 +280,6 @@ export type Database = {
           token_hash: string
           token_prefix: string
           user_id: string
-          workspace_id: string
         }
         Update: {
           created_at?: string
@@ -293,7 +291,6 @@ export type Database = {
           token_hash?: string
           token_prefix?: string
           user_id?: string
-          workspace_id?: string
         }
         Relationships: [
           {
@@ -301,13 +298,6 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "personal_access_tokens_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
