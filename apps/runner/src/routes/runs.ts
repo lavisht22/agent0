@@ -45,7 +45,7 @@ const ErrorSchema = {
 };
 
 export async function registerRunsRoutes(fastify: FastifyInstance) {
-	fastify.get("/api/v1/runs", {
+	fastify.get("/runs", {
 		preHandler: requireScope("runs:read:*"),
 		schema: {
 			tags: ["Runs"],
@@ -158,7 +158,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 		},
 	});
 
-	fastify.get("/api/v1/runs/:runId", {
+	fastify.get("/runs/:runId", {
 		preHandler: requireScope("runs:read:*"),
 		schema: {
 			tags: ["Runs"],
