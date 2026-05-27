@@ -5,7 +5,6 @@ import { registerAuthRoutes } from "./auth.js";
 import { registerRunsRoutes } from "./runs.js";
 import { registerEmbedRoutes } from "./embed.js";
 import { registerRefreshMCPRoute } from "./refresh-mcp.js";
-import { registerRunRoute } from "./run.js";
 import { registerTestRoute } from "./test.js";
 
 export async function registerRoutes(fastify: FastifyInstance) {
@@ -20,7 +19,6 @@ export async function registerRoutes(fastify: FastifyInstance) {
 		addAuth(scoped);
 		
 		await scoped.register(async (workspaceScoped) => {
-			await registerRunRoute(workspaceScoped);
 			await registerRunsRoutes(workspaceScoped);
 			await registerEmbedRoutes(workspaceScoped);
 			await registerAgentRoutes(workspaceScoped);
