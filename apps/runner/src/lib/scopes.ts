@@ -1,4 +1,37 @@
+import type { Database } from "@repo/database";
 import type { FastifyReply, FastifyRequest } from "fastify";
+
+type WorkspaceRole = Database["public"]["Enums"]["workspace_user_role"];
+
+/**
+ * Effective scopes granted to a personal access token, derived from the
+ * holder's `workspace_user.role` at the time of the request.
+ *
+ *   admin  → full access
+ *   writer → reads of everything + writes/runs on content the user manages
+ *            (agents, agent versions via `agents:write`, tags). NOT mcps,
+ *            providers, or api_keys — those are admin-managed.
+ *   reader → reads of everything + ability to trigger runs (matches the
+ *            dashboard test endpoint, which is open to any workspace member).
+ *
+ * Resolved per-request rather than snapshotted onto the PAT row so that role
+ * changes (promote / demote) take effect immediately.
+ */
+export function scopesForRole(role: WorkspaceRole): string[] {
+	switch (role) {
+		case "admin":
+			return ["*:*:*"];
+		case "writer":
+			return [
+				"*:read:*",
+				"agents:run:*",
+				"agents:write:*",
+				"tags:write:*",
+			];
+		case "reader":
+			return ["*:read:*", "agents:run:*"];
+	}
+}
 
 /**
  * Match a required scope against a granted scope. Both must have exactly three
@@ -59,4 +92,23 @@ export function checkScope(
 	if (hasScope(request.scopes, required)) return true;
 	reply.code(403).send({ message: `Missing required scope: ${required}` });
 	return false;
+}
+
+/**
+ * preHandler that 403s when the request is authenticated by an API key rather
+ * than a personal access token. Used to gate write endpoints — API keys are
+ * read/run-only; only PATs (with a known user identity) can mutate state.
+ *
+ *   { preHandler: [requireScope("agents:write:*"), requireUserId] }
+ */
+export async function requireUserId(
+	request: FastifyRequest,
+	reply: FastifyReply,
+) {
+	if (request.userId === undefined) {
+		return reply.code(403).send({
+			message:
+				"This endpoint requires a personal access token; API keys cannot mutate state",
+		});
+	}
 }

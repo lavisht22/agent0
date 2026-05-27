@@ -72,6 +72,48 @@ export type Database = {
           },
         ]
       }
+      agent_versions: {
+        Row: {
+          agent_id: string
+          created_at: string
+          data: Json
+          id: string
+          is_deployed: boolean
+          user_id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          data: Json
+          id: string
+          is_deployed?: boolean
+          user_id?: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          data?: Json
+          id?: string
+          is_deployed?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_versions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_versions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agents: {
         Row: {
           created_at: string
@@ -209,6 +251,60 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "mcps_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      personal_access_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          last_used_at: string | null
+          name: string
+          revoked_at: string | null
+          token_hash: string
+          token_prefix: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id: string
+          last_used_at?: string | null
+          name: string
+          revoked_at?: string | null
+          token_hash: string
+          token_prefix: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          last_used_at?: string | null
+          name?: string
+          revoked_at?: string | null
+          token_hash?: string
+          token_prefix?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personal_access_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personal_access_tokens_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -370,48 +466,6 @@ export type Database = {
         }
         Relationships: []
       }
-      agent_versions: {
-        Row: {
-          agent_id: string
-          created_at: string
-          data: Json
-          id: string
-          is_deployed: boolean
-          user_id: string
-        }
-        Insert: {
-          agent_id: string
-          created_at?: string
-          data: Json
-          id: string
-          is_deployed?: boolean
-          user_id?: string
-        }
-        Update: {
-          agent_id?: string
-          created_at?: string
-          data?: Json
-          id?: string
-          is_deployed?: boolean
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "agent_versions_agent_id_fkey"
-            columns: ["agent_id"]
-            isOneToOne: false
-            referencedRelation: "agents"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "agent_versions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       workspace_user: {
         Row: {
           created_at: string
@@ -491,18 +545,18 @@ export type Database = {
       delete_old_runs: { Args: never; Returns: undefined }
       get_dashboard_stats: {
         Args: {
-          p_workspace_id: string
-          p_start_date?: string
           p_end_date?: string
+          p_start_date?: string
+          p_workspace_id: string
         }
         Returns: Json
       }
       get_top_agents: {
         Args: {
-          p_workspace_id: string
-          p_start_date?: string
           p_end_date?: string
           p_limit?: number
+          p_start_date?: string
+          p_workspace_id: string
         }
         Returns: Json
       }

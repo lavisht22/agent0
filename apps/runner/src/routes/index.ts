@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { addApiKeyAuth } from "../lib/auth.js";
+import { addAuth } from "../lib/auth.js";
 import { registerAgentRoutes } from "./agents.js";
 import { registerRunsRoutes } from "./runs.js";
 import { registerEmbedRoutes } from "./embed.js";
@@ -12,9 +12,11 @@ export async function registerRoutes(fastify: FastifyInstance) {
 	await registerTestRoute(fastify);
 	await registerRefreshMCPRoute(fastify);
 
-	// API-key-authenticated routes (middleware validates key and sets request.workspaceId)
+	// Public API routes — authenticated by `addAuth` (PAT first, then x-api-key).
+	// PATs set request.userId; API keys leave it undefined. Routes that mutate
+	// state should chain `requireUserId` to block API keys.
 	await fastify.register(async (scoped) => {
-		addApiKeyAuth(scoped);
+		addAuth(scoped);
 		await registerRunRoute(scoped);
 		await registerEmbedRoutes(scoped);
 		await registerAgentRoutes(scoped);
