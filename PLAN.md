@@ -111,6 +111,12 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
   - **`GET /api/v1/version`** (unauthenticated): returns `{ name: "agent0", version: <package.json version>, api: "v1" }`. Lets `agent0 login` distinguish "wrong URL" (404, non-JSON, missing `name`) from "wrong token" (401 on a subsequent authed call). Cheap, ~10 lines.
   - Neither endpoint is workspace-scoped; both live at the top of `/api/v1/...`.
 
+- [ ] **T0.6 — Move `/internal/test` under `/internal/workspaces/:workspaceId/test`.**
+  - Keeps the `/internal` prefix (auth model stays Supabase JWT, not PAT/API-key) but brings the path under the same workspace-in-URL convention as T0.3.
+  - **Fixes a latent authorization bug.** Today `apps/runner/src/routes/test.ts` derives the workspace from `versionData.model.provider_id` and only checks that the calling user is a member of *that* provider's workspace. A user in workspaces A and B could submit a payload pointing at B's provider while testing from A's dashboard — the run would log against B. After the move, the handler reads `workspaceId` from the path param, re-checks `workspace_user` membership against it, and 403s if `provider.workspace_id !== pathWorkspaceId`.
+  - **Consumer update**: `apps/web/src/routes/_app.workspace.$workspaceId.agents.$agentId/hooks/use-agent-runner.tsx:47-49` builds the URL as `/internal/test` — change to `/internal/workspaces/${workspaceId}/test`. The hook already has `workspaceId` from the route params (`$workspaceId` segment).
+  - **Out of scope for this task**: `/internal/refresh-mcp` — T1.6 will revisit it as part of exposing a public `/api/v1/workspaces/:workspaceId/mcps/:id/refresh`, and there may be design discussion to have at that point.
+
 ### Phase 1 — Backend write endpoints (one PR each)
 
 > All routes in this phase live under `/api/v1/workspaces/:workspaceId/...` (see T0.4). `request.workspaceId` is set by the dual-auth middleware from the path param.
