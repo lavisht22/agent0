@@ -68,7 +68,7 @@ No write scopes are added — writes are PAT-only and PATs implicitly hold `*:*:
 
 The whole CLI flow assumes per-user attribution, so PAT support has to land before any of the write endpoints in Phase 1.
 
-- [ ] **T0.1 — PAT schema + dual-auth middleware + `requireUserId` guard.**
+- [x] **T0.1 — PAT schema + dual-auth middleware + `requireUserId` guard.** (4de358a)
   - **Migration**: new table `personal_access_tokens` — `id, user_id (fk users), workspace_id (fk workspaces), token_hash (sha256), name, created_at, last_used_at, expires_at?, revoked_at?`. Unique index on `token_hash`. One PAT binds to exactly one workspace — multi-workspace users mint one PAT per workspace.
   - **Auth middleware refactor** (`apps/runner/src/lib/auth.ts`): rename `addApiKeyAuth` → `addAuth`. The new flow tries `Authorization: Bearer …` first (look up by `token_hash`, populate `workspaceId` + `userId` + `scopes=["*:*:*"]`, update `last_used_at`). If no bearer token, falls back to the existing `x-api-key` path (populate `workspaceId` + `scopes`, leave `userId` unset). 401 if both are absent. Origin-allowlist enforcement stays API-key-only (PATs are CLI-issued, not browser-visible — origin is meaningless).
   - **Fastify request typing**: `userId` becomes `string | undefined`.
