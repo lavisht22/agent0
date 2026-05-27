@@ -28,8 +28,6 @@ export async function registerAuthRoutes(fastify: FastifyInstance) {
 								user_id: { type: "string" as const },
 								user_email: { type: "string" as const, nullable: true },
 								user_name: { type: "string" as const, nullable: true },
-								workspace_id: { type: "string" as const },
-								workspace_name: { type: "string" as const },
 								token_id: { type: "string" as const },
 							},
 						},
@@ -43,19 +41,13 @@ export async function registerAuthRoutes(fastify: FastifyInstance) {
 			// requireUserId guarantees both are set when authed via PAT.
 			const userId = request.userId as string;
 			const tokenId = request.tokenId as string;
-			const { workspaceId } = request;
 
-			const [userRes, workspaceRes, authRes] = await Promise.all([
+			const [userRes, authRes] = await Promise.all([
 				supabase.from("users").select("name").eq("id", userId).maybeSingle(),
-				supabase
-					.from("workspaces")
-					.select("name")
-					.eq("id", workspaceId)
-					.maybeSingle(),
 				supabase.auth.admin.getUserById(userId),
 			]);
 
-			if (userRes.error || workspaceRes.error || !workspaceRes.data) {
+			if (userRes.error) {
 				return reply.code(500).send({ message: "Failed to resolve identity" });
 			}
 
@@ -64,8 +56,6 @@ export async function registerAuthRoutes(fastify: FastifyInstance) {
 					user_id: userId,
 					user_email: authRes.data?.user?.email ?? null,
 					user_name: userRes.data?.name ?? null,
-					workspace_id: workspaceId,
-					workspace_name: workspaceRes.data.name,
 					token_id: tokenId,
 				},
 			});

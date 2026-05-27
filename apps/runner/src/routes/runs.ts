@@ -97,7 +97,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			const { workspaceId } = request;
+			const { workspaceId } = request.params as { workspaceId: string };
 
 			const {
 				agent_id,
@@ -203,8 +203,10 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			const { workspaceId } = request;
-			const { runId } = request.params as { runId: string };
+			const { workspaceId, runId } = request.params as {
+				workspaceId: string;
+				runId: string;
+			};
 
 			const { data: run, error } = await supabase
 				.from("runs")
@@ -343,7 +345,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				.send({ message: `Missing required scope: agents:run:${agent_id}` });
 		}
 
-		const { workspaceId } = request;
+		const { workspaceId } = request.params as { workspaceId: string };
 
 		// Get agent with its deployed version IDs, scoped to the authenticated workspace
 		const agent = await cachedQuery(

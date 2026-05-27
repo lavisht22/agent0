@@ -82,8 +82,10 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			const { workspaceId } = request;
-			const { agentId } = request.params as { agentId: string };
+			const { workspaceId, agentId } = request.params as {
+				workspaceId: string;
+				agentId: string;
+			};
 
 			const { data: agent, error } = await supabase
 				.from("agents")
@@ -139,7 +141,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			const { workspaceId } = request;
+			const { workspaceId } = request.params as { workspaceId: string };
 
 			const {
 				search,
@@ -262,7 +264,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			const { workspaceId } = request;
+			const { workspaceId } = request.params as { workspaceId: string };
 			const { name, tag_ids } = request.body as {
 				name: string;
 				tag_ids?: string[];
@@ -382,8 +384,10 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			const { workspaceId } = request;
-			const { agentId } = request.params as { agentId: string };
+			const { workspaceId, agentId } = request.params as {
+				workspaceId: string;
+				agentId: string;
+			};
 
 			const {
 				page = "1",
@@ -452,8 +456,11 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			const { workspaceId } = request;
-			const { agentId, versionId } = request.params as { agentId: string; versionId: string };
+			const { workspaceId, agentId, versionId } = request.params as {
+				workspaceId: string;
+				agentId: string;
+				versionId: string;
+			};
 
 			// Verify agent belongs to workspace
 			const { data: agent, error: agentError } = await supabase

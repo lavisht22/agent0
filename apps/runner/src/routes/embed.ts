@@ -95,6 +95,7 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
+		const { workspaceId } = request.params as { workspaceId: string };
 		const body = request.body as SingleEmbedRequest & {
 			environment?: "staging" | "production";
 		};
@@ -111,7 +112,7 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 		}
 
 		const result = await getProvider(
-			request.workspaceId,
+			workspaceId,
 			body.model.provider_id,
 			body.environment ?? "production",
 		);
@@ -187,6 +188,7 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
+		const { workspaceId } = request.params as { workspaceId: string };
 		const body = request.body as ManyEmbedRequest & {
 			environment?: "staging" | "production";
 		};
@@ -209,7 +211,7 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 		}
 
 		const result = await getProvider(
-			request.workspaceId,
+			workspaceId,
 			body.model.provider_id,
 			body.environment ?? "production",
 		);

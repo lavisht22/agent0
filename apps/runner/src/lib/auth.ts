@@ -5,7 +5,6 @@ import { scopesForRole } from "./scopes.js";
 
 declare module "fastify" {
 	interface FastifyRequest {
-		workspaceId: string;
 		userId: string | undefined;
 		tokenId: string | undefined;
 		scopes: string[];
@@ -20,14 +19,21 @@ function sha256Hex(input: string): string {
 /**
  * Registers dual authentication on the given Fastify instance.
  *
+ * The workspace a request targets is taken from the `:workspaceId` path
+ * param (see the prefix block in routes/index.ts), not from the credential.
+ *
  * Order of attempts:
  *   1. `Authorization: Bearer <pat>` — personal access token (user-bound).
- *      Populates workspaceId + userId + scopes derived from the user's
- *      current `workspace_user.role` (see scopesForRole). Origin allowlist
- *      is skipped (PATs are CLI-issued, no browser origin to validate).
- *   2. `x-api-key: <key>` — API key (workspace-bound, machine identity).
- *      Populates workspaceId + scopes + allowedOrigins, leaves userId
- *      undefined, enforces origin allowlist when configured.
+ *      Populates userId + scopes derived from the user's current
+ *      `workspace_user.role` against the path's workspace (see scopesForRole).
+ *      403s if the user isn't a member of that workspace. On unscoped routes
+ *      (no path param — e.g. /api/v1/me) the membership check is skipped and
+ *      scopes default to empty. Origin allowlist is skipped (PATs are
+ *      CLI-issued, no browser origin to validate).
+ *   2. `x-api-key: <key>` — API key (workspace-pinned, machine identity).
+ *      403s if the path's workspaceId differs from the key's pinned workspace.
+ *      Populates scopes + allowedOrigins, leaves userId undefined, enforces
+ *      origin allowlist when configured.
  *
  * If a bearer token is present but invalid/expired/revoked, the request is
  * rejected with 401 — we do not fall through to the API-key path, since
@@ -39,7 +45,6 @@ function sha256Hex(input: string): string {
  * Call this directly on a scoped instance — not via fastify.register().
  */
 export function addAuth(fastify: FastifyInstance) {
-	fastify.decorateRequest("workspaceId", null as unknown as string);
 	fastify.decorateRequest("userId", undefined);
 	fastify.decorateRequest("tokenId", undefined);
 	fastify.decorateRequest("scopes", null as unknown as string[]);
@@ -59,7 +64,7 @@ export function addAuth(fastify: FastifyInstance) {
 				const tokenHash = sha256Hex(token);
 				const { data: pat, error } = await supabase
 					.from("personal_access_tokens")
-					.select("id, user_id, workspace_id, expires_at, revoked_at")
+					.select("id, user_id, expires_at, revoked_at")
 					.eq("token_hash", tokenHash)
 					.maybeSingle();
 
@@ -76,27 +81,37 @@ export function addAuth(fastify: FastifyInstance) {
 					return reply.code(401).send({ message: "Token has expired" });
 				}
 
-				// Resolve the user's current role in this workspace. A PAT is
-				// only as powerful as its holder's role — demote a user and
-				// their PATs lose access on the next request.
-				const { data: membership, error: membershipError } = await supabase
-					.from("workspace_user")
-					.select("role")
-					.eq("user_id", pat.user_id)
-					.eq("workspace_id", pat.workspace_id)
-					.maybeSingle();
-
-				if (membershipError || !membership) {
-					return reply.code(401).send({
-						message: "User is no longer a member of this workspace",
-					});
-				}
-
-				request.workspaceId = pat.workspace_id;
 				request.userId = pat.user_id;
 				request.tokenId = pat.id;
-				request.scopes = scopesForRole(membership.role);
 				request.allowedOrigins = null;
+
+				const pathWorkspaceId = (request.params as { workspaceId?: string })
+					?.workspaceId;
+
+				if (pathWorkspaceId) {
+					// Resolve the user's current role in this workspace. A PAT is
+					// only as powerful as its holder's role — demote a user and
+					// their PATs lose access on the next request.
+					const { data: membership, error: membershipError } = await supabase
+						.from("workspace_user")
+						.select("role")
+						.eq("user_id", pat.user_id)
+						.eq("workspace_id", pathWorkspaceId)
+						.maybeSingle();
+
+					if (membershipError || !membership) {
+						return reply.code(403).send({
+							message: "User is not a member of this workspace",
+						});
+					}
+
+					request.scopes = scopesForRole(membership.role);
+				} else {
+					// Unscoped route (e.g. /api/v1/me, /api/v1/auth/logout).
+					// No workspace context — routes here must not depend on
+					// request.scopes for resource access.
+					request.scopes = [];
+				}
 
 				void supabase
 					.from("personal_access_tokens")
@@ -129,7 +144,6 @@ export function addAuth(fastify: FastifyInstance) {
 				return reply.code(403).send({ message: "API key is not scoped to this workspace" });
 			}
 
-			request.workspaceId = apiKeyData.workspace_id;
 			request.userId = undefined;
 			request.tokenId = undefined;
 			request.scopes = apiKeyData.scopes ?? [];
