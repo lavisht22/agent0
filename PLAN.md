@@ -74,13 +74,16 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
   - **Fastify request typing**: `userId` becomes `string | undefined`.
   - **`requireUserId` preHandler** in `apps/runner/src/lib/scopes.ts` (or a new `lib/auth-guards.ts`): returns `403 { message: "This endpoint requires a personal access token; API keys cannot mutate state" }` when `request.userId` is unset. Every Phase 1 write route chains this after its scope check.
 
-- [ ] **T0.2 — PAT lifecycle: mint / list / revoke + `/api/v1/me` + dashboard UI.**
-  - **`POST /api/v1/auth/device`** (unauthenticated): starts a device-code flow. Returns `{ device_code, user_code, verification_uri, interval, expires_in }`. Device codes stored server-side with a 10-min TTL, bound to a workspace only once the user approves.
-  - **`POST /api/v1/auth/device/poll`** (unauthenticated, takes `device_code`): polls for the approved PAT. Returns `{ status: "pending" | "approved", token? }`. Token is shown once and immediately discarded server-side (only the hash is kept).
-  - **Dashboard approval page** (`/auth/device?user_code=…`): user signs in, picks the workspace, names the PAT, and approves. Calls a Supabase-authed mutation that creates the `personal_access_tokens` row and marks the device-code record approved.
-  - **`GET /api/v1/auth/tokens` / `DELETE /api/v1/auth/tokens/:id`** (PAT-auth, scoped to the calling user): list and revoke. Revoke = set `revoked_at`.
-  - **Dashboard `/settings/tokens` page**: lists the calling user's PATs across all workspaces they belong to, with revoke buttons.
-  - **`GET /api/v1/me`**: PAT-only (chains `requireUserId`). Returns `{ user_id, user_email, workspace_id, token_id }`. The CLI's `agent0 whoami` displays this; `agent0 login` calls it to confirm a freshly minted PAT works.
+- [x] **T0.2 — PAT lifecycle: dashboard UI + `/api/v1/me` + `/api/v1/auth/logout`.** (768191f)
+  - **GitHub-style mint flow.** User generates a PAT on the dashboard and pastes it into the CLI. No device-code, no approval handshake — the dashboard mints directly via Supabase under RLS, the runner never sees the minting traffic.
+  - **Dashboard tokens page**: lists the calling user's PATs for the current workspace with mint and revoke buttons. Place it alongside the existing API keys page. Plaintext is shown once at creation and never persisted server-side (only the SHA-256 hash lives in `personal_access_tokens.token_hash`).
+  - **RLS on `personal_access_tokens`**:
+    - `SELECT`: a user sees only their own tokens (`user_id = auth.uid()`).
+    - `INSERT`: must set `user_id = auth.uid()` and a `workspace_id` the caller belongs to.
+    - `UPDATE`: a user can revoke their own tokens (set `revoked_at`). No other field updates.
+    - No `DELETE` — revocation is soft (`revoked_at`), so audits / `last_used_at` survive.
+  - **`GET /api/v1/me`** (PAT-only, chains `requireUserId`): returns `{ user_id, user_email, workspace_id, workspace_name, token_id }`. Used by `agent0 whoami` and by `agent0 login` to confirm a freshly pasted token.
+  - **`POST /api/v1/auth/logout`** (PAT-only, chains `requireUserId`): sets `revoked_at` on the calling token. Used by `agent0 logout`.
 
 ### Phase 1 — Backend write endpoints (one PR each)
 
@@ -144,10 +147,9 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
   - Global flags: `--json` (default true for read commands), `--api-base` (override default `https://…`).
 
 - [ ] **T3.2 — `agent0 login` + `agent0 whoami` + `agent0 logout`.**
-  - `login` (default — device-code flow): hits `POST /api/v1/auth/device`, prints `verification_uri` + short `user_code`, opens the URL in the user's browser, then polls `POST /api/v1/auth/device/poll` until the user approves and picks a workspace. Stores the returned PAT in `~/.config/agent0/config.json` (mode 0600). Confirms by calling `/api/v1/me`.
-  - `login --api-key`: escape hatch for CI. Prompts for an API key, writes it to the config file, skips the browser. Does **not** confirm via `/api/v1/me` (API keys can't call it) — instead pings `GET /api/v1/agents?limit=1` as a liveness check.
-  - `whoami`: calls `/api/v1/me`, prints user + workspace. Only works when authed via PAT — errors out clearly if the stored credential is an API key.
-  - `logout`: revokes the PAT (best-effort `DELETE /api/v1/auth/tokens/:id`) and deletes the config file.
+  - `login`: prompts for a token (PAT or API key — distinguished by prefix, e.g. `agent0_pat_…`). Writes it to `~/.config/agent0/config.json` (mode 0600). Confirms validity with `/api/v1/me` for PATs, or `GET /api/v1/agents?limit=1` for API keys (since API keys can't call `/me`).
+  - `whoami`: calls `/api/v1/me`, prints user + workspace. Errors clearly if the stored credential is an API key.
+  - `logout`: calls `POST /api/v1/auth/logout` (best-effort — for API keys this 403s and is ignored) and deletes the config file.
 
 - [ ] **T3.3 — `agent0 agents` commands.**
   - `agents list [--search …] [--tag …] [--page N] [--limit N]`
