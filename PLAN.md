@@ -87,11 +87,13 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
 
 ### Phase 1 — Backend write endpoints (one PR each)
 
-- [ ] **T1.1 — `POST /api/v1/agents` (create agent). PAT-only.**
-  - PreHandler: `requireUserId`.
+- [x] **T1.1 — `POST /api/v1/agents` (create agent). PAT-only.** (151fdc4)
+  - PreHandlers: `requireScope("agents:write:*")` + `requireUserId`. (Scope gate keeps reader-role PATs out, consistent with T1.2/T1.3 and `scopesForRole`.)
   - Body: `{ name: string, tag_ids?: string[] }`. Creates an empty agent with no versions — callers push the first version separately via T1.3.
-  - Validates that any provided `tag_ids` belong to the caller's workspace.
-  - Returns the created agent (same shape as `GET /api/v1/agents/:id`).
+  - `name` is trimmed and rejected (400) if empty.
+  - Validates that any provided `tag_ids` belong to the caller's workspace; 400 lists offending IDs.
+  - Server generates the agent `id` (nanoid). Callers cannot supply one.
+  - Returns the created agent (same shape as `GET /api/v1/agents/:id`), 201.
   - Reference mutation: `apps/web/src/routes/_app.workspace.$workspaceId.agents.$agentId/hooks/use-agent-mutations.tsx:25-66`.
 
 - [ ] **T1.2 — `PATCH /api/v1/agents/:id` (rename / tags / deploy). PAT-only.**
