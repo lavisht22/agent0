@@ -4,6 +4,8 @@ Tracking document for exposing agent0's full functionality to AI tools (Claude C
 
 We work through this **one task at a time**, one PR per task, in roughly the order listed.
 
+> **Note to the AI assistant working this plan:** before starting any task below, pause and surface open questions about the task — design choices, ambiguities, dependencies, anything the task description doesn't pin down. Don't dive in until those are answered. The decisions made along the way feed back into this document.
+
 ---
 
 ## Locked-in decisions
@@ -11,7 +13,8 @@ We work through this **one task at a time**, one PR per task, in roughly the ord
 - **CLI over MCP** as the primary surface. CLI reaches every AI tool with shell access, plus humans and CI. A thin MCP wrapper may come later.
 - **`agent0 run` returns JSON by default.** No streaming flag at v1.
 - **No conflict handling on `prompt push`.** Last write wins.
-- **Existing API keys are sufficient.** No changes to the auth layer; the CLI sends `x-api-key` against the same `/api/v1/*` endpoints.
+- **Two auth modes, one middleware.** API keys (`x-api-key`) for machines/CI — workspace-scoped, no user identity attached. Personal Access Tokens (`Authorization: Bearer …`) for humans using the CLI — bound to a specific user + workspace. The auth middleware accepts either and populates `request.workspaceId` / `request.userId?` / `request.scopes`. Route handlers don't care which token type authenticated the caller.
+- **Writes require a user; API keys are read/run-only.** Any endpoint that mutates state (creating agents, pushing versions, deploying, editing tags, refreshing MCPs) is PAT-only — enforced by a single `requireUserId` preHandler that 403s when `request.userId` is unset. This keeps `agent_versions.user_id` `NOT NULL` and gives clean per-actor attribution. API keys can list/read everything and run agents; nothing more.
 - **`PATCH /api/v1/agents/:id` handles deployment.** Setting `staging_version_id` / `production_version_id` is just a field update. Single scope (`agents:write:<id>`) covers rename, tag sync, and deploy.
 - **Tags are folded into the agent PATCH** as `tag_ids: string[]` (replaces the set).
 - **Prompt edits use a pull/push file flow**, not JSON-in-args. AI tools edit the file with their native Read/Edit tools.
@@ -22,10 +25,10 @@ We work through this **one task at a time**, one PR per task, in roughly the ord
 ## Architecture overview
 
 ```
-+--------------------+        x-api-key         +-----------------------+
-|  agent0 CLI        |  ----------------------> |  apps/runner          |
-|  (packages/cli)    |  /api/v1/* (HTTPS+JSON)  |  Fastify + Supabase   |
-+--------------------+                          +-----------------------+
++--------------------+   PAT (humans) /         +-----------------------+
+|  agent0 CLI        |   x-api-key (machines)   |  apps/runner          |
+|  (packages/cli)    |  ----------------------> |  Fastify + Supabase   |
++--------------------+  /api/v1/* (HTTPS+JSON)  +-----------------------+
         ^                                                 |
         | reads/writes ~/.config/agent0/config.json       v
         |                                          +----------------+
@@ -37,6 +40,7 @@ We work through this **one task at a time**, one PR per task, in roughly the ord
 
 - Frontend continues to talk directly to Supabase. The CLI never touches Supabase directly — it goes through `/api/v1/*`, which means we're forced to design clean, scope-checked endpoints that any third party can use.
 - The "prompt" itself is the opaque JSON in `agent_versions.data`. The API treats it as a blob; only the runner interprets it. CLI pulls it to a file, AI edits the file, CLI pushes it back as a new version.
+- **Auth dispatch:** the middleware checks `Authorization: Bearer …` first (PAT, user-scoped). If absent, falls back to `x-api-key` (workspace-scoped). PAT path sets `request.userId` and grants `scopes = ["*:*:*"]` (PATs inherit the user's full workspace permissions). API-key path leaves `userId` unset and uses the explicit scope list. Routes that mutate state chain a second preHandler — `requireUserId` — which 403s when the caller is an API key.
 
 ---
 
@@ -46,74 +50,81 @@ Existing scope model (`apps/runner/src/lib/scopes.ts`): three segments, `resourc
 
 **Already in use:** `agents:read:*`, `agents:read:<id>`, `agents:run:*`, `agents:run:<id>`, `runs:read:*`.
 
-**New scopes to introduce:**
+**Scopes added by Phase 1 tasks** (each one introduced alongside the endpoint that needs it, plus a suggestion added to the dashboard key-creation form):
 
-| Scope | Used by |
-|---|---|
-| `agents:write:*` | `POST /api/v1/agents` |
-| `agents:write:<id>` | `PATCH /api/v1/agents/:id`, `POST /api/v1/agents/:id/versions` |
-| `tags:read:*` | `GET /api/v1/tags` |
-| `tags:write:*` | `POST /api/v1/tags`, `DELETE /api/v1/tags/:id` |
-| `providers:read:*` | `GET /api/v1/providers` |
-| `mcps:read:*` | `GET /api/v1/mcps` |
-| `mcps:write:*` | `POST /api/v1/mcps/:id/refresh` |
+| Scope | Used by | Task |
+|---|---|---|
+| `tags:read:*` | `GET /api/v1/tags` | T1.4 |
+| `providers:read:*` | `GET /api/v1/providers` | T1.5 |
+| `mcps:read:*` | `GET /api/v1/mcps` | T1.6 |
 
-No engine changes needed — `scopes.ts` already handles arbitrary strings. The work is:
-1. Allow these scopes to be selected when creating an API key in the dashboard.
-2. Reference them in the new route preHandlers.
+No write scopes are added — writes are PAT-only and PATs implicitly hold `*:*:*`. The `scopes.ts` engine handles arbitrary strings; the only work per scope is allowing it in the key-creation UI and referencing it in the route preHandler.
 
 ---
 
 ## Tasks
 
-### Phase 0 — Foundation
+### Phase 0 — Foundation (PAT auth)
 
-- [ ] **T0.1 — Add new scope strings to the dashboard's key-creation UI.**
-  - File: web app key creation form (wherever scopes are picked).
-  - Adds the seven new scopes from the table above as selectable options.
-  - No backend change — `scopes.ts` is already string-based.
+The whole CLI flow assumes per-user attribution, so PAT support has to land before any of the write endpoints in Phase 1.
 
-- [ ] **T0.2 — `GET /api/v1/me` (whoami).**
-  - New route file `apps/runner/src/routes/me.ts`, registered in the API-key-authed group.
-  - Returns `{ workspace_id, scopes, allowed_origins }` for the calling key.
-  - No new scope required (any valid key can call it).
+- [ ] **T0.1 — PAT schema + dual-auth middleware + `requireUserId` guard.**
+  - **Migration**: new table `personal_access_tokens` — `id, user_id (fk users), workspace_id (fk workspaces), token_hash (sha256), name, created_at, last_used_at, expires_at?, revoked_at?`. Unique index on `token_hash`. One PAT binds to exactly one workspace — multi-workspace users mint one PAT per workspace.
+  - **Auth middleware refactor** (`apps/runner/src/lib/auth.ts`): rename `addApiKeyAuth` → `addAuth`. The new flow tries `Authorization: Bearer …` first (look up by `token_hash`, populate `workspaceId` + `userId` + `scopes=["*:*:*"]`, update `last_used_at`). If no bearer token, falls back to the existing `x-api-key` path (populate `workspaceId` + `scopes`, leave `userId` unset). 401 if both are absent. Origin-allowlist enforcement stays API-key-only (PATs are CLI-issued, not browser-visible — origin is meaningless).
+  - **Fastify request typing**: `userId` becomes `string | undefined`.
+  - **`requireUserId` preHandler** in `apps/runner/src/lib/scopes.ts` (or a new `lib/auth-guards.ts`): returns `403 { message: "This endpoint requires a personal access token; API keys cannot mutate state" }` when `request.userId` is unset. Every Phase 1 write route chains this after its scope check.
+
+- [ ] **T0.2 — PAT lifecycle: mint / list / revoke + `/api/v1/me` + dashboard UI.**
+  - **`POST /api/v1/auth/device`** (unauthenticated): starts a device-code flow. Returns `{ device_code, user_code, verification_uri, interval, expires_in }`. Device codes stored server-side with a 10-min TTL, bound to a workspace only once the user approves.
+  - **`POST /api/v1/auth/device/poll`** (unauthenticated, takes `device_code`): polls for the approved PAT. Returns `{ status: "pending" | "approved", token? }`. Token is shown once and immediately discarded server-side (only the hash is kept).
+  - **Dashboard approval page** (`/auth/device?user_code=…`): user signs in, picks the workspace, names the PAT, and approves. Calls a Supabase-authed mutation that creates the `personal_access_tokens` row and marks the device-code record approved.
+  - **`GET /api/v1/auth/tokens` / `DELETE /api/v1/auth/tokens/:id`** (PAT-auth, scoped to the calling user): list and revoke. Revoke = set `revoked_at`.
+  - **Dashboard `/settings/tokens` page**: lists the calling user's PATs across all workspaces they belong to, with revoke buttons.
+  - **`GET /api/v1/me`**: PAT-only (chains `requireUserId`). Returns `{ user_id, user_email, workspace_id, token_id }`. The CLI's `agent0 whoami` displays this; `agent0 login` calls it to confirm a freshly minted PAT works.
 
 ### Phase 1 — Backend write endpoints (one PR each)
 
-- [ ] **T1.1 — `POST /api/v1/agents` (create agent).**
-  - Scope: `agents:write:*`.
-  - Body: `{ name: string, data?: object, tag_ids?: string[] }`. If `data` is provided, also creates an initial `agent_versions` row.
+- [ ] **T1.1 — `POST /api/v1/agents` (create agent). PAT-only.**
+  - PreHandler: `requireUserId`.
+  - Body: `{ name: string, tag_ids?: string[] }`. Creates an empty agent with no versions — callers push the first version separately via T1.3.
+  - Validates that any provided `tag_ids` belong to the caller's workspace.
   - Returns the created agent (same shape as `GET /api/v1/agents/:id`).
   - Reference mutation: `apps/web/src/routes/_app.workspace.$workspaceId.agents.$agentId/hooks/use-agent-mutations.tsx:25-66`.
 
-- [ ] **T1.2 — `PATCH /api/v1/agents/:id` (rename / tags / deploy).**
-  - Scope: `agents:write:<id>`.
+- [ ] **T1.2 — `PATCH /api/v1/agents/:id` (rename / tags / deploy). PAT-only.**
+  - PreHandlers: `checkScope(agents:write:<id>)` inline + `requireUserId`. (Scope check is mostly redundant for PATs which hold `*:*:*`, but keeps the audit-friendly per-id scope language.)
   - Body: any subset of `{ name?, staging_version_id?, production_version_id?, tag_ids? }`.
-  - Validate that any version_id being assigned belongs to this agent.
+  - Validate that any `version_id` being assigned belongs to this agent.
   - If `tag_ids` is present, replace the agent's tag set (delete + insert, matching `use-agent-mutations.tsx:164-183`).
   - Returns the updated agent.
 
-- [ ] **T1.3 — `POST /api/v1/agents/:id/versions` (push new prompt version).**
-  - Scope: `agents:write:<id>`.
+- [ ] **T1.3 — `POST /api/v1/agents/:id/versions` (push new prompt version). PAT-only.**
+  - PreHandlers: `checkScope(agents:write:<id>)` inline + `requireUserId`.
   - Body: `{ data: object }` — opaque JSON, stored as-is.
   - Optional query: `?deploy=staging|production` — if set, also updates the corresponding `*_version_id` on the agent in the same response.
+  - Sets `user_id = request.userId` (guaranteed present because of `requireUserId`).
   - Returns the created version (same shape as `GET /api/v1/agents/:id/versions/:versionId`).
   - This is the headline endpoint for the CLI `prompt push` flow.
 
 - [ ] **T1.4 — `GET /api/v1/tags`, `POST /api/v1/tags`, `DELETE /api/v1/tags/:id`.**
-  - Scopes: `tags:read:*` for GET, `tags:write:*` for POST/DELETE.
+  - GET: scope `tags:read:*`. API keys allowed.
+  - POST / DELETE: PAT-only (`requireUserId`). No new scope needed — PATs hold `*:*:*`.
   - Tag fields: `id`, `name`, `color`, `workspace_id`.
   - DELETE cascades on `agent_tags` (verify the FK already does this; otherwise delete manually first).
+  - Adds `tags:read:*` as a suggestion in the dashboard key-creation form.
 
 - [ ] **T1.5 — `GET /api/v1/providers`.**
-  - Scope: `providers:read:*`.
+  - Scope: `providers:read:*`. Read-only; API keys allowed.
   - Returns `id, name, type, created_at, updated_at, has_staging_config`. **Never** returns the encrypted blobs.
   - Mirrors `apps/web/src/lib/queries.ts:22-42`.
+  - Adds `providers:read:*` as a suggestion in the dashboard key-creation form.
 
 - [ ] **T1.6 — `GET /api/v1/mcps` + `POST /api/v1/mcps/:id/refresh`.**
-  - Scopes: `mcps:read:*` for GET, `mcps:write:*` for refresh.
+  - GET: scope `mcps:read:*`. API keys allowed.
+  - Refresh: PAT-only (`requireUserId`). No new scope needed.
   - List response mirrors `queries.ts:44-64` (no encrypted blobs).
   - Refresh: promote the existing internal `/internal/refresh-mcp` (`apps/runner/src/routes/refresh-mcp.ts`) — extract the core logic, expose it under `/api/v1/`, keep the internal route as a thin wrapper.
+  - Adds `mcps:read:*` as a suggestion in the dashboard key-creation form.
 
 ### Phase 2 — OpenAPI publishing
 
@@ -132,10 +143,11 @@ No engine changes needed — `scopes.ts` already handles arbitrary strings. The 
   - Config loader: reads `AGENT0_API_KEY` env var or `~/.config/agent0/config.json` (env wins).
   - Global flags: `--json` (default true for read commands), `--api-base` (override default `https://…`).
 
-- [ ] **T3.2 — `agent0 login` + `agent0 whoami`.**
-  - `login`: prompts for an API key, writes `~/.config/agent0/config.json` (mode 0600), confirms by calling `/api/v1/me`.
-  - `logout`: deletes the config file.
-  - `whoami`: calls `/api/v1/me`, prints workspace + scopes.
+- [ ] **T3.2 — `agent0 login` + `agent0 whoami` + `agent0 logout`.**
+  - `login` (default — device-code flow): hits `POST /api/v1/auth/device`, prints `verification_uri` + short `user_code`, opens the URL in the user's browser, then polls `POST /api/v1/auth/device/poll` until the user approves and picks a workspace. Stores the returned PAT in `~/.config/agent0/config.json` (mode 0600). Confirms by calling `/api/v1/me`.
+  - `login --api-key`: escape hatch for CI. Prompts for an API key, writes it to the config file, skips the browser. Does **not** confirm via `/api/v1/me` (API keys can't call it) — instead pings `GET /api/v1/agents?limit=1` as a liveness check.
+  - `whoami`: calls `/api/v1/me`, prints user + workspace. Only works when authed via PAT — errors out clearly if the stored credential is an API key.
+  - `logout`: revokes the PAT (best-effort `DELETE /api/v1/auth/tokens/:id`) and deletes the config file.
 
 - [ ] **T3.3 — `agent0 agents` commands.**
   - `agents list [--search …] [--tag …] [--page N] [--limit N]`
@@ -207,7 +219,6 @@ No engine changes needed — `scopes.ts` already handles arbitrary strings. The 
 ## Out of scope (revisit later)
 
 - **MCP server.** Once the CLI and OpenAPI spec are stable, a thin MCP wrapper is a few hundred lines. Skip until there's clear demand from users on tools that *only* support MCP.
-- **OAuth login flow** (`gh auth login` style). Paste-the-key is fine for v1.
 - **Prompt diffing as a server feature.** If we want it, do it client-side first (`agent0 prompt diff --from <vA> --to <vB>` just pulls both and diffs locally).
 - **Streaming `agent0 run`.** JSON-only at v1 per the locked-in decision.
 - **Static binary distribution.** npm-only for v1; every target user (Claude Code / Cursor / Codex CLI) already has Node. Revisit (via `bun build --compile` + GitHub Releases + Homebrew tap) if sandboxed-env users ask for it.
