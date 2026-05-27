@@ -55,7 +55,7 @@ const ErrorSchema = {
 };
 
 export async function registerAgentRoutes(fastify: FastifyInstance) {
-	fastify.get("/api/v1/agents/:agentId", {
+	fastify.get("/agents/:agentId", {
 		preHandler: async (request, reply) => {
 			const { agentId } = request.params as { agentId: string };
 			checkScope(request, reply, `agents:read:${agentId}`);
@@ -112,7 +112,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 		},
 	});
 
-	fastify.get("/api/v1/agents", {
+	fastify.get("/agents", {
 		preHandler: requireScope("agents:read:*"),
 		schema: {
 			tags: ["Agents"],
@@ -232,7 +232,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 		},
 	});
 
-	fastify.post("/api/v1/agents", {
+	fastify.post("/agents", {
 		preHandler: [requireScope("agents:write:*"), requireUserId],
 		schema: {
 			tags: ["Agents"],
@@ -346,7 +346,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 	});
 
 	// List versions for an agent (excludes version data/content for lighter response)
-	fastify.get("/api/v1/agents/:agentId/versions", {
+	fastify.get("/agents/:agentId/versions", {
 		preHandler: async (request, reply) => {
 			const { agentId } = request.params as { agentId: string };
 			checkScope(request, reply, `agents:read:${agentId}`);
@@ -425,7 +425,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 	});
 
 	// Get a single version with full content
-	fastify.get("/api/v1/agents/:agentId/versions/:versionId", {
+	fastify.get("/agents/:agentId/versions/:versionId", {
 		preHandler: async (request, reply) => {
 			const { agentId } = request.params as { agentId: string };
 			checkScope(request, reply, `agents:read:${agentId}`);

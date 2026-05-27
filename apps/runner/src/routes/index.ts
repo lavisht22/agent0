@@ -22,10 +22,10 @@ export async function registerRoutes(fastify: FastifyInstance) {
 		await scoped.register(async (workspaceScoped) => {
 			await registerRunRoute(workspaceScoped);
 			await registerRunsRoutes(workspaceScoped);
+			await registerEmbedRoutes(workspaceScoped);
+			await registerAgentRoutes(workspaceScoped);
 		}, { prefix: "/api/v1/workspaces/:workspaceId" });
 
-		await registerEmbedRoutes(scoped);
-		await registerAgentRoutes(scoped);
 		await registerAuthRoutes(scoped);
 	});
 }

@@ -131,7 +131,7 @@ export class Agent0 {
 	 */
 	async embed(options: EmbedOptions): Promise<EmbedResponse> {
 		// Pass all options directly to the API
-		const response = await this.fetchApi("/api/v1/embed", options);
+		const response = await this.fetchApi(`/api/v1/workspaces/${this.workspaceId}/embed`, options);
 		return await response.json();
 	}
 
@@ -144,7 +144,7 @@ export class Agent0 {
 	 */
 	async embedMany(options: EmbedManyOptions): Promise<EmbedManyResponse> {
 		// Pass all options directly to the API
-		const response = await this.fetchApi("/api/v1/embed-many", options);
+		const response = await this.fetchApi(`/api/v1/workspaces/${this.workspaceId}/embed-many`, options);
 		return await response.json();
 	}
 }

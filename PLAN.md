@@ -90,7 +90,7 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
 
 > **Correction note (2026-05-27):** T0.1/T0.2 shipped with two design mistakes — PATs were tied to a single workspace, and there was no story for capturing the agent0 base URL from the CLI (the runner is open-source and self-hostable). T0.3–T0.5 below correct the model **before** Phase 1's write endpoints land. After this, T1.* paths shift to `/api/v1/workspaces/:workspaceId/...`.
 
-- [ ] **T0.3 — Move all resource routes under `/api/v1/workspaces/:workspaceId/...`.**
+- [x] **T0.3 — Move all resource routes under `/api/v1/workspaces/:workspaceId/...`.**
   - **Affected existing routes** (these are the ones already shipped that need to move):
     - `POST /api/v1/run` → `POST /api/v1/workspaces/:workspaceId/runs`
     - `GET /api/v1/runs`, `GET /api/v1/runs/:runId` → `/api/v1/workspaces/:workspaceId/runs[/...]`

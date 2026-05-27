@@ -61,7 +61,7 @@ async function getProvider(
 
 export async function registerEmbedRoutes(fastify: FastifyInstance) {
 	// Single embedding endpoint
-	fastify.post("/api/v1/embed", {
+	fastify.post("/embed", {
 		preHandler: requireScope("embeddings:run:*"),
 		schema: {
 			tags: ["Embeddings"],
@@ -153,7 +153,7 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 	});
 
 	// Multiple embeddings endpoint
-	fastify.post("/api/v1/embed-many", {
+	fastify.post("/embed-many", {
 		preHandler: requireScope("embeddings:run:*"),
 		schema: {
 			tags: ["Embeddings"],
