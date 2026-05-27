@@ -90,21 +90,21 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
 
 > **Correction note (2026-05-27):** T0.1/T0.2 shipped with two design mistakes — PATs were tied to a single workspace, and there was no story for capturing the agent0 base URL from the CLI (the runner is open-source and self-hostable). T0.3–T0.5 below correct the model **before** Phase 1's write endpoints land. After this, T1.* paths shift to `/api/v1/workspaces/:workspaceId/...`.
 
-- [ ] **T0.3 — Detach PATs from workspaces (user-bound tokens).**
-  - **Migration**: drop `workspace_id` column from `personal_access_tokens` along with its FK, its index, and the workspace-related half of the INSERT RLS check. New INSERT RLS: `user_id = auth.uid()`. Migration also drops the `(workspace_id, user_id)` composite index if present.
-  - **Auth middleware** (`apps/runner/src/lib/auth.ts`): PAT branch no longer reads `workspace_id` off the token row. It reads the workspaceId from the route's `:workspaceId` path param (Fastify exposes it on `request.params`). Then runs the existing `workspace_user` lookup with `(pat.user_id, pathWorkspaceId)`. 403 if the user isn't a member. API-key branch additionally 403s if `pathWorkspaceId !== apiKey.workspace_id`. Unscoped routes (identity/discovery) skip the workspace check.
-  - **Dashboard**: move the tokens page from `/_app/workspace/$workspaceId/personal-access-tokens.*` to an account-level path (`/_app/account/personal-access-tokens.*`). Drop `workspace_id` from the insert in the mint form (`apps/web/src/routes/_app.workspace.$workspaceId.personal-access-tokens.$tokenId.tsx:78`). Drop the `workspace_id` filter from `personalAccessTokensQuery` (`apps/web/src/lib/queries.ts:236-253`). Move the sidebar entry to the user/account menu.
-  - **`/api/v1/me`**: drop `workspace_id`, `workspace_name` from the response (those become per-request, supplied by the URL path on other endpoints). New shape: `{ user_id, user_email, user_name, token_id }`. The CLI calls `/api/v1/workspaces` separately (T0.5) to learn what workspaces the user can act in.
-
-- [ ] **T0.4 — Move all resource routes under `/api/v1/workspaces/:workspaceId/...`.**
+- [ ] **T0.3 — Move all resource routes under `/api/v1/workspaces/:workspaceId/...`.**
   - **Affected existing routes** (these are the ones already shipped that need to move):
-    - `POST /api/v1/run` → `POST /api/v1/workspaces/:workspaceId/run`
+    - `POST /api/v1/run` → `POST /api/v1/workspaces/:workspaceId/runs`
     - `GET /api/v1/runs`, `GET /api/v1/runs/:runId` → `/api/v1/workspaces/:workspaceId/runs[/...]`
     - `GET /api/v1/agents`, `GET /api/v1/agents/:agentId`, `POST /api/v1/agents`, version subroutes → `/api/v1/workspaces/:workspaceId/agents[/...]`
     - `POST /api/v1/embed`, `POST /api/v1/embed-many` → `/api/v1/workspaces/:workspaceId/embed[-many]`
   - **Unchanged (kept unscoped):** `GET /api/v1/me`, `POST /api/v1/auth/logout`, `GET /api/v1/version` (T0.5), `GET /api/v1/workspaces` (T0.5).
-  - **API-key matching guard:** add it to the dual-auth middleware in T0.3 — `pathWorkspaceId !== apiKey.workspace_id` → 403 with `{ message: "API key is not scoped to this workspace" }`.
+  - **API-key matching guard:** add it to the dual-auth middleware — `pathWorkspaceId !== apiKey.workspace_id` → 403 with `{ message: "API key is not scoped to this workspace" }`.
   - **Breaking change for existing API-key consumers.** This is a hard cut: the old paths are removed, not aliased. Justification — the API surface isn't widely consumed yet (no published OpenAPI spec, no CLI shipped, no SDK using these routes), and dual paths would double the maintenance surface. **Open question for review: do we want a one-release deprecation window with the legacy paths emitting `Sunset` / `Deprecation` headers, or a clean break?**
+
+- [ ] **T0.4 — Detach PATs from workspaces (user-bound tokens).**
+  - **Migration**: drop `workspace_id` column from `personal_access_tokens` along with its FK, its index, and the workspace-related half of the INSERT RLS check. New INSERT RLS: `user_id = auth.uid()`. Migration also drops the `(workspace_id, user_id)` composite index if present.
+  - **Auth middleware** (`apps/runner/src/lib/auth.ts`): PAT branch no longer reads `workspace_id` off the token row. It reads the workspaceId from the route's `:workspaceId` path param (Fastify exposes it on `request.params`, now populated by T0.3). Then runs the existing `workspace_user` lookup with `(pat.user_id, pathWorkspaceId)`. 403 if the user isn't a member. Unscoped routes (identity/discovery) skip the workspace check.
+  - **Dashboard**: move the tokens page from `/_app/workspace/$workspaceId/personal-access-tokens.*` to an account-level path (`/_app/account/personal-access-tokens.*`). Drop `workspace_id` from the insert in the mint form (`apps/web/src/routes/_app.workspace.$workspaceId.personal-access-tokens.$tokenId.tsx:78`). Drop the `workspace_id` filter from `personalAccessTokensQuery` (`apps/web/src/lib/queries.ts:236-253`). Move the sidebar entry to the user/account menu.
+  - **`/api/v1/me`**: drop `workspace_id`, `workspace_name` from the response (those become per-request, supplied by the URL path on other endpoints). New shape: `{ user_id, user_email, user_name, token_id }`. The CLI calls `/api/v1/workspaces` separately (T0.5) to learn what workspaces the user can act in.
 
 - [ ] **T0.5 — Discovery endpoints: `GET /api/v1/workspaces` + `GET /api/v1/version`.**
   - **`GET /api/v1/workspaces`** (PAT-only, chains `requireUserId`): returns `{ data: Array<{ id, name, role, created_at }> }` listing every workspace the calling user is a member of. Powers `agent0 login`'s workspace-picker prompt and `agent0 workspaces list`.
