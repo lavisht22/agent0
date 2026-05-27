@@ -34,7 +34,9 @@ const BUILT_IN_SCOPE_SUGGESTIONS = [
 	"embeddings:run:*",
 	"tags:read:*",
 	"providers:read:*",
+	"mcps:read:*",
 ];
+
 
 
 

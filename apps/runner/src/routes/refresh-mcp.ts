@@ -5,11 +5,11 @@ import { supabase } from '../lib/db.js';
 import { decryptMessage } from '../lib/openpgp.js';
 import type { MCPConfig } from '../lib/types.js';
 
-type Environment = "production" | "staging";
-type ToolEntry = { name: string; description: string | undefined };
-type ToolsByEnv = { production?: ToolEntry[]; staging?: ToolEntry[] | null };
+export type Environment = "production" | "staging";
+export type ToolEntry = { name: string; description: string | undefined };
+export type ToolsByEnv = { production?: ToolEntry[]; staging?: ToolEntry[] | null };
 
-async function fetchToolsForEnv(encrypted: string): Promise<ToolEntry[]> {
+export async function fetchToolsForEnv(encrypted: string): Promise<ToolEntry[]> {
     const decrypted = await decryptMessage(encrypted);
     const config: MCPConfig = JSON.parse(decrypted);
 

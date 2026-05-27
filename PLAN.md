@@ -152,7 +152,7 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
   - Mirrors `apps/web/src/lib/queries.ts:22-42`.
   - Adds `providers:read:*` as a suggestion in the dashboard key-creation form.
 
-- [ ] **T1.6 — `GET /api/v1/workspaces/:workspaceId/mcps` + `POST /api/v1/workspaces/:workspaceId/mcps/:id/refresh`.**
+- [x] **T1.6 — `GET /api/v1/workspaces/:workspaceId/mcps` + `POST /api/v1/workspaces/:workspaceId/mcps/:id/refresh`.**
   - GET: scope `mcps:read:*`. API keys allowed.
   - Refresh: PAT-only (`requireUserId`). No new scope needed.
   - List response mirrors `queries.ts:44-64` (no encrypted blobs).
