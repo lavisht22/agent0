@@ -146,7 +146,7 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
   - DELETE cascades on `agent_tags` (verify the FK already does this; otherwise delete manually first).
   - Adds `tags:read:*` as a suggestion in the dashboard key-creation form.
 
-- [ ] **T1.5 — `GET /api/v1/workspaces/:workspaceId/providers`.**
+- [x] **T1.5 — `GET /api/v1/workspaces/:workspaceId/providers`.**
   - Scope: `providers:read:*`. Read-only; API keys allowed.
   - Returns `id, name, type, created_at, updated_at, has_staging_config`. **Never** returns the encrypted blobs.
   - Mirrors `apps/web/src/lib/queries.ts:22-42`.
