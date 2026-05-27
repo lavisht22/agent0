@@ -186,18 +186,18 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
   - **Global flags**: `--json` (default true for read commands), `--profile <name>`, `--url <https://…>` (one-shot override), `--workspace <id>` (one-shot override).
   - **No defaults baked in.** There is no default `https://agent0.…` host — this is open source and self-hostable. `agent0` with no config errors with a hint to run `agent0 login`.
 
-- [ ] **T3.2 — `agent0 login` + `agent0 whoami` + `agent0 logout` + `agent0 use` + workspace switch.**
+- [x] **T3.2 — `agent0 login` + `agent0 whoami` + `agent0 logout` + `agent0 use` + workspace switch.**
   - `login [--profile <name>] [--url <https://…>]`:
     1. Prompts for the agent0 base URL if not passed (or env-supplied). Trims trailing `/`.
     2. Calls `GET <url>/api/v1/version` to confirm the URL points at agent0; errors clearly otherwise (handles 404, non-JSON, missing `name: "agent0"`).
-    3. Prompts for a token (PAT or API key — distinguished by prefix `agent0_pat_…`).
-    4. For PATs: calls `GET /api/v1/me` to confirm token validity, then `GET /api/v1/workspaces` and presents the list for the user to pick one. For API keys: skips the picker; calls `GET /api/v1/workspaces/${workspace_id}/agents?limit=1` against a workspace inferred by trial — actually, since API-key requests now need a workspace in the path and the key is pinned, prompt the user to enter `workspace_id` manually (machine identities know what they're for).
-    5. Writes `{ url, token, workspace_id }` to the named profile (default: `default`). Sets `active` to that profile if it's new.
-  - `whoami`: calls `/api/v1/me`, prints `user_email`, the active workspace name (from a follow-up `/api/v1/workspaces` call), the profile name, and the URL. Errors clearly if the stored credential is an API key (since API keys can't call `/me`).
-  - `logout [--profile <name>]`: calls `POST /api/v1/auth/logout` (best-effort — for API keys this 403s and is ignored) and removes the named profile from config. If the removed profile was `active`, picks another or leaves `active: null`.
+    3. Prompts (masked, via `@clack/prompts` password) for a personal access token, surfacing the mint URL `${url}/account/personal-access-tokens`. Tokens not prefixed `agent0_pat_` are rejected at the input validator — login is **PAT-only**. (The runtime auth middleware and HTTP client still accept API keys for read/run flows; they just can't bootstrap a profile.)
+    4. Calls `GET /api/v1/me` to confirm the token (403 → "API keys are not supported by login"; 401 → "invalid or revoked"). Then `GET /api/v1/workspaces` and presents the list. If one workspace, auto-selects; if many, shows a clack `select` picker.
+    5. Writes `{ url, token, workspace_id }` to the named profile (default: `default`, overwriting silently on re-login). Sets `active` to that profile when there's no current active profile.
+  - `whoami`: calls `/api/v1/me` and `/api/v1/workspaces` in parallel, prints `profile / url / user / workspace[role]`. `--json` (or non-TTY) emits a JSON object instead. Errors clearly if the stored credential is an API key (403 from `/me`).
+  - `logout [--profile <name>]`: calls `POST /api/v1/auth/logout` (warns + continues on any non-2xx) and removes the named profile from config. If the removed profile was `active`, picks another or leaves `active: null`.
   - `use <profile>`: switches the active profile.
-  - `workspaces list`: prints workspaces the current PAT can see (`GET /api/v1/workspaces`).
-  - `workspace use <id>`: validates membership (call `/api/v1/workspaces`, verify `id` is present) and updates `workspace_id` on the active profile.
+  - `workspaces list` (alias `workspaces ls`): prints workspaces the current PAT can see (`GET /api/v1/workspaces`). TTY: marks the currently-selected workspace with `*`; non-TTY/`--json`: emits the raw array.
+  - `workspaces use <id>`: validates membership (`/api/v1/workspaces` must include `id`) and updates `workspace_id` on the active profile. (Naming unified to plural; PLAN previously said `workspace use`.)
 
 - [ ] **T3.3 — `agent0 agents` commands.**
   - `agents list [--search …] [--tag …] [--page N] [--limit N]`
