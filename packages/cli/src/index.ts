@@ -1,5 +1,11 @@
 import { cac } from "cac";
 import pkg from "../package.json" with { type: "json" };
+import {
+	agentsCreateCommand,
+	agentsGetCommand,
+	agentsListCommand,
+	agentsRenameCommand,
+} from "./commands/agents.js";
 import { loginCommand } from "./commands/login.js";
 import { logoutCommand } from "./commands/logout.js";
 import { useCommand } from "./commands/use.js";
@@ -8,7 +14,7 @@ import {
 	workspacesListCommand,
 	workspacesUseCommand,
 } from "./commands/workspaces.js";
-import { extractErrorMessage } from "./lib/errors.js";
+import { extractErrorMessage, fail } from "./lib/errors.js";
 
 const cli = cac("agent0");
 
@@ -40,14 +46,68 @@ cli
 	.command("use <profile>", "Switch the active profile")
 	.action((profileName: string) => run(() => useCommand(profileName)));
 
+// cac matches commands by argv[0] only, so we can't register "agents list" as
+// its own command — we register one parent command per group and dispatch on
+// the [action] positional. This also fixes the same bug in `workspaces list`
+// that shipped silently in T3.2.
 cli
-	.command("workspaces list", "List workspaces the active profile can access")
-	.alias("workspaces ls")
-	.action((opts) => run(() => workspacesListCommand(opts)));
+	.command(
+		"workspaces [action] [target]",
+		"Manage workspaces — actions: list | ls, use <id>",
+	)
+	.action((action: string | undefined, target: string | undefined, opts) => {
+		switch (action) {
+			case undefined:
+				cli.outputHelp();
+				return;
+			case "list":
+			case "ls":
+				return run(() => workspacesListCommand(opts));
+			case "use":
+				if (!target) fail("Usage: agent0 workspaces use <id>");
+				return run(() => workspacesUseCommand(target, opts));
+			default:
+				fail(
+					`Unknown workspaces action: "${action}". Try: list, ls, use <id>.`,
+				);
+		}
+	});
 
 cli
-	.command("workspaces use <id>", "Switch the active profile to a workspace")
-	.action((id: string, opts) => run(() => workspacesUseCommand(id, opts)));
+	.command(
+		"agents [action] [target]",
+		"Manage agents — actions: list | ls [--search ...] [--tag ...]…, get <id>, create --name ... [--tag ...]…, rename <id> --name ...",
+	)
+	.option("--search <term>", "Filter agents by name substring (list)")
+	.option(
+		"--tag <name>",
+		"Tag name; repeatable. Filters on list, attaches on create.",
+	)
+	.option("--page <n>", "Page number (list)", { default: "1" })
+	.option("--limit <n>", "Items per page, max 100 (list)", { default: "20" })
+	.option("--name <name>", "Agent name (create, rename)")
+	.action((action: string | undefined, target: string | undefined, opts) => {
+		switch (action) {
+			case undefined:
+				cli.outputHelp();
+				return;
+			case "list":
+			case "ls":
+				return run(() => agentsListCommand(opts));
+			case "get":
+				if (!target) fail("Usage: agent0 agents get <id>");
+				return run(() => agentsGetCommand(target, opts));
+			case "create":
+				return run(() => agentsCreateCommand(opts));
+			case "rename":
+				if (!target) fail("Usage: agent0 agents rename <id> --name ...");
+				return run(() => agentsRenameCommand(target, opts));
+			default:
+				fail(
+					`Unknown agents action: "${action}". Try: list, get <id>, create, rename <id>.`,
+				);
+		}
+	});
 
 cli.command("").action(() => {
 	cli.outputHelp();

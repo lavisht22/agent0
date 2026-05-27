@@ -199,12 +199,16 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
   - `workspaces list` (alias `workspaces ls`): prints workspaces the current PAT can see (`GET /api/v1/workspaces`). TTY: marks the currently-selected workspace with `*`; non-TTY/`--json`: emits the raw array.
   - `workspaces use <id>`: validates membership (`/api/v1/workspaces` must include `id`) and updates `workspace_id` on the active profile. (Naming unified to plural; PLAN previously said `workspace use`.)
 
-- [ ] **T3.3 — `agent0 agents` commands.**
-  - `agents list [--search …] [--tag …] [--page N] [--limit N]`
+- [x] **T3.3 — `agent0 agents` commands.**
+  - `agents list [--search …] [--tag …]… [--page N] [--limit N]`
   - `agents get <id>`
-  - `agents create --name … [--from-file prompt.json] [--tag …]…`
-  - `agents rename <id> --name …`
-  - All return JSON; pretty-print only if stdout is a TTY and `--json` not explicitly passed.
+  - `agents create --name … [--tag …]…` — creates an empty shell; first prompt version is pushed separately via `agent0 prompt push` (T3.4). `--from-file` was dropped because `POST /agents` doesn't accept initial version data, and chaining create+push in the CLI duplicated logic that T3.4 already owns.
+  - `agents rename <id> --name …` — PATCH wrapper, name-only.
+  - `--tag` accepts tag **names** (repeatable, e.g. `--tag prod --tag urgent`), resolved client-side via a single `GET /tags` call. Unknown tag → clear error. Duplicate tag names within the workspace → ambiguity error asking the user to pass IDs.
+  - TTY output: aligned plain text matching `workspaces list` style (no table library). JSON when `--json` or stdout is non-TTY.
+  - Bare `agent0 agents` (no action) prints the agents group's per-command help.
+
+> **Correction note (2026-05-27, landed in T3.3):** T3.2 shipped a broken routing pattern — cac matches commands by `argv[0]` only, so `cli.command("workspaces list", …)` and `cli.command("workspaces use <id>", …)` never routed; every multi-word invocation fell through to the empty-default catch-all and printed global help. Fixed in T3.3 by collapsing each group into a single `cli.command("<group> [action] [target]", …)` that dispatches in code. The same pattern is used for `agents`. UX (`agent0 workspaces list`, `agent0 agents list`) is unchanged.
 
 - [ ] **T3.4 — `agent0 prompt pull` + `agent0 prompt push` (the headline).**
   - `prompt pull <agentId> [--version <id>] [--env staging|production] [-o file.json]`
