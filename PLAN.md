@@ -124,7 +124,7 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
   - Returns the created agent (same shape as `GET .../agents/:id`), 201.
   - Reference mutation: `apps/web/src/routes/_app.workspace.$workspaceId.agents.$agentId/hooks/use-agent-mutations.tsx:25-66`.
 
-- [ ] **T1.2 — `PATCH /api/v1/workspaces/:workspaceId/agents/:id` (rename / tags / deploy). PAT-only.**
+- [x] **T1.2 — `PATCH /api/v1/workspaces/:workspaceId/agents/:id` (rename / tags / deploy). PAT-only.**
   - PreHandlers: `checkScope(agents:write:<id>)` inline + `requireUserId`. (Scope check is mostly redundant for PATs which hold `*:*:*`, but keeps the audit-friendly per-id scope language.)
   - Body: any subset of `{ name?, staging_version_id?, production_version_id?, tag_ids? }`.
   - Validate that any `version_id` being assigned belongs to this agent.

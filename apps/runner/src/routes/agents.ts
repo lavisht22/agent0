@@ -488,4 +488,211 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			return reply.send({ data: version });
 		},
 	});
+
+	fastify.patch("/agents/:agentId", {
+		preHandler: [
+			async (request, reply) => {
+				const { agentId } = request.params as { agentId: string };
+				checkScope(request, reply, `agents:write:${agentId}`);
+			},
+			requireUserId,
+		],
+		schema: {
+			tags: ["Agents"],
+			summary: "Update an agent (rename, tags, deploy)",
+			params: {
+				type: "object" as const,
+				properties: {
+					agentId: { type: "string" as const, description: "Agent ID" },
+				},
+				required: ["agentId"],
+			},
+			body: {
+				type: "object" as const,
+				properties: {
+					name: { type: "string" as const, minLength: 1, description: "New agent name" },
+					staging_version_id: { type: "string" as const, nullable: true, description: "ID of version to deploy to staging" },
+					production_version_id: { type: "string" as const, nullable: true, description: "ID of version to deploy to production" },
+					tag_ids: {
+						type: "array" as const,
+						items: { type: "string" as const },
+						description: "Replacement set of tag IDs. All must belong to the caller's workspace.",
+					},
+				},
+				additionalProperties: false,
+			},
+			response: {
+				200: {
+					type: "object" as const,
+					properties: {
+						data: AgentSchema,
+					},
+				},
+				400: ErrorSchema,
+				404: ErrorSchema,
+				500: ErrorSchema,
+			},
+		},
+		handler: async (request, reply) => {
+			const { workspaceId, agentId } = request.params as {
+				workspaceId: string;
+				agentId: string;
+			};
+			const { name, staging_version_id, production_version_id, tag_ids } =
+				request.body as {
+					name?: string;
+					staging_version_id?: string | null;
+					production_version_id?: string | null;
+					tag_ids?: string[];
+				};
+
+			if (
+				name === undefined &&
+				staging_version_id === undefined &&
+				production_version_id === undefined &&
+				tag_ids === undefined
+			) {
+				return reply.code(400).send({ message: "No updates provided" });
+			}
+
+			// Verify agent belongs to workspace
+			const { data: agent, error: agentError } = await supabase
+				.from("agents")
+				.select("id")
+				.eq("id", agentId)
+				.eq("workspace_id", workspaceId)
+				.single();
+
+			if (agentError || !agent) {
+				return reply.code(404).send({ message: "Agent not found" });
+			}
+
+			// Validate versions if provided
+			const versionIdsToCheck = [staging_version_id, production_version_id].filter(
+				(id): id is string => id !== undefined && id !== null,
+			);
+
+			if (versionIdsToCheck.length > 0) {
+				const { data: versions, error: versionsError } = await supabase
+					.from("agent_versions")
+					.select("id")
+					.eq("agent_id", agentId)
+					.in("id", versionIdsToCheck);
+
+				if (versionsError) {
+					return reply.code(500).send({ message: "Failed to validate versions" });
+				}
+
+				const foundVersionIds = new Set(versions.map((v) => v.id));
+				for (const vid of versionIdsToCheck) {
+					if (!foundVersionIds.has(vid)) {
+						return reply.code(400).send({
+							message: `Version ${vid} does not exist for this agent`,
+						});
+					}
+				}
+			}
+
+			const updateFields: Record<string, any> = {};
+			if (name !== undefined) {
+				const trimmed = name.trim();
+				if (trimmed.length === 0) {
+					return reply.code(400).send({ message: "name must not be empty" });
+				}
+				updateFields.name = trimmed;
+			}
+			if (staging_version_id !== undefined) {
+				updateFields.staging_version_id = staging_version_id;
+			}
+			if (production_version_id !== undefined) {
+				updateFields.production_version_id = production_version_id;
+			}
+
+			if (Object.keys(updateFields).length > 0) {
+				const { error: updateError } = await supabase
+					.from("agents")
+					.update(updateFields)
+					.eq("id", agentId);
+
+				if (updateError) {
+					return reply.code(500).send({ message: "Failed to update agent" });
+				}
+			}
+
+			// Handle tags
+			if (tag_ids !== undefined) {
+				const uniqueTagIds = Array.from(new Set(tag_ids));
+
+				// Validate tags belong to workspace
+				if (uniqueTagIds.length > 0) {
+					const { data: workspaceTags, error: tagLookupError } = await supabase
+						.from("tags")
+						.select("id")
+						.eq("workspace_id", workspaceId)
+						.in("id", uniqueTagIds);
+
+					if (tagLookupError) {
+						return reply.code(500).send({ message: "Failed to validate tags" });
+					}
+
+					const foundIds = new Set(workspaceTags.map((t) => t.id));
+					const unknown = uniqueTagIds.filter((id) => !foundIds.has(id));
+					if (unknown.length > 0) {
+						return reply.code(400).send({
+							message: `Unknown tag_ids for this workspace: ${unknown.join(", ")}`,
+						});
+					}
+				}
+
+				// Delete existing tags
+				const { error: deleteError } = await supabase
+					.from("agent_tags")
+					.delete()
+					.eq("agent_id", agentId);
+
+				if (deleteError) {
+					return reply.code(500).send({ message: "Failed to clear existing tags" });
+				}
+
+				// Insert new tags
+				if (uniqueTagIds.length > 0) {
+					const { error: insertError } = await supabase
+						.from("agent_tags")
+						.insert(
+							uniqueTagIds.map((tagId) => ({ agent_id: agentId, tag_id: tagId })),
+						);
+
+					if (insertError) {
+						return reply.code(500).send({ message: "Failed to attach new tags" });
+					}
+				}
+			}
+
+			// Fetch final agent state
+			const { data: updatedAgent, error: fetchError } = await supabase
+				.from("agents")
+				.select(
+					"id, name, staging_version_id, production_version_id, created_at, updated_at, agent_tags(tags(id, name))",
+				)
+				.eq("id", agentId)
+				.single();
+
+			if (fetchError || !updatedAgent) {
+				return reply.code(500).send({ message: "Failed to fetch updated agent" });
+			}
+
+			return reply.code(200).send({
+				data: {
+					id: updatedAgent.id,
+					name: updatedAgent.name,
+					staging_version_id: updatedAgent.staging_version_id,
+					production_version_id: updatedAgent.production_version_id,
+					tags:
+						updatedAgent.agent_tags?.map((at) => at.tags).filter(Boolean) ?? [],
+					created_at: updatedAgent.created_at,
+					updated_at: updatedAgent.updated_at,
+				},
+			});
+		},
+	});
 }
