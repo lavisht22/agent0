@@ -3,7 +3,7 @@ import type { Tables } from "@repo/database";
 import type { TextStreamPart, Tool } from "ai";
 import { events } from "fetch-event-stream";
 import { nanoid } from "nanoid";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type z from "zod";
 import type { assistantMessageSchema } from "@/components/assistant-message";
 import type { MessageT } from "@/components/messages";
@@ -24,9 +24,15 @@ export const useAgentRunner = ({
 	const [errors, setErrors] = useState<unknown[]>([]);
 	const [warnings, setWarnings] = useState<unknown[]>([]);
 	const [generatedMessages, setGeneratedMessages] = useState<MessageT[]>([]);
+	const abortRef = useRef<AbortController | null>(null);
 
 	const handleRun = useCallback(
 		async (data: unknown) => {
+			// Abort any prior run that's still in flight before starting a new one.
+			abortRef.current?.abort();
+			const controller = new AbortController();
+			abortRef.current = controller;
+
 			try {
 				setIsRunning(true);
 
@@ -65,6 +71,7 @@ export const useAgentRunner = ({
 								.map(([id, headers]) => [id, { headers }]),
 						),
 					}),
+					signal: controller.signal,
 				});
 
 				if (!response.ok) {
@@ -186,15 +193,24 @@ export const useAgentRunner = ({
 					setGeneratedMessages([...generatedMessageState]);
 				}
 			} catch (error) {
+				// User-initiated cancel; partial generatedMessages stay on screen.
+				if (error instanceof Error && error.name === "AbortError") return;
 				toast.danger(
 					error instanceof Error ? error.message : "Failed to run agent.",
 				);
 			} finally {
 				setIsRunning(false);
+				if (abortRef.current === controller) {
+					abortRef.current = null;
+				}
 			}
 		},
 		[variableValues, mcpHeaderValues, version, environment],
 	);
+
+	const handleStop = useCallback(() => {
+		abortRef.current?.abort();
+	}, []);
 
 	const resetRunner = useCallback(() => {
 		setGeneratedMessages([]);
@@ -207,6 +223,7 @@ export const useAgentRunner = ({
 		errors,
 		warnings,
 		handleRun,
+		handleStop,
 		resetRunner,
 		generatedMessages,
 	};

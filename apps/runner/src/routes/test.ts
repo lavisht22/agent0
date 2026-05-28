@@ -1,7 +1,7 @@
 import { Output, stepCountIs, streamText, type ToolSet } from "ai";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
-import { calculateModelCost } from "../lib/cost.js";
+import { calculateModelCost, sumUsage } from "../lib/cost.js";
 import { supabase } from "../lib/db.js";
 import {
 	applyMessageVariables,
@@ -105,6 +105,8 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 
 		const preProcessingTime = Date.now() - startTime;
 		let firstTokenTime: number | null = null;
+		let streamCompleted = false;
+		const controller = new AbortController();
 
 		const result = streamText({
 			model,
@@ -115,12 +117,14 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			tools: allTools as ToolSet,
 			output: outputFormat === "json" ? Output.json() : Output.text(),
 			providerOptions,
+			abortSignal: controller.signal,
 			onChunk: () => {
 				if (!firstTokenTime) {
 					firstTokenTime = Date.now() - preProcessingTime - startTime;
 				}
 			},
 			onFinish: async ({ steps, totalUsage }) => {
+				streamCompleted = true;
 				closeAll();
 
 				runData.steps = steps;
@@ -148,6 +152,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 				await uploadRunData(id, runData);
 			},
 			onError: async ({ error }) => {
+				streamCompleted = true;
 				closeAll();
 
 				if (!firstTokenTime) {
@@ -180,7 +185,57 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 				});
 				await uploadRunData(id, runData);
 			},
+			onAbort: async ({ steps }) => {
+				if (streamCompleted) return;
+				streamCompleted = true;
+				closeAll();
+
+				if (!firstTokenTime) {
+					firstTokenTime = Date.now() - preProcessingTime - startTime;
+				}
+
+				const totalUsage = sumUsage(steps);
+
+				runData.steps = steps;
+				runData.totalUsage = totalUsage;
+				runData.error = {
+					name: "AbortError",
+					message: "Run aborted by client disconnect",
+				};
+
+				const id = nanoid();
+				await supabase.from("runs").insert({
+					id,
+					workspace_id: provider.workspace_id,
+					version_id,
+					created_at: new Date(startTime).toISOString(),
+					is_error: true,
+					is_test: true,
+					is_stream: true,
+					pre_processing_time: preProcessingTime,
+					first_token_time: firstTokenTime,
+					response_time:
+						Date.now() - (firstTokenTime || 0) - preProcessingTime - startTime,
+					tokens: totalUsage.totalTokens,
+					cost: calculateModelCost(
+						typeof model === "string" ? model : model.modelId,
+						totalUsage,
+					),
+				});
+				await uploadRunData(id, runData);
+			},
 		});
+
+		// Abort on client disconnect. See routes/runs.ts for the rationale on
+		// listening to both reply.raw and request.raw under Fastify 5 / Cloud Run.
+		const handleClientClose = () => {
+			if (!streamCompleted) {
+				controller.abort();
+				closeAll();
+			}
+		};
+		reply.raw.on("close", handleClientClose);
+		request.raw.on("close", handleClientClose);
 
 		const stream = createSSEStream(result);
 

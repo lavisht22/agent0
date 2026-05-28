@@ -10,7 +10,6 @@ import {
 	Popover,
 	Select,
 	Slider,
-	Spinner,
 	TextField,
 	useOverlayState,
 } from "@heroui/react";
@@ -27,6 +26,7 @@ import {
 	LucidePencil,
 	LucidePlay,
 	LucideSettings2,
+	LucideSquare,
 } from "lucide-react";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
@@ -146,6 +146,7 @@ function RouteComponent() {
 		errors,
 		warnings,
 		handleRun,
+		handleStop,
 		resetRunner,
 		generatedMessages,
 	} = useAgentRunner({
@@ -609,25 +610,27 @@ function RouteComponent() {
 								{testEnvironment}
 							</Button>
 
-							<Button
-								size="sm"
-								variant="primary"
-								type="button"
-								onPress={() => handleRun(form.state.values)}
-								isDisabled={isRunning}
-								isPending={isRunning}
-							>
-								{({ isPending }) => (
-									<>
-										{isPending ? (
-											<Spinner color="current" size="sm" />
-										) : (
-											<LucidePlay className="size-3.5" />
-										)}
-										Run
-									</>
-								)}
-							</Button>
+							{isRunning ? (
+								<Button
+									size="sm"
+									variant="danger"
+									type="button"
+									onPress={() => handleStop()}
+								>
+									<LucideSquare className="size-3.5 fill-current" />
+									Stop
+								</Button>
+							) : (
+								<Button
+									size="sm"
+									variant="primary"
+									type="button"
+									onPress={() => handleRun(form.state.values)}
+								>
+									<LucidePlay className="size-3.5" />
+									Run
+								</Button>
+							)}
 						</div>
 					</div>
 					<div className="border-b border-border">
