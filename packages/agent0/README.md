@@ -30,6 +30,7 @@ import { Agent0 } from 'agent0-js';
 // Initialize the client
 const client = new Agent0({
   apiKey: 'your-api-key-here',
+  workspaceId: 'your-workspace-id',
   baseUrl: 'https://app.agent0.com' // Optional, defaults to this value
 });
 
@@ -52,6 +53,8 @@ console.log(response.messages);
 3. Click **+ Create**
 4. Copy the generated key and store it securely
 
+Your **Workspace ID** is shown in the dashboard URL and on the workspace settings page.
+
 > ⚠️ **Important**: Keep your API key secure and never commit it to version control. Use environment variables instead.
 
 ## Usage
@@ -63,6 +66,7 @@ import { Agent0 } from 'agent0-js';
 
 const client = new Agent0({
   apiKey: process.env.AGENT0_API_KEY!,
+  workspaceId: process.env.AGENT0_WORKSPACE_ID!,
   baseUrl: 'https://app.agent0.com' // Optional
 });
 ```
@@ -72,6 +76,7 @@ const client = new Agent0({
 | Option | Type | Required | Default | Description |
 |--------|------|----------|---------|-------------|
 | `apiKey` | `string` | Yes | - | Your Agent0 API key |
+| `workspaceId` | `string` | Yes | - | The ID of the workspace the API key belongs to. All API calls are scoped to this workspace. |
 | `baseUrl` | `string` | No | `https://app.agent0.com` | The base URL for the Agent0 API |
 | `environment` | `'staging' \| 'production'` | No | `'production'` | Default environment for all runs (can be overridden per-run) |
 
@@ -94,6 +99,7 @@ interface RunOptions {
   mcpOptions?: Record<string, {      // Per-MCP server runtime options (keyed by MCP ID)
     headers?: Record<string, string>; // Custom HTTP headers to send with MCP requests
   }>;
+  signal?: AbortSignal;               // Abort signal to cancel the run (see Cancellation section)
 }
 
 interface CustomTool {
@@ -337,7 +343,8 @@ const googleResult = await client.embed({
 const { Agent0 } = require('agent0-js');
 
 const client = new Agent0({
-  apiKey: process.env.AGENT0_API_KEY
+  apiKey: process.env.AGENT0_API_KEY,
+  workspaceId: process.env.AGENT0_WORKSPACE_ID
 });
 
 async function main() {
@@ -365,7 +372,8 @@ main();
 import { Agent0 } from 'agent0-js';
 
 const client = new Agent0({
-  apiKey: process.env.AGENT0_API_KEY!
+  apiKey: process.env.AGENT0_API_KEY!,
+  workspaceId: process.env.AGENT0_WORKSPACE_ID!
 });
 
 async function streamExample() {
@@ -407,7 +415,8 @@ Generate embeddings to power semantic search, similarity matching, or RAG (Retri
 import { Agent0 } from 'agent0-js';
 
 const client = new Agent0({
-  apiKey: process.env.AGENT0_API_KEY!
+  apiKey: process.env.AGENT0_API_KEY!,
+  workspaceId: process.env.AGENT0_WORKSPACE_ID!
 });
 
 // Embed documents for a knowledge base
@@ -479,6 +488,7 @@ The environment can be set at two levels with the following priority:
 // Set default environment at constructor level
 const stagingClient = new Agent0({
   apiKey: process.env.AGENT0_API_KEY!,
+  workspaceId: process.env.AGENT0_WORKSPACE_ID!,
   environment: 'staging' // All runs will use staging by default
 });
 
@@ -497,7 +507,8 @@ const response2 = await stagingClient.generate({
 
 // Default client (no constructor environment) uses 'production'
 const defaultClient = new Agent0({
-  apiKey: process.env.AGENT0_API_KEY!
+  apiKey: process.env.AGENT0_API_KEY!,
+  workspaceId: process.env.AGENT0_WORKSPACE_ID!
 });
 
 // This uses 'production' (the default)
@@ -796,13 +807,86 @@ for await (const chunk of stream) {
 
 > ⚠️ **Note**: Only header names that are pre-configured as "Custom Headers" on the MCP server will be sent. Any extra headers not in the allowed list are ignored.
 
+### Cancellation (AbortSignal)
+
+`generate()`, `stream()`, `embed()`, and `embedMany()` all accept an optional `signal` of type `AbortSignal`. When the signal is aborted, the SDK cancels the underlying `fetch`, the runner detects the dropped connection, kills the in-flight agent run, and records it as an aborted run with partial token usage and cost.
+
+This is what you want when the *caller* is cancelled — for example, a serverless task whose host has decided to kill it. Without a `signal`, an in-flight `generate()` will keep running on the server even after your worker is told to stop, because the HTTP socket stays open.
+
+**Basic usage:**
+
+```typescript
+const controller = new AbortController();
+
+// Cancel after 30 seconds
+setTimeout(() => controller.abort(), 30_000);
+
+try {
+  const response = await client.generate({
+    agentId: 'agent_123',
+    variables: { input: 'A long task...' },
+    signal: controller.signal,
+  });
+} catch (error) {
+  if ((error as Error).name === 'AbortError') {
+    console.log('Run cancelled');
+  } else {
+    throw error;
+  }
+}
+```
+
+**With trigger.dev:**
+
+Pass `ctx.signal` (which trigger.dev aborts when the run is cancelled) straight through to Agent0 so cancellation propagates end-to-end:
+
+```typescript
+import { task } from '@trigger.dev/sdk/v3';
+import { Agent0 } from 'agent0-js';
+
+const agent0 = new Agent0({
+  apiKey: process.env.AGENT0_API_KEY!,
+  workspaceId: process.env.AGENT0_WORKSPACE_ID!,
+});
+
+export const runAgent = task({
+  id: 'run-agent',
+  run: async (payload: { agentId: string; input: string }, { signal }) => {
+    const response = await agent0.generate({
+      agentId: payload.agentId,
+      variables: { input: payload.input },
+      signal, // ← cancels the Agent0 run if the trigger.dev task is cancelled
+    });
+
+    return response;
+  },
+});
+```
+
+The same pattern works for `stream()`:
+
+```typescript
+const stream = client.stream({
+  agentId: 'agent_123',
+  variables: { prompt: 'Write a story' },
+  signal: ctx.signal,
+});
+
+for await (const chunk of stream) {
+  // ...
+}
+```
+
+> ℹ️ The SDK still enforces an internal 10-minute timeout. Your `signal` is combined with that timeout — whichever fires first wins.
+
 ### Error Handling
 
 ```typescript
 import { Agent0 } from 'agent0-js';
 
 const client = new Agent0({
-  apiKey: process.env.AGENT0_API_KEY!
+  apiKey: process.env.AGENT0_API_KEY!,
+  workspaceId: process.env.AGENT0_WORKSPACE_ID!
 });
 
 async function runAgentWithErrorHandling() {
@@ -838,6 +922,7 @@ Create a `.env` file:
 
 ```bash
 AGENT0_API_KEY=your_api_key_here
+AGENT0_WORKSPACE_ID=your_workspace_id
 AGENT0_BASE_URL=https://app.agent0.com
 ```
 
@@ -851,6 +936,7 @@ dotenv.config();
 
 const client = new Agent0({
   apiKey: process.env.AGENT0_API_KEY!,
+  workspaceId: process.env.AGENT0_WORKSPACE_ID!,
   baseUrl: process.env.AGENT0_BASE_URL
 });
 ```
@@ -863,7 +949,8 @@ This SDK is written in TypeScript and includes full type definitions. You get au
 import { Agent0, type RunOptions, type GenerateResponse } from 'agent0-js';
 
 const client = new Agent0({
-  apiKey: process.env.AGENT0_API_KEY!
+  apiKey: process.env.AGENT0_API_KEY!,
+  workspaceId: process.env.AGENT0_WORKSPACE_ID!
 });
 
 // TypeScript will enforce correct types

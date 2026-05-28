@@ -86,6 +86,13 @@ export interface RunOptions {
 		/** Custom headers to send to this MCP server */
 		headers?: Record<string, string>;
 	}>;
+	/**
+	 * Abort signal to cancel the request. When aborted, the underlying fetch is
+	 * cancelled, the server detects the disconnect, and the in-flight agent run
+	 * is killed. Pass `ctx.signal` from a trigger.dev task or any other host
+	 * abort signal here to propagate cancellation end-to-end.
+	 */
+	signal?: AbortSignal;
 }
 
 export interface GenerateResponse {
@@ -111,6 +118,8 @@ export interface EmbedModel {
  */
 export type EmbedOptions = Omit<Parameters<typeof embed>[0], "model"> & {
 	model: EmbedModel;
+	/** Abort signal to cancel the HTTP request. See {@link RunOptions.signal}. */
+	signal?: AbortSignal;
 };
 
 /**
@@ -123,6 +132,8 @@ export type EmbedManyOptions = Omit<
 	"model"
 > & {
 	model: EmbedModel;
+	/** Abort signal to cancel the HTTP request. See {@link RunOptions.signal}. */
+	signal?: AbortSignal;
 };
 
 /**

@@ -30,7 +30,11 @@ export class Agent0 {
 		return runEnvironment ?? this.environment ?? "production";
 	}
 
-	private async fetchApi(endpoint: string, body: unknown): Promise<Response> {
+	private async fetchApi(
+		endpoint: string,
+		body: unknown,
+		signal?: AbortSignal,
+	): Promise<Response> {
 		const url = `${this.baseUrl}${endpoint}`;
 
 		const headers = {
@@ -38,11 +42,16 @@ export class Agent0 {
 			"x-api-key": this.apiKey,
 		};
 
+		const timeoutSignal = AbortSignal.timeout(10 * 60 * 1000);
+		const combinedSignal = signal
+			? anySignal([signal, timeoutSignal])
+			: timeoutSignal;
+
 		const response = await fetch(url, {
 			method: "POST",
 			headers,
 			body: JSON.stringify(body),
-			signal: AbortSignal.timeout(10 * 60 * 1000),
+			signal: combinedSignal,
 		});
 
 		if (!response.ok) {
@@ -56,16 +65,20 @@ export class Agent0 {
 	}
 
 	async generate(options: RunOptions): Promise<GenerateResponse> {
-		const response = await this.fetchApi(`/api/v1/workspaces/${this.workspaceId}/runs`, {
-			agent_id: options.agentId,
-			environment: this.resolveEnvironment(options.environment),
-			variables: options.variables,
-			overrides: options.overrides,
-			extra_messages: options.extraMessages,
-			extra_tools: options.extraTools,
-			mcp_options: options.mcpOptions,
-			stream: false,
-		});
+		const response = await this.fetchApi(
+			`/api/v1/workspaces/${this.workspaceId}/runs`,
+			{
+				agent_id: options.agentId,
+				environment: this.resolveEnvironment(options.environment),
+				variables: options.variables,
+				overrides: options.overrides,
+				extra_messages: options.extraMessages,
+				extra_tools: options.extraTools,
+				mcp_options: options.mcpOptions,
+				stream: false,
+			},
+			options.signal,
+		);
 
 		return await response.json();
 	}
@@ -73,16 +86,20 @@ export class Agent0 {
 	async *stream(
 		options: RunOptions,
 	): AsyncGenerator<TextStreamPart<ToolSet>, void, unknown> {
-		const response = await this.fetchApi(`/api/v1/workspaces/${this.workspaceId}/runs`, {
-			agent_id: options.agentId,
-			environment: this.resolveEnvironment(options.environment),
-			variables: options.variables,
-			overrides: options.overrides,
-			extra_messages: options.extraMessages,
-			extra_tools: options.extraTools,
-			mcp_options: options.mcpOptions,
-			stream: true,
-		});
+		const response = await this.fetchApi(
+			`/api/v1/workspaces/${this.workspaceId}/runs`,
+			{
+				agent_id: options.agentId,
+				environment: this.resolveEnvironment(options.environment),
+				variables: options.variables,
+				overrides: options.overrides,
+				extra_messages: options.extraMessages,
+				extra_tools: options.extraTools,
+				mcp_options: options.mcpOptions,
+				stream: true,
+			},
+			options.signal,
+		);
 
 		if (!response.body) {
 			throw new Error("Response body is empty");
@@ -130,8 +147,12 @@ export class Agent0 {
 	 * @returns The embedding vector
 	 */
 	async embed(options: EmbedOptions): Promise<EmbedResponse> {
-		// Pass all options directly to the API
-		const response = await this.fetchApi(`/api/v1/workspaces/${this.workspaceId}/embed`, options);
+		const { signal, ...body } = options;
+		const response = await this.fetchApi(
+			`/api/v1/workspaces/${this.workspaceId}/embed`,
+			body,
+			signal,
+		);
 		return await response.json();
 	}
 
@@ -143,10 +164,32 @@ export class Agent0 {
 	 * @returns The embedding vectors (one per input value)
 	 */
 	async embedMany(options: EmbedManyOptions): Promise<EmbedManyResponse> {
-		// Pass all options directly to the API
-		const response = await this.fetchApi(`/api/v1/workspaces/${this.workspaceId}/embed-many`, options);
+		const { signal, ...body } = options;
+		const response = await this.fetchApi(
+			`/api/v1/workspaces/${this.workspaceId}/embed-many`,
+			body,
+			signal,
+		);
 		return await response.json();
 	}
+}
+
+// AbortSignal.any was added in Node 20.3; fall back for older runtimes.
+function anySignal(signals: AbortSignal[]): AbortSignal {
+	if (typeof AbortSignal.any === "function") {
+		return AbortSignal.any(signals);
+	}
+	const controller = new AbortController();
+	for (const s of signals) {
+		if (s.aborted) {
+			controller.abort(s.reason);
+			return controller.signal;
+		}
+		s.addEventListener("abort", () => controller.abort(s.reason), {
+			once: true,
+		});
+	}
+	return controller.signal;
 }
 
 // Re-export types for convenience
