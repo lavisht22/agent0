@@ -610,13 +610,19 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 					},
 				});
 
-				// Handle client disconnect - clean up MCP clients if stream didn't complete
-				request.raw.on("close", () => {
+				// Abort the AI SDK call when the client disconnects. Under Fastify 5
+				// the request-side 'close' event is unreliable during a streamed
+				// response — only reply.raw emits 'close' on disconnect. We listen on
+				// both as defense-in-depth; the streamCompleted guard prevents
+				// double-handling.
+				const handleClientClose = () => {
 					if (!streamCompleted) {
 						controller.abort();
 						closeAll();
 					}
-				});
+				};
+				reply.raw.on("close", handleClientClose);
+				request.raw.on("close", handleClientClose);
 
 				const streamResponse = createSSEStream(result);
 
@@ -634,11 +640,15 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 			let completed = false;
 			const collectedSteps: StepResult<ToolSet>[] = [];
 
-			request.raw.on("close", () => {
+			// Same pattern as the streaming path — Fastify 5 only fires close on
+			// reply.raw for response disconnects. Listen on both for safety.
+			const handleClientClose = () => {
 				if (!completed) {
 					controller.abort();
 				}
-			});
+			};
+			reply.raw.on("close", handleClientClose);
+			request.raw.on("close", handleClientClose);
 
 			try {
 				const result = await generateText({

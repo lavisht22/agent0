@@ -244,18 +244,40 @@ export const createSSEStream = (
 				}
 			}, PING_INTERVAL_MS);
 
+			let downstreamClosed = false;
 			try {
 				for await (const part of result.fullStream) {
-					controller.enqueue(
-						encoder.encode(`data: ${JSON.stringify(part)}\r\n\r\n`),
-					);
+					if (downstreamClosed) break;
+					try {
+						controller.enqueue(
+							encoder.encode(`data: ${JSON.stringify(part)}\r\n\r\n`),
+						);
+					} catch {
+						// Downstream (Fastify reply) tore down the controller mid-stream
+						// because the client disconnected. Stop iterating; the abort
+						// handler in the route is responsible for stopping the AI SDK.
+						downstreamClosed = true;
+						break;
+					}
 				}
 			} catch (err) {
-				console.error("Streaming error", err);
-				controller.error(err);
+				if (!downstreamClosed) {
+					console.error("Streaming error", err);
+					try {
+						controller.error(err);
+					} catch {
+						// Controller already closed
+					}
+				}
 			} finally {
 				clearInterval(pingInterval);
-				controller.close();
+				if (!downstreamClosed) {
+					try {
+						controller.close();
+					} catch {
+						// Already closed
+					}
+				}
 			}
 		},
 	});
