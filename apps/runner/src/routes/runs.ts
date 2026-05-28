@@ -629,7 +629,6 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				reply.headers({
 					"Content-Type": "text/event-stream",
 					"Cache-Control": "no-cache",
-					Connection: "keep-alive",
 				});
 
 				return reply.send(streamResponse);

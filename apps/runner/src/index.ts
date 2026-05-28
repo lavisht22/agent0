@@ -12,9 +12,19 @@ import { registerRoutes } from "./routes/index.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Enable HTTP/2 (cleartext) when running behind a proxy that needs to propagate
+// client cancellation via RST_STREAM — most notably GCP Cloud Run, whose
+// HTTP/1.1 path silently holds the upstream connection open after the client
+// disconnects, leaving `reply.raw` 'close' events un-fired. With h2c the
+// frontend forwards stream resets immediately, so the abort wiring in routes/
+// actually triggers. Off by default for local dev (browsers / Vite proxy can't
+// talk h2c cleanly without TLS).
+const useHttp2 = process.env.USE_HTTP2 === "true";
+
 const fastify = Fastify({
 	logger: true,
 	bodyLimit: 50 * 1024 * 1024, // 50 MB
+	...(useHttp2 ? { http2: true as const } : {}),
 });
 
 // 1. Register Static File Serving
