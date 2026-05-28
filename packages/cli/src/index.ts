@@ -8,6 +8,7 @@ import {
 } from "./commands/agents.js";
 import { loginCommand } from "./commands/login.js";
 import { logoutCommand } from "./commands/logout.js";
+import { promptPullCommand, promptPushCommand } from "./commands/prompt.js";
 import { useCommand } from "./commands/use.js";
 import { whoamiCommand } from "./commands/whoami.js";
 import {
@@ -105,6 +106,37 @@ cli
 			default:
 				fail(
 					`Unknown agents action: "${action}". Try: list, get <id>, create, rename <id>.`,
+				);
+		}
+	});
+
+cli
+	.command(
+		"prompt [action] [target]",
+		"Pull/push agent prompt versions — actions: pull <agentId> [--version-id <id>] [--env staging|production] [-o file], push <agentId> -f file [--deploy staging|production]",
+	)
+	.option("--version-id <id>", "Pull a specific version by ID (pull)")
+	.option("--env <env>", "Pull the staging or production version (pull)")
+	.option("-o, --output <file>", "Write to file instead of stdout (pull)")
+	.option("-f, --file <file>", "JSON file to push as a new version (push)")
+	.option(
+		"--deploy <env>",
+		"Also deploy the new version to staging or production (push)",
+	)
+	.action((action: string | undefined, target: string | undefined, opts) => {
+		switch (action) {
+			case undefined:
+				cli.outputHelp();
+				return;
+			case "pull":
+				if (!target) fail("Usage: agent0 prompt pull <agentId>");
+				return run(() => promptPullCommand(target, opts));
+			case "push":
+				if (!target) fail("Usage: agent0 prompt push <agentId> -f <file>");
+				return run(() => promptPushCommand(target, opts));
+			default:
+				fail(
+					`Unknown prompt action: "${action}". Try: pull <agentId>, push <agentId> -f file.`,
 				);
 		}
 	});

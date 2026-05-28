@@ -210,13 +210,16 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
 
 > **Correction note (2026-05-27, landed in T3.3):** T3.2 shipped a broken routing pattern — cac matches commands by `argv[0]` only, so `cli.command("workspaces list", …)` and `cli.command("workspaces use <id>", …)` never routed; every multi-word invocation fell through to the empty-default catch-all and printed global help. Fixed in T3.3 by collapsing each group into a single `cli.command("<group> [action] [target]", …)` that dispatches in code. The same pattern is used for `agents`. UX (`agent0 workspaces list`, `agent0 agents list`) is unchanged.
 
-- [ ] **T3.4 — `agent0 prompt pull` + `agent0 prompt push` (the headline).**
-  - `prompt pull <agentId> [--version <id>] [--env staging|production] [-o file.json]`
-    - Default version: production if it exists, else staging, else latest.
-    - Writes the version's `data` JSON to a file (or stdout if no `-o`).
+- [x] **T3.4 — `agent0 prompt pull` + `agent0 prompt push` (the headline).**
+  - `prompt pull <agentId> [--version-id <id>] [--env staging|production] [-o file.json]`
+    - Default version: production if it exists, else staging, else latest (via `GET /agents/:id/versions?limit=1`).
+    - `--version-id` and `--env` are mutually exclusive (errors).
+    - Writes the version's inner `data` JSON (pretty-printed, indent 2) to a file or stdout. The `data` blob already contains `model`/`messages`/`tools`/`params`, so the AI can edit any of those in place; server-managed wrapper fields (`id`, `agent_id`, `is_deployed`, `user_id`, `created_at`) are stripped because they're not editable.
   - `prompt push <agentId> -f file.json [--deploy staging|production]`
-    - Reads the file, POSTs as a new version, optionally deploys.
-    - Prints the new version_id.
+    - Reads the file, parses + re-serializes locally (fails fast on bad JSON or non-object root), POSTs as a new version, optionally deploys via `?deploy=...`.
+    - TTY: prints `Pushed version <id> for agent <agentId>[ (deployed to <env>)]` then the bare `<id>` on its own line (pipe-friendly). `--json`/non-TTY: emits the full version object.
+
+> **Correction note (2026-05-28, landed in T3.4):** The plan specified `--version <id>` for `prompt pull`, but cac registers a global `--version` flag via `cli.version()` for printing the CLI version. Having both produced `CACError: option \`--version <id>\` value is missing`. Renamed the command-level flag to `--version-id <id>`. Keeps `agent0 --version` working as users expect and is also a more accurate label.
 
 - [ ] **T3.5 — `agent0 versions` commands.**
   - `versions list <agentId>`
