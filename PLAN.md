@@ -247,21 +247,17 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
 
 ### Phase 4 — Skill for AI tools
 
-- [ ] **T4.1 — Author the agent0 skill bundle.**
-  - Lives in `skills/agent0/` in this repo.
-  - Contents:
-    - `SKILL.md` with frontmatter (`name: agent0`, description telling the AI when to use it) and body explaining: what agent0 is, when the skill applies (any time the user mentions editing prompts, agents, deploying versions, etc.), and the canonical CLI workflows.
-    - Sub-pages for less-common operations (e.g. `reference/runs.md`, `reference/scopes.md`) so the main `SKILL.md` stays scannable.
-  - Headline workflows the skill must teach:
-    1. **Edit a prompt:** `agent0 prompt pull <id> -o /tmp/p.json` → edit file → `agent0 prompt push <id> -f /tmp/p.json --deploy staging`.
-    2. **Run an agent:** `agent0 run <id> --input "…"`.
-    3. **Find an agent:** `agent0 agents list --search "…"`.
-    4. **Inspect a failed run:** `agent0 runs list --status failed` → `agent0 runs get <id>`.
-  - Includes a "do not" section: do not try to construct the full prompt JSON inline — always pull, edit, push.
+- [x] **T4.1 — Author the agent0 skill bundle.**
+  - Lives in `skills/agent0/` in this repo. **Single concise `SKILL.md`** (no `reference/` subpages — kept everything scannable in one file, under ~150 lines) plus `LICENSE.txt` (ISC, matching the repo).
+  - `SKILL.md` frontmatter: `name: agent0`, description packed with trigger keywords (`agent0`, prompt version, deploy prompt, run agent, failed run, etc.).
+  - Body teaches: (1) **Bootstrap** — `agent0 --version` to detect, `npm install -g agent0-cli` if absent, `agent0 whoami` to confirm a profile is set; (2) the four headline workflows from this plan; (3) a compact command reference; (4) a "Rules" section.
+  - **Login is interactive**, so the skill tells the AI to instruct the user to run `! agent0 login` themselves (covering URL + token + workspace picker). The AI never tries to drive it.
+  - **Rules section** covers: always pull/edit/push (never construct prompt JSON), default deploys to staging, confirm before `agents create` / `tags delete`, and the 403-on-write hint when an API-key profile slipped in.
 
-- [ ] **T4.2 — Publish the skill so it installs via `npx skills`.**
-  - Confirm the exact publishing target (Anthropic skills registry / a GitHub-released bundle / npm). Documented in this task once verified.
-  - Add a one-liner to the project README: `npx skills add agent0` so users can install with a single command.
+- [x] **T4.2 — Publish the skill so it installs via `npx skills`.**
+  - **Publishing target confirmed: the [`skills`](https://www.npmjs.com/package/skills) npm CLI's GitHub-source mode.** Same mechanism this repo already uses to install HeroUI skills (see `skills-lock.json`). No separate skills registry / npm publish needed — being at `skills/agent0/SKILL.md` in this repo on the default branch IS publishing.
+  - Install command for users: `npx skills add lavisht22/agent0`. Drops the skill under both `.claude/skills/agent0/` (Claude Code) and `.agents/skills/agent0/` (agent-tool-agnostic) in the consuming repo.
+  - Added a "Use agent0 from your AI tools" section to the root README with the one-liner.
 
 ### Phase 5 — Docs & launch
 

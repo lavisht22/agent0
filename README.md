@@ -34,6 +34,19 @@ This project is organized as a monorepo:
 - `apps/runner`: The Node.js server responsible for hosting the frontend and running AI agents.
 - `packages/database`: Shared database configurations and types.
 
+## Use agent0 from your AI tools
+
+Edit prompts, deploy versions, and trigger runs from Claude Code, Cursor, or any agent with shell access — using the [`agent0-cli`](packages/cli) plus a skill that teaches the AI when and how to use it.
+
+```bash
+# Install the skill (drops it under .claude/skills/agent0/ and .agents/skills/agent0/)
+npx skills add lavisht22/agent0
+
+# The skill installs the CLI on first use, then your AI tool drives it.
+```
+
+The CLI can also be installed manually: `npm install -g agent0-cli`.
+
 ## Getting Started
 
 ### Prerequisites
