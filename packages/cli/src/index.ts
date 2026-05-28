@@ -8,8 +8,22 @@ import {
 } from "./commands/agents.js";
 import { loginCommand } from "./commands/login.js";
 import { logoutCommand } from "./commands/logout.js";
+import { mcpsListCommand, mcpsRefreshCommand } from "./commands/mcps.js";
 import { promptPullCommand, promptPushCommand } from "./commands/prompt.js";
+import { providersListCommand } from "./commands/providers.js";
+import { runCommand } from "./commands/run.js";
+import { runsGetCommand, runsListCommand } from "./commands/runs.js";
+import {
+	tagsCreateCommand,
+	tagsDeleteCommand,
+	tagsListCommand,
+} from "./commands/tags.js";
 import { useCommand } from "./commands/use.js";
+import {
+	versionsDeployCommand,
+	versionsGetCommand,
+	versionsListCommand,
+} from "./commands/versions.js";
 import { whoamiCommand } from "./commands/whoami.js";
 import {
 	workspacesListCommand,
@@ -137,6 +151,162 @@ cli
 			default:
 				fail(
 					`Unknown prompt action: "${action}". Try: pull <agentId>, push <agentId> -f file.`,
+				);
+		}
+	});
+
+cli
+	.command(
+		"versions [action] [agentId] [versionId]",
+		"Manage agent versions — actions: list <agentId>, get <agentId> <versionId>, deploy <agentId> <versionId> --env staging|production",
+	)
+	.option("--page <n>", "Page number (list)", { default: "1" })
+	.option("--limit <n>", "Items per page, max 100 (list)", { default: "20" })
+	.option("--env <env>", "Deploy target: staging or production (deploy)")
+	.action(
+		(
+			action: string | undefined,
+			agentId: string | undefined,
+			versionId: string | undefined,
+			opts,
+		) => {
+			switch (action) {
+				case undefined:
+					cli.outputHelp();
+					return;
+				case "list":
+				case "ls":
+					if (!agentId) fail("Usage: agent0 versions list <agentId>");
+					return run(() => versionsListCommand(agentId, opts));
+				case "get":
+					if (!agentId || !versionId)
+						fail("Usage: agent0 versions get <agentId> <versionId>");
+					return run(() => versionsGetCommand(agentId, versionId, opts));
+				case "deploy":
+					if (!agentId || !versionId)
+						fail(
+							"Usage: agent0 versions deploy <agentId> <versionId> --env staging|production",
+						);
+					return run(() => versionsDeployCommand(agentId, versionId, opts));
+				default:
+					fail(
+						`Unknown versions action: "${action}". Try: list <agentId>, get <agentId> <versionId>, deploy <agentId> <versionId> --env ...`,
+					);
+			}
+		},
+	);
+
+cli
+	.command("run [agentId]", "Run an agent and print the JSON response")
+	.option(
+		"--input <text>",
+		"Sets the `input` variable (shorthand for --var input=...)",
+	)
+	.option("--env <env>", "Environment: staging or production (default: production)")
+	.option(
+		"--var <pair>",
+		"Set a variable as key=value; repeatable for multiple variables.",
+	)
+	.action((agentId: string | undefined, opts) => {
+		if (!agentId) fail("Usage: agent0 run <agentId> --input '...'");
+		return run(() => runCommand(agentId, opts));
+	});
+
+cli
+	.command(
+		"runs [action] [target]",
+		"Inspect runs — actions: list [--agent <id>] [--status success|failed] [--from <iso>] [--to <iso>], get <runId>",
+	)
+	.option("--agent <id>", "Filter by agent ID (list)")
+	.option("--status <status>", "Filter by status: success or failed (list)")
+	.option("--from <iso>", "Only runs created on or after this ISO date (list)")
+	.option("--to <iso>", "Only runs created on or before this ISO date (list)")
+	.option("--page <n>", "Page number (list)", { default: "1" })
+	.option("--limit <n>", "Items per page, max 100 (list)", { default: "20" })
+	.action((action: string | undefined, target: string | undefined, opts) => {
+		switch (action) {
+			case undefined:
+				cli.outputHelp();
+				return;
+			case "list":
+			case "ls":
+				return run(() => runsListCommand(opts));
+			case "get":
+				if (!target) fail("Usage: agent0 runs get <runId>");
+				return run(() => runsGetCommand(target, opts));
+			default:
+				fail(
+					`Unknown runs action: "${action}". Try: list, get <runId>.`,
+				);
+		}
+	});
+
+cli
+	.command(
+		"tags [action] [target]",
+		"Manage tags — actions: list | ls, create --name ... --color ..., delete <id>",
+	)
+	.option("--name <name>", "Tag name (create)")
+	.option("--color <hex>", 'Tag color, e.g. "#aabbcc" (create)')
+	.option("-y, --yes", "Skip the confirmation prompt (delete)")
+	.action((action: string | undefined, target: string | undefined, opts) => {
+		switch (action) {
+			case undefined:
+				cli.outputHelp();
+				return;
+			case "list":
+			case "ls":
+				return run(() => tagsListCommand(opts));
+			case "create":
+				return run(() => tagsCreateCommand(opts));
+			case "delete":
+			case "rm":
+				if (!target) fail("Usage: agent0 tags delete <id>");
+				return run(() => tagsDeleteCommand(target, opts));
+			default:
+				fail(
+					`Unknown tags action: "${action}". Try: list, create --name ... --color ..., delete <id>.`,
+				);
+		}
+	});
+
+cli
+	.command(
+		"providers [action]",
+		"Inspect providers — actions: list | ls",
+	)
+	.action((action: string | undefined, opts) => {
+		switch (action) {
+			case undefined:
+				cli.outputHelp();
+				return;
+			case "list":
+			case "ls":
+				return run(() => providersListCommand(opts));
+			default:
+				fail(`Unknown providers action: "${action}". Try: list.`);
+		}
+	});
+
+cli
+	.command(
+		"mcps [action] [target]",
+		"Manage MCP servers — actions: list | ls, refresh <id>",
+	)
+	.action((action: string | undefined, target: string | undefined, opts) => {
+		switch (action) {
+			case undefined:
+				cli.outputHelp();
+				return;
+			case "list":
+			case "ls":
+				return run(() => mcpsListCommand(opts));
+			case "refresh":
+				if (!target) fail("Usage: agent0 mcps refresh <id>");
+				return run(() => mcpsRefreshCommand(target, opts));
+			default:
+				fail(
+					`Unknown mcps action: "${action}". Try: list, refresh <id>.`,
 				);
 		}
 	});
