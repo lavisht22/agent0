@@ -221,28 +221,29 @@ The whole CLI flow assumes per-user attribution, so PAT support has to land befo
 
 > **Correction note (2026-05-28, landed in T3.4):** The plan specified `--version <id>` for `prompt pull`, but cac registers a global `--version` flag via `cli.version()` for printing the CLI version. Having both produced `CACError: option \`--version <id>\` value is missing`. Renamed the command-level flag to `--version-id <id>`. Keeps `agent0 --version` working as users expect and is also a more accurate label.
 
-- [ ] **T3.5 — `agent0 versions` commands.**
-  - `versions list <agentId>`
-  - `versions get <agentId> <versionId>`
-  - `versions deploy <agentId> <versionId> --env staging|production`
-    - Implemented as a PATCH on the agent — reuses T1.2.
+- [x] **T3.5 — `agent0 versions` commands.**
+  - `versions list <agentId> [--page] [--limit]` — TTY: one line per version (`id  created_at  deployed|draft  by:<short user>`). `--json`/non-TTY: full list payload.
+  - `versions get <agentId> <versionId>` — TTY: metadata only (id, agent_id, created_at, is_deployed, user_id, plus `data: (JSON, N bytes)`) with a hint to `agent0 prompt pull` for editing. `--json`/non-TTY: full object including `data`.
+  - `versions deploy <agentId> <versionId> --env staging|production` — PATCHes `/agents/:id` with `{ staging_version_id }` or `{ production_version_id }` (reuses T1.2).
 
-- [ ] **T3.6 — `agent0 run`.**
+- [x] **T3.6 — `agent0 run`.**
   - `run <agentId> --input "…" [--env staging|production] [--var key=val]…`
-  - JSON output by default (entire response collected, no streaming at v1).
+  - `--input X` is sugar for `--var input=X` — errors if both set the same `input` key. `--var key=val` is repeatable; the first `=` is the separator so values may contain `=`.
+  - Posts to `/runs` with `stream: false`. Prints the full `{ text, messages }` response as JSON (pretty on TTY, compact when piped).
 
-- [ ] **T3.7 — `agent0 runs` commands.**
-  - `runs list [--agent <id>] [--status success|failed] [--from <date>] [--to <date>]`
-  - `runs get <runId>`
+- [x] **T3.7 — `agent0 runs` commands.**
+  - `runs list [--agent <id>] [--status success|failed] [--from <iso>] [--to <iso>] [--page] [--limit]` — TTY: one line per run (`id  created_at  status  agent_name  cost`). `--json`/non-TTY: full list payload.
+  - `runs get <runId>` — always JSON (the response object is large/nested; no tidy TTY form).
 
-- [ ] **T3.8 — `agent0 tags`, `agent0 providers`, `agent0 mcps` commands.**
-  - `tags list/create/delete`
-  - `providers list`
-  - `mcps list`, `mcps refresh <id>`
+- [x] **T3.8 — `agent0 tags`, `agent0 providers`, `agent0 mcps` commands.**
+  - `tags list|ls`, `tags create --name … --color "#aabbcc"`, `tags delete <id>` (prompts on TTY by default; `-y/--yes` skips, non-TTY auto-skips).
+  - `providers list|ls` — read-only.
+  - `mcps list|ls`, `mcps refresh <id>` — refresh prints tool count across envs and any per-env errors.
 
-- [ ] **T3.9 — Publish `agent0-cli` to npm.**
-  - Verify `bin` works after `npm install -g agent0-cli` (command is `agent0`).
-  - Publish stable v1.
+- [x] **T3.9 — Publish `agent0-cli` to npm.**
+  - Added README, plus `repository`/`bugs`/`homepage` to `package.json` (npm publish UX). Expanded description and keywords.
+  - Verified via `npm pack` → `npm install <tarball>` in a fresh project: `npx agent0 --version` and `npx agent0 prompt --help` both run correctly. Shebang on `dist/index.js`, deps install cleanly.
+  - **Publishing itself is left to the maintainer:** `cd packages/cli && pnpm build && npm publish --access public`. This step requires npm credentials and is irreversible, so it's not run by the AI assistant.
 
 ### Phase 4 — Skill for AI tools
 

@@ -1,7 +1,7 @@
 {
 	"name": "agent0-cli",
 	"version": "2.0.0",
-	"description": "Command-line interface for agent0",
+	"description": "Command-line interface for agent0 — manage agents, prompt versions, runs, tags, providers, and MCP servers from a shell.",
 	"type": "module",
 	"bin": {
 		"agent0": "dist/index.js"
@@ -16,8 +16,17 @@
 	"engines": {
 		"node": ">=20"
 	},
-	"keywords": ["agent0", "cli", "ai", "agent"],
+	"keywords": ["agent0", "cli", "ai", "agent", "llm", "prompt", "mcp"],
 	"license": "ISC",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/lavisht22/agent0.git",
+		"directory": "packages/cli"
+	},
+	"bugs": {
+		"url": "https://github.com/lavisht22/agent0/issues"
+	},
+	"homepage": "https://github.com/lavisht22/agent0/tree/main/packages/cli#readme",
 	"dependencies": {
 		"@clack/prompts": "^0.8.2",
 		"cac": "^6.7.14",
