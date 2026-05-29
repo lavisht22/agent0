@@ -236,6 +236,13 @@ export const MODELS: Model[] = [
 	},
 
 	{
+		id: "claude-opus-4-8",
+		providers: ["anthropic-vertex"],
+		status: "active",
+		cost: { noCacheInput: 5, cacheInput: 0.5, output: 25 },
+		releaseDate: "2026-05-28",
+	},
+	{
 		id: "claude-opus-4-7",
 		providers: ["anthropic-vertex"],
 		status: "active",
