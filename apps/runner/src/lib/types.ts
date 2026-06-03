@@ -45,8 +45,6 @@ export type AgentTool = {
 	type: "agent";
 	/** The agent to invoke. Must belong to the same workspace. */
 	agent_id: string;
-	/** Which deployed version to run. Defaults to "production". */
-	environment?: Environment;
 	/** Tool name surfaced to the calling model (e.g. "research_assistant"). */
 	name: string;
 	/** When/why to call this agent — the calling model reasons over this. */

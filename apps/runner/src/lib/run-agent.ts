@@ -57,6 +57,8 @@ export const buildAgentTools = (
 	workspaceId: string,
 	activeChain: string[],
 	parentRunId: string,
+	environment: Environment,
+	isTest: boolean,
 ): ToolSet => {
 	const toolSet: ToolSet = {};
 
@@ -87,11 +89,17 @@ export const buildAgentTools = (
 					const result = await runAgent({
 						workspaceId,
 						agentId: agentTool.agent_id,
-						environment: agentTool.environment ?? "production",
-						extraMessages: [{ role: "user", content: prompt }],
+						// Sub-agents run in the same environment as the parent run.
+						environment,
+						extraMessages: [
+							{ role: "user", content: [{ type: "text", text: prompt }] },
+						],
 						abortSignal,
 						callStack: activeChain,
 						parentRunId,
+						// Inherit the parent's test flag so a test run's sub-agents are
+						// also logged as test runs.
+						isTest,
 					});
 					return result.text;
 				} catch (err) {
@@ -148,6 +156,8 @@ export type PrepareRunOptions = {
 	 * guard agent-as-tool recursion; see buildAgentTools.
 	 */
 	callStack?: string[];
+	/** Whether this run (and its own sub-agents) should be logged as test runs. */
+	isTest?: boolean;
 };
 
 export type PreparedRun = {
@@ -186,6 +196,7 @@ export const prepareRun = async (
 		extraTools,
 		mcpOptions,
 		callStack = [],
+		isTest = false,
 	} = opts;
 
 	// Get agent with its deployed version IDs, scoped to the authenticated
@@ -283,6 +294,7 @@ export const prepareRun = async (
 		extraMessages,
 		mcpOptions,
 		callStack,
+		isTest,
 	});
 
 	// Record the overrides alongside the request for observability.
@@ -315,6 +327,8 @@ export type AssembleRunOptions = {
 	 * run's own agent. Used to guard agent-as-tool recursion.
 	 */
 	callStack?: string[];
+	/** Whether this is a test run — inherited by any sub-agents invoked as tools. */
+	isTest?: boolean;
 };
 
 export type AssembledRun = {
@@ -350,6 +364,7 @@ export const assembleRun = async (
 		extraMessages,
 		mcpOptions,
 		callStack = [],
+		isTest = false,
 	} = opts;
 
 	const processedMessages = applyMessageVariables(data, variables);
@@ -384,6 +399,8 @@ export const assembleRun = async (
 		workspaceId,
 		activeChain,
 		runId,
+		environment,
+		isTest,
 	);
 
 	// Skills win on name collision so the catalog's `read_skill` reference always
@@ -475,6 +492,8 @@ export type RunAgentOptions = {
 	callStack?: string[];
 	/** Id of the run that invoked this one; recorded as parent_run_id. */
 	parentRunId?: string | null;
+	/** Whether this run (and its own sub-agents) should be logged as test runs. */
+	isTest?: boolean;
 };
 
 export type RunAgentResult = {
@@ -510,6 +529,7 @@ export const runAgent = async (
 		overrides: opts.overrides,
 		extraMessages: opts.extraMessages,
 		callStack: opts.callStack,
+		isTest: opts.isTest,
 	});
 
 	const {
@@ -558,6 +578,7 @@ export const runAgent = async (
 			responseTime: 0,
 			isError: false,
 			isStream: false,
+			isTest: opts.isTest,
 			modelId,
 			usage: totalUsage,
 			runData,
@@ -600,6 +621,7 @@ export const runAgent = async (
 			responseTime: 0,
 			isError: true,
 			isStream: false,
+			isTest: opts.isTest,
 			modelId,
 			usage: collectedSteps.length > 0 ? totalUsage : undefined,
 			runData,

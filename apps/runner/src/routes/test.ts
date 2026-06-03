@@ -99,6 +99,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 				agentId: editedAgentId,
 				variables,
 				mcpOptions: mcp_options,
+				isTest: true,
 			});
 
 		const preProcessingTime = Date.now() - startTime;
