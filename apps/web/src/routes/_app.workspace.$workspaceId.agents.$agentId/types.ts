@@ -36,6 +36,13 @@ export const agentFormSchema = z.object({
 				description: z.string(),
 				inputSchema: z.record(z.string(), z.unknown()).optional(),
 			}),
+			// Agent Tool — another agent exposed as a tool
+			z.object({
+				type: z.literal("agent"),
+				agent_id: z.string(),
+				name: z.string(),
+				description: z.string(),
+			}),
 		]),
 	),
 	skills: z.array(skillSchema),

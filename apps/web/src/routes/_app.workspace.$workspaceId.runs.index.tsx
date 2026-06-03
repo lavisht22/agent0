@@ -1,6 +1,10 @@
 import { Button, Chip, Dropdown, Label, Table, Tooltip } from "@heroui/react";
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import {
+	createFileRoute,
+	useNavigate,
+	useRouter,
+} from "@tanstack/react-router";
 import { format } from "date-fns";
 import {
 	AlertCircle,
@@ -74,6 +78,16 @@ function RouteComponent() {
 	const { workspaceId } = Route.useParams();
 	const { page, agentId, status, ...dateValues } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
+	const router = useRouter();
+
+	// Open a run in a new tab (built via the router so the basepath is honored).
+	const openRunInNewTab = (runId: string) => {
+		const { href } = router.buildLocation({
+			to: "/workspace/$workspaceId/runs/$runId",
+			params: { workspaceId, runId },
+		});
+		window.open(href, "_blank", "noopener,noreferrer");
+	};
 
 	const {
 		data: runs,
@@ -218,12 +232,7 @@ function RouteComponent() {
 										key={item.id}
 										id={item.id}
 										className="hover:bg-surface-hover cursor-pointer"
-										onAction={() =>
-											navigate({
-												to: "$runId",
-												params: { runId: item.id },
-											})
-										}
+										onAction={() => openRunInNewTab(item.id)}
 									>
 										<Table.Cell>
 											{format(item.created_at, "d LLL, hh:mm a")}
@@ -282,12 +291,7 @@ function RouteComponent() {
 														<Dropdown.Item
 															id="view"
 															textValue="View"
-															onAction={() =>
-																navigate({
-																	to: "$runId",
-																	params: { runId: item.id },
-																})
-															}
+															onAction={() => openRunInNewTab(item.id)}
 														>
 															<Label>View</Label>
 														</Dropdown.Item>

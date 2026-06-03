@@ -272,9 +272,16 @@ export const runsQuery = (
 			status,
 		],
 		queryFn: async () => {
+			// Inner join only when filtering by a specific agent (untagged runs
+			// don't belong to any agent). Otherwise left join so runs from unsaved
+			// agents (null version_id) still appear in the list.
 			let query = supabase
 				.from("runs")
-				.select("*, agent_versions!inner(id, agent_id, agents:agent_id(name))")
+				.select(
+					agentId
+						? "*, agent_versions!inner(id, agent_id, agents:agent_id(name))"
+						: "*, agent_versions(id, agent_id, agents:agent_id(name))",
+				)
 				.eq("workspace_id", workspaceId);
 
 			// Compute date range at query time
@@ -331,6 +338,26 @@ export const runQuery = (runId: string) =>
 			return data;
 		},
 		enabled: !!runId,
+	});
+
+// Runs invoked by this run via an agent-as-tool (parent_run_id == runId).
+export const childRunsQuery = (parentRunId: string | null | undefined) =>
+	queryOptions({
+		queryKey: ["child-runs", parentRunId],
+		queryFn: async () => {
+			const { data, error } = await supabase
+				.from("runs")
+				.select(
+					"id, is_error, is_test, created_at, agent_versions(id, agents:agent_id(name))",
+				)
+				.eq("parent_run_id", parentRunId as string)
+				.order("created_at", { ascending: true });
+
+			if (error) throw error;
+
+			return data;
+		},
+		enabled: !!parentRunId,
 	});
 
 export const runDataQuery = (runId: string) =>
@@ -451,9 +478,10 @@ export const recentRunsQuery = (workspaceId: string) =>
 	queryOptions({
 		queryKey: ["recent-runs", workspaceId],
 		queryFn: async () => {
+			// Left join so runs from unsaved agents (null version_id) still appear.
 			const { data, error } = await supabase
 				.from("runs")
-				.select("*, agent_versions!inner(id, agent_id, agents:agent_id(name))")
+				.select("*, agent_versions(id, agent_id, agents:agent_id(name))")
 				.eq("workspace_id", workspaceId)
 				.order("created_at", { ascending: false })
 				.limit(5);

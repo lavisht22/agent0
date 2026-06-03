@@ -352,6 +352,7 @@ export type Database = {
           is_error: boolean
           is_stream: boolean | null
           is_test: boolean
+          parent_run_id: string | null
           pre_processing_time: number
           response_time: number
           tokens: number | null
@@ -366,6 +367,7 @@ export type Database = {
           is_error?: boolean
           is_stream?: boolean | null
           is_test?: boolean
+          parent_run_id?: string | null
           pre_processing_time: number
           response_time: number
           tokens?: number | null
@@ -380,6 +382,7 @@ export type Database = {
           is_error?: boolean
           is_stream?: boolean | null
           is_test?: boolean
+          parent_run_id?: string | null
           pre_processing_time?: number
           response_time?: number
           tokens?: number | null

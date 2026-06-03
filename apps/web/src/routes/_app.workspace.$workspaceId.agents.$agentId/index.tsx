@@ -675,6 +675,7 @@ function RouteComponent() {
 							{(field) => (
 								<ToolsSection
 									workspaceId={workspaceId}
+									agentId={agentId}
 									value={field.state.value}
 									onValueChange={field.handleChange}
 									isInvalid={field.state.meta.errors.length > 0}

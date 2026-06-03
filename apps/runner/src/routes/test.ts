@@ -1,24 +1,18 @@
 import { Output, stepCountIs, streamText, type ToolSet } from "ai";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
-import { calculateModelCost, sumUsage } from "../lib/cost.js";
+import { sumUsage } from "../lib/cost.js";
 import { supabase } from "../lib/db.js";
-import {
-	applyMessageVariables,
-	applySkillCatalog,
-	createSSEStream,
-	prepareMCPServers,
-	prepareSkills,
-	resolveProviderModel,
-	uploadRunData,
-} from "../lib/helpers.js";
-import type { RunData, VersionData } from "../lib/types.js";
+import { createSSEStream } from "../lib/helpers.js";
+import { assembleRun, recordRun } from "../lib/run-agent.js";
+import type { VersionData } from "../lib/types.js";
 
 export async function registerTestRoute(fastify: FastifyInstance) {
 	fastify.post("/internal/test", async (request, reply) => {
 		const startTime = Date.now();
-
-		const runData: RunData = {};
+		// Generate up front so agents exposed as tools can link their sub-runs
+		// back to this test run as parent_run_id.
+		const runId = nanoid();
 
 		// Extract and validate JWT token from Authorization header
 		const token = request.headers.authorization?.split("Bearer ")[1];
@@ -48,7 +42,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 		} = request.body as {
 			data: unknown;
 			variables: Record<string, string>;
-			version_id: string;
+			version_id?: string;
 			mcp_options?: Record<string, { headers?: Record<string, string> }>;
 			environment?: "staging" | "production";
 		};
@@ -71,6 +65,21 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			return reply.code(403).send({ message: "Access denied" });
 		}
 
+		// Resolve the agent/version this draft belongs to. An unsaved draft has no
+		// row in agent_versions: we still log the run (so it shows in the dashboard
+		// as a test run), just without a version link, and seed the cycle guard
+		// from the owning agent when we can resolve it. Logging a non-existent
+		// version_id would violate the runs_version_id foreign key.
+		const { data: versionRow } = version_id
+			? await supabase
+					.from("agent_versions")
+					.select("agent_id")
+					.eq("id", version_id)
+					.maybeSingle()
+			: { data: null };
+		const resolvedVersionId = versionRow ? (version_id ?? null) : null;
+		const editedAgentId = versionRow?.agent_id ?? undefined;
+
 		const {
 			maxOutputTokens,
 			outputFormat,
@@ -79,29 +88,19 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			providerOptions,
 		} = versionData;
 
-		const processedMessages = applyMessageVariables(versionData, variables);
-		const [
-			{ model },
-			{ tools, closeAll },
-			{ systemAddendum, skillTools },
-		] = await Promise.all([
-			resolveProviderModel(versionData, environment),
-			prepareMCPServers(versionData, environment, mcp_options),
-			prepareSkills(versionData),
-		]);
-
-		const messagesWithSkills = applySkillCatalog(
-			processedMessages,
-			systemAddendum,
-		);
-
-		// Skills win on name collision (see run.ts for rationale).
-		const allTools = { ...tools, ...skillTools };
-
-		runData.request = {
-			...versionData,
-			messages: messagesWithSkills,
-		};
+		// Assemble the runnable pieces from the (possibly unsaved) draft data —
+		// shared with the saved-version path so agent tools, skills, and MCP tools
+		// are wired identically.
+		const { model, modelId, finalMessages, allTools, closeAll, runData } =
+			await assembleRun(versionData, {
+				workspaceId: provider.workspace_id,
+				environment,
+				runId,
+				agentId: editedAgentId,
+				variables,
+				mcpOptions: mcp_options,
+				isTest: true,
+			});
 
 		const preProcessingTime = Date.now() - startTime;
 		let firstTokenTime: number | null = null;
@@ -113,7 +112,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			maxOutputTokens,
 			temperature,
 			stopWhen: stepCountIs(maxStepCount || 10),
-			messages: messagesWithSkills,
+			messages: finalMessages,
 			tools: allTools as ToolSet,
 			output: outputFormat === "json" ? Output.json() : Output.text(),
 			providerOptions,
@@ -124,34 +123,34 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 				}
 			},
 			onFinish: async ({ steps, totalUsage }) => {
+				if (streamCompleted) return;
+				if (controller.signal.aborted) return;
 				streamCompleted = true;
 				closeAll();
 
 				runData.steps = steps;
 				runData.totalUsage = totalUsage;
 
-				const id = nanoid();
-				await supabase.from("runs").insert({
-					id,
-					workspace_id: provider.workspace_id,
-					version_id,
-					created_at: new Date(startTime).toISOString(),
-					is_error: false,
-					is_test: true,
-					is_stream: true,
-					pre_processing_time: preProcessingTime,
-					first_token_time: firstTokenTime as number,
-					response_time:
+				await recordRun({
+					id: runId,
+					parentRunId: null,
+					workspaceId: provider.workspace_id,
+					versionId: resolvedVersionId,
+					startTime,
+					preProcessingTime,
+					firstTokenTime: firstTokenTime as number,
+					responseTime:
 						Date.now() - (firstTokenTime || 0) - preProcessingTime - startTime,
-					tokens: totalUsage.totalTokens,
-					cost: calculateModelCost(
-						typeof model === "string" ? model : model.modelId,
-						totalUsage,
-					),
+					isError: false,
+					isStream: true,
+					isTest: true,
+					modelId,
+					usage: totalUsage,
+					runData,
 				});
-				await uploadRunData(id, runData);
 			},
 			onError: async ({ error }) => {
+				if (streamCompleted) return;
 				streamCompleted = true;
 				closeAll();
 
@@ -169,21 +168,22 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 							: undefined,
 				};
 
-				const id = nanoid();
-				await supabase.from("runs").insert({
-					id,
-					workspace_id: provider.workspace_id,
-					version_id,
-					created_at: new Date(startTime).toISOString(),
-					is_error: true,
-					is_test: true,
-					is_stream: true,
-					pre_processing_time: preProcessingTime,
-					first_token_time: firstTokenTime,
-					response_time:
+				await recordRun({
+					id: runId,
+					parentRunId: null,
+					workspaceId: provider.workspace_id,
+					versionId: resolvedVersionId,
+					startTime,
+					preProcessingTime,
+					firstTokenTime,
+					responseTime:
 						Date.now() - (firstTokenTime || 0) - preProcessingTime - startTime,
+					isError: true,
+					isStream: true,
+					isTest: true,
+					modelId,
+					runData,
 				});
-				await uploadRunData(id, runData);
 			},
 			onAbort: async ({ steps }) => {
 				if (streamCompleted) return;
@@ -203,26 +203,23 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 					message: "Run aborted by client disconnect",
 				};
 
-				const id = nanoid();
-				await supabase.from("runs").insert({
-					id,
-					workspace_id: provider.workspace_id,
-					version_id,
-					created_at: new Date(startTime).toISOString(),
-					is_error: true,
-					is_test: true,
-					is_stream: true,
-					pre_processing_time: preProcessingTime,
-					first_token_time: firstTokenTime,
-					response_time:
+				await recordRun({
+					id: runId,
+					parentRunId: null,
+					workspaceId: provider.workspace_id,
+					versionId: resolvedVersionId,
+					startTime,
+					preProcessingTime,
+					firstTokenTime,
+					responseTime:
 						Date.now() - (firstTokenTime || 0) - preProcessingTime - startTime,
-					tokens: totalUsage.totalTokens,
-					cost: calculateModelCost(
-						typeof model === "string" ? model : model.modelId,
-						totalUsage,
-					),
+					isError: true,
+					isStream: true,
+					isTest: true,
+					modelId,
+					usage: totalUsage,
+					runData,
 				});
-				await uploadRunData(id, runData);
 			},
 		});
 

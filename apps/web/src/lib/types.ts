@@ -20,6 +20,17 @@ export type CustomTool = {
 	inputSchema?: Record<string, unknown>;
 };
 
+/**
+ * Agent Tool - another agent in the same workspace exposed as a tool. The
+ * runner executes the referenced agent's deployed version and returns its text.
+ */
+export type AgentTool = {
+	type: "agent";
+	agent_id: string;
+	name: string;
+	description: string;
+};
+
 export type RunData = {
 	request?: {
 		model: { provider_id: string; name: string };
@@ -28,7 +39,7 @@ export type RunData = {
 		outputFormat?: "text" | "json";
 		temperature?: number;
 		maxStepCount?: number;
-		tools?: (MCPTool | CustomTool)[];
+		tools?: (MCPTool | CustomTool | AgentTool)[];
 		providerOptions?: Record<string, unknown>;
 	};
 	steps?: StepResult<ToolSet>[];

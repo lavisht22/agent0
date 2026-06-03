@@ -23,7 +23,7 @@ import {
 import { Messages, type MessageT } from "@/components/messages";
 import { MonacoJsonEditor } from "@/components/monaco-json-editor";
 import { PageHeader } from "@/components/page-header";
-import { runDataQuery, runQuery } from "@/lib/queries";
+import { childRunsQuery, runDataQuery, runQuery } from "@/lib/queries";
 import type { AgentFormValues } from "./_app.workspace.$workspaceId.agents.$agentId/types";
 
 export const Route = createFileRoute(
@@ -64,6 +64,51 @@ function MetricCard({
 	);
 }
 
+// Shared row for a related run (parent or child) in the lineage section, so
+// both render identically. Opens the run in a new tab.
+type LineageRun = {
+	id: string;
+	is_error: boolean;
+	created_at: string;
+	agent_versions: { agents: { name: string | null } | null } | null;
+};
+
+function RunLink({
+	workspaceId,
+	run,
+}: {
+	workspaceId: string;
+	run: LineageRun;
+}) {
+	return (
+		<li className="flex items-center gap-2">
+			{run.is_error ? (
+				<Chip variant="soft" color="danger" size="sm">
+					<AlertCircle className="size-3" />
+					Error
+				</Chip>
+			) : (
+				<Chip variant="soft" color="success" size="sm">
+					<CheckCircle2 className="size-3" />
+					Success
+				</Chip>
+			)}
+			<Link
+				to="/workspace/$workspaceId/runs/$runId"
+				params={{ workspaceId, runId: run.id }}
+				target="_blank"
+				rel="noreferrer"
+				className="text-foreground hover:underline"
+			>
+				{run.agent_versions?.agents?.name || "Unknown Agent"}
+			</Link>
+			<span className="text-muted text-xs">
+				{format(run.created_at, "PPp")}
+			</span>
+		</li>
+	);
+}
+
 function RouteComponent() {
 	const { workspaceId, runId } = Route.useParams();
 	const modalState = useOverlayState();
@@ -74,6 +119,11 @@ function RouteComponent() {
 		...runDataQuery(runId),
 		retry: 0,
 	});
+
+	// Parent/child run lineage (agent-as-tool). Both enable only once their id
+	// is known, so they're safe to call unconditionally before the early returns.
+	const { data: parentRun } = useQuery(runQuery(run?.parent_run_id ?? ""));
+	const { data: childRuns } = useQuery(childRunsQuery(runId));
 
 	const handleReplay = () => {
 		if (!runData?.request) return;
@@ -168,6 +218,38 @@ function RouteComponent() {
 							{agentName}
 						</Link>
 					</div>
+
+					{/* Run lineage (agent-as-tool) */}
+					{(parentRun || (childRuns && childRuns.length > 0)) && (
+						<Card>
+							<Card.Content className="space-y-3 text-sm">
+								{parentRun && (
+									<div className="flex flex-col gap-1.5">
+										<span className="text-muted">Called by</span>
+										<ul className="flex flex-col gap-1.5">
+											<RunLink workspaceId={workspaceId} run={parentRun} />
+										</ul>
+									</div>
+								)}
+								{childRuns && childRuns.length > 0 && (
+									<div className="flex flex-col gap-1.5">
+										<span className="text-muted">
+											Sub-runs ({childRuns.length})
+										</span>
+										<ul className="flex flex-col gap-1.5">
+											{childRuns.map((child) => (
+												<RunLink
+													key={child.id}
+													workspaceId={workspaceId}
+													run={child}
+												/>
+											))}
+										</ul>
+									</div>
+								)}
+							</Card.Content>
+						</Card>
+					)}
 
 					{/* Metrics Row */}
 					<div className="flex flex-row items-center gap-4">

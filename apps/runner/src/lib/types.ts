@@ -36,9 +36,26 @@ export type CustomTool = {
 };
 
 /**
- * A tool can either be from an MCP server or a custom tool.
+ * Another agent in the same workspace exposed as a tool. When the model calls
+ * it, the runner executes the referenced agent's deployed version in-process
+ * (see runAgent) and returns its text output. The model passes a single
+ * free-form `prompt` string as the sub-agent's input.
  */
-export type ToolDefinition = MCPTool | CustomTool;
+export type AgentTool = {
+	type: "agent";
+	/** The agent to invoke. Must belong to the same workspace. */
+	agent_id: string;
+	/** Tool name surfaced to the calling model (e.g. "research_assistant"). */
+	name: string;
+	/** When/why to call this agent — the calling model reasons over this. */
+	description: string;
+};
+
+/**
+ * A tool can be from an MCP server, a custom (client-executed) tool, or another
+ * agent exposed as a tool.
+ */
+export type ToolDefinition = MCPTool | CustomTool | AgentTool;
 
 /**
  * A skill embedded inside the agent version. Versioned along with the rest
