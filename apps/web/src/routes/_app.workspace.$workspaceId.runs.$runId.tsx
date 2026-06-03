@@ -64,6 +64,51 @@ function MetricCard({
 	);
 }
 
+// Shared row for a related run (parent or child) in the lineage section, so
+// both render identically. Opens the run in a new tab.
+type LineageRun = {
+	id: string;
+	is_error: boolean;
+	created_at: string;
+	agent_versions: { agents: { name: string | null } | null } | null;
+};
+
+function RunLink({
+	workspaceId,
+	run,
+}: {
+	workspaceId: string;
+	run: LineageRun;
+}) {
+	return (
+		<li className="flex items-center gap-2">
+			{run.is_error ? (
+				<Chip variant="soft" color="danger" size="sm">
+					<AlertCircle className="size-3" />
+					Error
+				</Chip>
+			) : (
+				<Chip variant="soft" color="success" size="sm">
+					<CheckCircle2 className="size-3" />
+					Success
+				</Chip>
+			)}
+			<Link
+				to="/workspace/$workspaceId/runs/$runId"
+				params={{ workspaceId, runId: run.id }}
+				target="_blank"
+				rel="noreferrer"
+				className="text-foreground hover:underline"
+			>
+				{run.agent_versions?.agents?.name || "Unknown Agent"}
+			</Link>
+			<span className="text-muted text-xs">
+				{format(run.created_at, "PPp")}
+			</span>
+		</li>
+	);
+}
+
 function RouteComponent() {
 	const { workspaceId, runId } = Route.useParams();
 	const modalState = useOverlayState();
@@ -179,16 +224,11 @@ function RouteComponent() {
 						<Card>
 							<Card.Content className="space-y-3 text-sm">
 								{parentRun && (
-									<div className="flex items-center gap-2">
-										<span className="text-muted shrink-0">Called by</span>
-										<Link
-											to="/workspace/$workspaceId/runs/$runId"
-											params={{ workspaceId, runId: parentRun.id }}
-											className="text-foreground hover:underline"
-										>
-											{parentRun.agent_versions?.agents?.name ||
-												"Unknown Agent"}
-										</Link>
+									<div className="flex flex-col gap-1.5">
+										<span className="text-muted">Called by</span>
+										<ul className="flex flex-col gap-1.5">
+											<RunLink workspaceId={workspaceId} run={parentRun} />
+										</ul>
 									</div>
 								)}
 								{childRuns && childRuns.length > 0 && (
@@ -198,30 +238,11 @@ function RouteComponent() {
 										</span>
 										<ul className="flex flex-col gap-1.5">
 											{childRuns.map((child) => (
-												<li key={child.id} className="flex items-center gap-2">
-													{child.is_error ? (
-														<Chip variant="soft" color="danger" size="sm">
-															<AlertCircle className="size-3" />
-															Error
-														</Chip>
-													) : (
-														<Chip variant="soft" color="success" size="sm">
-															<CheckCircle2 className="size-3" />
-															Success
-														</Chip>
-													)}
-													<Link
-														to="/workspace/$workspaceId/runs/$runId"
-														params={{ workspaceId, runId: child.id }}
-														className="text-foreground hover:underline"
-													>
-														{child.agent_versions?.agents?.name ||
-															"Unknown Agent"}
-													</Link>
-													<span className="text-muted text-xs">
-														{format(child.created_at, "PPp")}
-													</span>
-												</li>
+												<RunLink
+													key={child.id}
+													workspaceId={workspaceId}
+													run={child}
+												/>
 											))}
 										</ul>
 									</div>
