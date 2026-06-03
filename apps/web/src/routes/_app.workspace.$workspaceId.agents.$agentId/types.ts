@@ -40,7 +40,6 @@ export const agentFormSchema = z.object({
 			z.object({
 				type: z.literal("agent"),
 				agent_id: z.string(),
-				environment: z.enum(["staging", "production"]).optional(),
 				name: z.string(),
 				description: z.string(),
 			}),

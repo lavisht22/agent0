@@ -131,9 +131,6 @@ export default function ToolsSection({
 	const [agentToolAgentId, setAgentToolAgentId] = useState<string | null>(null);
 	const [agentToolName, setAgentToolName] = useState("");
 	const [agentToolDescription, setAgentToolDescription] = useState("");
-	const [agentToolEnvironment, setAgentToolEnvironment] = useState<
-		"staging" | "production"
-	>("production");
 	// The agent tool being edited (null means adding a new one). Keyed by name,
 	// which is the unique identifier of an agent tool within a version.
 	const [editingAgentTool, setEditingAgentTool] = useState<AgentTool | null>(
@@ -313,7 +310,6 @@ export default function ToolsSection({
 		setAgentToolAgentId(null);
 		setAgentToolName("");
 		setAgentToolDescription("");
-		setAgentToolEnvironment("production");
 		setEditingAgentTool(null);
 	};
 
@@ -322,7 +318,6 @@ export default function ToolsSection({
 		setAgentToolAgentId(tool.agent_id);
 		setAgentToolName(tool.name);
 		setAgentToolDescription(tool.description);
-		setAgentToolEnvironment(tool.environment ?? "production");
 		agentToolModalState.open();
 	};
 
@@ -366,7 +361,6 @@ export default function ToolsSection({
 		const newTool: AgentTool = {
 			type: "agent",
 			agent_id: agentToolAgentId,
-			environment: agentToolEnvironment,
 			name,
 			description: agentToolDescription.trim(),
 		};
@@ -550,7 +544,6 @@ export default function ToolsSection({
 										{tool.name}{" "}
 										<span className="text-muted ml-1 text-xs">
 											{getAgentName(tool.agent_id)}
-											{tool.environment === "staging" ? " · staging" : ""}
 										</span>
 									</Chip.Label>
 
@@ -803,6 +796,7 @@ export default function ToolsSection({
 									</Label>
 									<Select
 										aria-label="Agent"
+										variant="secondary"
 										placeholder="Select an agent"
 										value={agentToolAgentId}
 										// Editing keeps the original agent fixed — change it by
@@ -811,9 +805,9 @@ export default function ToolsSection({
 										onChange={(key) => {
 											const id = (key as string | null) ?? null;
 											setAgentToolAgentId(id);
-											// Prefill a sensible tool name from the agent name when the
-											// name field hasn't been touched yet.
-											if (id && !agentToolName.trim()) {
+											// Re-derive the tool name from the selected agent each time
+											// the agent changes.
+											if (id) {
 												const agent = selectableAgents.find((a) => a.id === id);
 												if (agent)
 													setAgentToolName(slugifyToolName(agent.name));
@@ -860,38 +854,6 @@ export default function ToolsSection({
 										invoke this agent.
 									</Description>
 								</TextField>
-								<div className="flex flex-col gap-1.5">
-									<Label>Environment</Label>
-									<Select
-										aria-label="Environment"
-										value={agentToolEnvironment}
-										onChange={(key) =>
-											setAgentToolEnvironment(
-												(key as "staging" | "production") || "production",
-											)
-										}
-									>
-										<Select.Trigger className="flex items-center gap-2">
-											<Select.Value />
-											<Select.Indicator />
-										</Select.Trigger>
-										<Select.Popover>
-											<ListBox>
-												<ListBox.Item id="production" textValue="Production">
-													Production
-													<ListBox.ItemIndicator />
-												</ListBox.Item>
-												<ListBox.Item id="staging" textValue="Staging">
-													Staging
-													<ListBox.ItemIndicator />
-												</ListBox.Item>
-											</ListBox>
-										</Select.Popover>
-									</Select>
-									<Description>
-										Which deployed version of the agent to run when called.
-									</Description>
-								</div>
 							</Drawer.Body>
 							<Drawer.Footer>
 								<Button

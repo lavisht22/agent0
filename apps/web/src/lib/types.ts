@@ -27,7 +27,6 @@ export type CustomTool = {
 export type AgentTool = {
 	type: "agent";
 	agent_id: string;
-	environment?: "staging" | "production";
 	name: string;
 	description: string;
 };
