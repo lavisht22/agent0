@@ -56,6 +56,7 @@ const buildAgentTools = (
 	agentTools: AgentTool[],
 	workspaceId: string,
 	activeChain: string[],
+	parentRunId: string,
 ): ToolSet => {
 	const toolSet: ToolSet = {};
 
@@ -90,6 +91,7 @@ const buildAgentTools = (
 						extraMessages: [{ role: "user", content: prompt }],
 						abortSignal,
 						callStack: activeChain,
+						parentRunId,
 					});
 					return result.text;
 				} catch (err) {
@@ -130,6 +132,11 @@ export type PrepareRunOptions = {
 	agentId: string;
 	environment: Environment;
 	startTime: number;
+	/**
+	 * The id this run will be recorded under. Known up front so agents exposed
+	 * as tools can link their sub-runs back to it as `parent_run_id`.
+	 */
+	runId: string;
 	variables?: Record<string, string>;
 	overrides?: RunOverrides;
 	extraMessages?: ModelMessage[];
@@ -172,6 +179,7 @@ export const prepareRun = async (
 		agentId,
 		environment,
 		startTime,
+		runId,
 		variables = {},
 		overrides,
 		extraMessages,
@@ -292,10 +300,12 @@ export const prepareRun = async (
 	const agentToolDefs = (data.tools ?? []).filter(
 		(t): t is AgentTool => "type" in t && t.type === "agent",
 	);
-	const agentTools = buildAgentTools(agentToolDefs, workspaceId, [
-		...callStack,
-		agentId,
-	]);
+	const agentTools = buildAgentTools(
+		agentToolDefs,
+		workspaceId,
+		[...callStack, agentId],
+		runId,
+	);
 
 	// Skills win on name collision so the catalog's `read_skill` reference always
 	// routes to the built-in handler.
@@ -332,6 +342,14 @@ export type RecordRunOptions = {
 	modelId: string;
 	usage?: LanguageModelUsage;
 	runData: RunData;
+	/**
+	 * Pre-generated run id. Supply this when the id must be known before the run
+	 * finishes (so sub-runs can reference it as their parent). Defaults to a
+	 * fresh id.
+	 */
+	id?: string;
+	/** Id of the run that invoked this one (agent-as-tool). Null for top-level. */
+	parentRunId?: string | null;
 };
 
 /**
@@ -340,11 +358,12 @@ export type RecordRunOptions = {
  * them, matching the previous inline behavior). Returns the run id.
  */
 export const recordRun = async (opts: RecordRunOptions): Promise<string> => {
-	const id = nanoid();
+	const id = opts.id ?? nanoid();
 	await supabase.from("runs").insert({
 		id,
 		workspace_id: opts.workspaceId,
 		version_id: opts.versionId,
+		parent_run_id: opts.parentRunId ?? null,
 		created_at: new Date(opts.startTime).toISOString(),
 		is_error: opts.isError,
 		is_test: opts.isTest ?? false,
@@ -377,6 +396,8 @@ export type RunAgentOptions = {
 	 * `agentId`. Threaded through to bound agent-as-tool recursion.
 	 */
 	callStack?: string[];
+	/** Id of the run that invoked this one; recorded as parent_run_id. */
+	parentRunId?: string | null;
 };
 
 export type RunAgentResult = {
@@ -400,12 +421,14 @@ export const runAgent = async (
 	opts: RunAgentOptions,
 ): Promise<RunAgentResult> => {
 	const startTime = opts.startTime ?? Date.now();
+	const runId = nanoid();
 
 	const prepared = await prepareRun({
 		workspaceId: opts.workspaceId,
 		agentId: opts.agentId,
 		environment: opts.environment,
 		startTime,
+		runId,
 		variables: opts.variables,
 		overrides: opts.overrides,
 		extraMessages: opts.extraMessages,
@@ -447,7 +470,9 @@ export const runAgent = async (
 		runData.steps = steps;
 		runData.totalUsage = totalUsage;
 
-		const runId = await recordRun({
+		await recordRun({
+			id: runId,
+			parentRunId: opts.parentRunId,
 			workspaceId: opts.workspaceId,
 			versionId,
 			startTime,
@@ -488,6 +513,8 @@ export const runAgent = async (
 				};
 
 		await recordRun({
+			id: runId,
+			parentRunId: opts.parentRunId,
 			workspaceId: opts.workspaceId,
 			versionId,
 			startTime,

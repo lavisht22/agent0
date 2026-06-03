@@ -8,12 +8,13 @@ import {
 	type ToolSet,
 } from "ai";
 import type { FastifyInstance } from "fastify";
+import { nanoid } from "nanoid";
 import { sumUsage } from "../lib/cost.js";
 import { supabase } from "../lib/db.js";
 import { createSSEStream } from "../lib/helpers.js";
-import { prepareRun, recordRun, RunPrepError } from "../lib/run-agent.js";
-import type { RunOverrides } from "../lib/types.js";
+import { prepareRun, RunPrepError, recordRun } from "../lib/run-agent.js";
 import { hasScope, requireScope } from "../lib/scopes.js";
+import type { RunOverrides } from "../lib/types.js";
 
 const AgentRefSchema = {
 	type: "object" as const,
@@ -297,6 +298,9 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 		},
 		handler: async (request, reply) => {
 		const startTime = Date.now();
+		// Generate up front so agents exposed as tools can link their sub-runs
+		// back to this run as parent_run_id.
+		const runId = nanoid();
 
 		const {
 			agent_id,
@@ -347,6 +351,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				agentId: agent_id,
 				environment,
 				startTime,
+				runId,
 				variables,
 				overrides,
 				extraMessages: extra_messages,
@@ -425,6 +430,8 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 						await recordRun({
 							workspaceId,
+							id: runId,
+							parentRunId: null,
 							versionId: preparedVersionId,
 							startTime,
 							preProcessingTime,
@@ -464,6 +471,8 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 						await recordRun({
 							workspaceId,
+							id: runId,
+							parentRunId: null,
 							versionId: preparedVersionId,
 							startTime,
 							preProcessingTime,
@@ -499,6 +508,8 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 						await recordRun({
 							workspaceId,
+							id: runId,
+							parentRunId: null,
 							versionId: preparedVersionId,
 							startTime,
 							preProcessingTime,
@@ -579,6 +590,8 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 				await recordRun({
 					workspaceId,
+					id: runId,
+					parentRunId: null,
 					versionId: preparedVersionId,
 					startTime,
 					preProcessingTime,
@@ -612,6 +625,8 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 					await recordRun({
 						workspaceId,
+						id: runId,
+						parentRunId: null,
 						versionId: preparedVersionId,
 						startTime,
 						preProcessingTime,
@@ -638,6 +653,8 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 				await recordRun({
 					workspaceId,
+					id: runId,
+					parentRunId: null,
 					versionId: preparedVersionId,
 					startTime,
 					preProcessingTime,
