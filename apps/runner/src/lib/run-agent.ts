@@ -1,16 +1,18 @@
 import {
 	generateText,
+	jsonSchema,
 	type LanguageModel,
 	type LanguageModelUsage,
 	type ModelMessage,
 	Output,
 	type StepResult,
 	stepCountIs,
+	type Tool,
 	type ToolSet,
 } from "ai";
 import { nanoid } from "nanoid";
 import { cachedQuery } from "./cache.js";
-import { calculateModelCost } from "./cost.js";
+import { calculateModelCost, sumUsage } from "./cost.js";
 import { supabase } from "./db.js";
 import {
 	applyMessageVariables,
@@ -21,12 +23,88 @@ import {
 	uploadRunData,
 } from "./helpers.js";
 import type {
+	AgentTool,
 	Environment,
 	MCPOptions,
 	RunData,
 	RunOverrides,
 	VersionData,
 } from "./types.js";
+
+/**
+ * Maximum length of the agent call chain (the top-level agent counts as 1).
+ * Bounds runaway fan-out/recursion when agents are exposed as tools.
+ */
+const MAX_AGENT_DEPTH = 5;
+
+/**
+ * Build AI-SDK tools for any agents exposed as tools on a version. Each tool's
+ * `execute` runs the referenced agent in-process via `runAgent`, passing the
+ * model's free-form `prompt` as the sub-agent's input.
+ *
+ * `activeChain` is the list of agent IDs currently on the execution stack,
+ * INCLUDING the agent that owns these tools. It guards two ways:
+ *   - cycle: refuse to call an agent already in the chain (A → B → A);
+ *   - depth: refuse once the chain reaches MAX_AGENT_DEPTH.
+ * Guard failures are returned to the model as an error string rather than
+ * thrown, so the calling agent can recover or report it.
+ *
+ * `abortSignal` from each tool call (forwarded by the SDK from the parent run)
+ * is threaded into the sub-agent so cancelling the parent cancels children.
+ */
+const buildAgentTools = (
+	agentTools: AgentTool[],
+	workspaceId: string,
+	activeChain: string[],
+): ToolSet => {
+	const toolSet: ToolSet = {};
+
+	for (const agentTool of agentTools) {
+		const tool: Tool = {
+			description: agentTool.description,
+			inputSchema: jsonSchema({
+				type: "object",
+				properties: {
+					prompt: {
+						type: "string",
+						description: "The request to send to this agent.",
+					},
+				},
+				required: ["prompt"],
+			}),
+			execute: async (input, { abortSignal }) => {
+				if (activeChain.includes(agentTool.agent_id)) {
+					return `Error: agent "${agentTool.name}" is already running in this call chain; refusing to call it recursively.`;
+				}
+				if (activeChain.length >= MAX_AGENT_DEPTH) {
+					return `Error: maximum agent call depth (${MAX_AGENT_DEPTH}) reached; cannot call "${agentTool.name}".`;
+				}
+
+				const prompt = (input as { prompt?: string })?.prompt ?? "";
+
+				try {
+					const result = await runAgent({
+						workspaceId,
+						agentId: agentTool.agent_id,
+						environment: agentTool.environment ?? "production",
+						extraMessages: [{ role: "user", content: prompt }],
+						abortSignal,
+						callStack: activeChain,
+					});
+					return result.text;
+				} catch (err) {
+					return `Error running agent "${agentTool.name}": ${
+						err instanceof Error ? err.message : "unknown error"
+					}`;
+				}
+			},
+		};
+
+		toolSet[agentTool.name] = tool;
+	}
+
+	return toolSet;
+};
 
 /**
  * Error thrown by `prepareRun` when an agent/version can't be resolved. Carries
@@ -57,6 +135,12 @@ export type PrepareRunOptions = {
 	extraMessages?: ModelMessage[];
 	extraTools?: ExtraTool[];
 	mcpOptions?: Record<string, MCPOptions>;
+	/**
+	 * Agent IDs already on the execution stack (ancestors of this run), NOT
+	 * including `agentId` itself. Empty/undefined for a top-level run. Used to
+	 * guard agent-as-tool recursion; see buildAgentTools.
+	 */
+	callStack?: string[];
 };
 
 export type PreparedRun = {
@@ -93,6 +177,7 @@ export const prepareRun = async (
 		extraMessages,
 		extraTools,
 		mcpOptions,
+		callStack = [],
 	} = opts;
 
 	// Get agent with its deployed version IDs, scoped to the authenticated
@@ -201,9 +286,20 @@ export const prepareRun = async (
 		? [...messagesWithSkills, ...extraMessages]
 		: messagesWithSkills;
 
+	// Build tools for any agents exposed as tools. The active chain includes
+	// this agent so a sub-agent can detect a cycle back to it (and to bound
+	// depth). prepareMCPServers ignores "agent" tools, so they're handled here.
+	const agentToolDefs = (data.tools ?? []).filter(
+		(t): t is AgentTool => "type" in t && t.type === "agent",
+	);
+	const agentTools = buildAgentTools(agentToolDefs, workspaceId, [
+		...callStack,
+		agentId,
+	]);
+
 	// Skills win on name collision so the catalog's `read_skill` reference always
 	// routes to the built-in handler.
-	const allTools = { ...tools, ...skillTools } as ToolSet;
+	const allTools = { ...tools, ...agentTools, ...skillTools } as ToolSet;
 
 	const runData: RunData = {};
 	runData.request = { ...data, messages: finalMessages, overrides };
@@ -276,6 +372,11 @@ export type RunAgentOptions = {
 	overrides?: RunOverrides;
 	abortSignal?: AbortSignal;
 	startTime?: number;
+	/**
+	 * Agent IDs already on the execution stack (ancestors), NOT including
+	 * `agentId`. Threaded through to bound agent-as-tool recursion.
+	 */
+	callStack?: string[];
 };
 
 export type RunAgentResult = {
@@ -308,6 +409,7 @@ export const runAgent = async (
 		variables: opts.variables,
 		overrides: opts.overrides,
 		extraMessages: opts.extraMessages,
+		callStack: opts.callStack,
 	});
 
 	const {
@@ -322,6 +424,9 @@ export const runAgent = async (
 		runData,
 	} = prepared;
 
+	// Collected for partial cost attribution if the run is aborted mid-flight.
+	const collectedSteps: StepResult<ToolSet>[] = [];
+
 	try {
 		const result = await generateText({
 			model,
@@ -333,6 +438,9 @@ export const runAgent = async (
 			output: data.outputFormat === "json" ? Output.json() : Output.text(),
 			providerOptions: data.providerOptions,
 			abortSignal: opts.abortSignal,
+			onStepFinish: (step) => {
+				collectedSteps.push(step as StepResult<ToolSet>);
+			},
 		});
 
 		const { response, text, steps, totalUsage } = result;
@@ -361,15 +469,23 @@ export const runAgent = async (
 			runId,
 		};
 	} catch (error) {
-		runData.error = {
-			name: error instanceof Error ? error.name : "UnknownError",
-			message:
-				error instanceof Error ? error.message : "Unknown error occured.",
-			cause:
-				error instanceof Error
-					? (error as Error & { cause?: unknown }).cause
-					: undefined,
-		};
+		// A parent cancellation aborts the shared signal; record it as an abort
+		// (with partial usage from completed steps) rather than a generic error.
+		const aborted = opts.abortSignal?.aborted ?? false;
+		const totalUsage = sumUsage(collectedSteps);
+		runData.steps = collectedSteps;
+		runData.totalUsage = totalUsage;
+		runData.error = aborted
+			? { name: "AbortError", message: "Run aborted by parent run" }
+			: {
+					name: error instanceof Error ? error.name : "UnknownError",
+					message:
+						error instanceof Error ? error.message : "Unknown error occured.",
+					cause:
+						error instanceof Error
+							? (error as Error & { cause?: unknown }).cause
+							: undefined,
+				};
 
 		await recordRun({
 			workspaceId: opts.workspaceId,
@@ -381,6 +497,7 @@ export const runAgent = async (
 			isError: true,
 			isStream: false,
 			modelId,
+			usage: collectedSteps.length > 0 ? totalUsage : undefined,
 			runData,
 		});
 
