@@ -28,12 +28,12 @@ import {
 import { useState } from "react";
 import { MonacoJsonEditor } from "@/components/monaco-json-editor";
 import { mcpsQuery } from "@/lib/queries";
-import type { CustomTool, MCPTool } from "@/lib/types";
+import type { AgentTool, CustomTool, MCPTool } from "@/lib/types";
 
 /**
  * Union type for all tools
  */
-type ToolDefinition = MCPTool | CustomTool;
+type ToolDefinition = MCPTool | CustomTool | AgentTool;
 
 // For backward compatibility, support old format without type field
 type LegacyTool = { mcp_id: string; name: string };
