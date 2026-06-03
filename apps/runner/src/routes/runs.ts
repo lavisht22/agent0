@@ -497,6 +497,14 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 					},
 
 					onFinish: async ({ steps, totalUsage }) => {
+						// Another terminal callback (onError/onAbort) may have already
+						// recorded this run.
+						if (streamCompleted) return;
+						// A cancelled run (e.g. with in-flight MCP tool calls) can fire
+						// both onFinish and onAbort. Don't record it as a success —
+						// defer to onAbort so it's deterministically saved as aborted.
+						// Returning without setting the guard lets onAbort still run.
+						if (controller.signal.aborted) return;
 						streamCompleted = true;
 						closeAll();
 
@@ -528,6 +536,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						await uploadRunData(id, runData);
 					},
 					onError: async ({ error }) => {
+						if (streamCompleted) return;
 						streamCompleted = true;
 						closeAll();
 
