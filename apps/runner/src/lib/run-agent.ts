@@ -274,6 +274,84 @@ export const prepareRun = async (
 		data.tools = [...(data.tools || []), ...customTools];
 	}
 
+	const assembled = await assembleRun(data, {
+		workspaceId,
+		environment,
+		runId,
+		agentId,
+		variables,
+		extraMessages,
+		mcpOptions,
+		callStack,
+	});
+
+	// Record the overrides alongside the request for observability.
+	if (overrides && assembled.runData.request) {
+		assembled.runData.request.overrides = overrides;
+	}
+
+	return {
+		...assembled,
+		versionId,
+		preProcessingTime: Date.now() - startTime,
+	};
+};
+
+export type AssembleRunOptions = {
+	workspaceId: string;
+	environment: Environment;
+	runId: string;
+	/**
+	 * The id of the agent that owns this run, if known. Appended to the active
+	 * chain so a sub-agent can detect a cycle back to it. Omitted for unsaved
+	 * drafts (depth still bounds runaway fan-out).
+	 */
+	agentId?: string;
+	variables?: Record<string, string>;
+	extraMessages?: ModelMessage[];
+	mcpOptions?: Record<string, MCPOptions>;
+	/**
+	 * Agent IDs already on the execution stack (ancestors), NOT including this
+	 * run's own agent. Used to guard agent-as-tool recursion.
+	 */
+	callStack?: string[];
+};
+
+export type AssembledRun = {
+	model: LanguageModel;
+	modelId: string;
+	data: VersionData;
+	finalMessages: ModelMessage[];
+	allTools: ToolSet;
+	closeAll: () => void;
+	runData: RunData;
+};
+
+/**
+ * Assemble the runnable pieces from a resolved `VersionData`: substitute
+ * variables, load the provider model, MCP tools, skills, and agent-as-tool
+ * tools, and build the final message list + tool set. Pure of any DB lookup of
+ * the agent/version, so it's shared by both the saved-version path (prepareRun)
+ * and the editor test path (which runs unsaved draft data directly).
+ *
+ * The caller owns `closeAll()` — it MUST be invoked once the run finishes to
+ * release MCP clients.
+ */
+export const assembleRun = async (
+	data: VersionData,
+	opts: AssembleRunOptions,
+): Promise<AssembledRun> => {
+	const {
+		workspaceId,
+		environment,
+		runId,
+		agentId,
+		variables = {},
+		extraMessages,
+		mcpOptions,
+		callStack = [],
+	} = opts;
+
 	const processedMessages = applyMessageVariables(data, variables);
 	const [{ model }, { tools, closeAll }, { systemAddendum, skillTools }] =
 		await Promise.all([
@@ -294,16 +372,17 @@ export const prepareRun = async (
 		? [...messagesWithSkills, ...extraMessages]
 		: messagesWithSkills;
 
-	// Build tools for any agents exposed as tools. The active chain includes
-	// this agent so a sub-agent can detect a cycle back to it (and to bound
-	// depth). prepareMCPServers ignores "agent" tools, so they're handled here.
+	// Build tools for any agents exposed as tools. The active chain includes this
+	// run's own agent (when known) so a sub-agent can detect a cycle back to it
+	// (and to bound depth). prepareMCPServers ignores "agent" tools.
+	const activeChain = agentId ? [...callStack, agentId] : [...callStack];
 	const agentToolDefs = (data.tools ?? []).filter(
 		(t): t is AgentTool => "type" in t && t.type === "agent",
 	);
 	const agentTools = buildAgentTools(
 		agentToolDefs,
 		workspaceId,
-		[...callStack, agentId],
+		activeChain,
 		runId,
 	);
 
@@ -312,19 +391,17 @@ export const prepareRun = async (
 	const allTools = { ...tools, ...agentTools, ...skillTools } as ToolSet;
 
 	const runData: RunData = {};
-	runData.request = { ...data, messages: finalMessages, overrides };
+	runData.request = { ...data, messages: finalMessages };
 
 	const modelId = typeof model === "string" ? model : model.modelId;
 
 	return {
 		model,
 		modelId,
-		versionId,
 		data,
 		finalMessages,
 		allTools,
 		closeAll,
-		preProcessingTime: Date.now() - startTime,
 		runData,
 	};
 };
