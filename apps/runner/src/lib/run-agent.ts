@@ -59,6 +59,13 @@ export const buildAgentTools = (
 	parentRunId: string,
 	environment: Environment,
 	isTest: boolean,
+	/**
+	 * Per-MCP-server runtime options (e.g. custom headers) supplied to the parent
+	 * run. Forwarded to sub-agents so they reach shared MCP servers with the same
+	 * headers; `prepareMCPServers` only applies entries whose key matches an MCP
+	 * server the sub-agent actually uses.
+	 */
+	mcpOptions?: Record<string, MCPOptions>,
 ): ToolSet => {
 	const toolSet: ToolSet = {};
 
@@ -100,6 +107,9 @@ export const buildAgentTools = (
 						// Inherit the parent's test flag so a test run's sub-agents are
 						// also logged as test runs.
 						isTest,
+						// Forward runtime MCP options (e.g. custom headers) so sub-agents
+						// reach shared MCP servers with the same headers as the parent.
+						mcpOptions,
 					});
 					return result.text;
 				} catch (err) {
@@ -401,6 +411,7 @@ export const assembleRun = async (
 		runId,
 		environment,
 		isTest,
+		mcpOptions,
 	);
 
 	// Skills win on name collision so the catalog's `read_skill` reference always
@@ -494,6 +505,8 @@ export type RunAgentOptions = {
 	parentRunId?: string | null;
 	/** Whether this run (and its own sub-agents) should be logged as test runs. */
 	isTest?: boolean;
+	/** Per-MCP-server runtime options (e.g. custom headers) to apply to this run. */
+	mcpOptions?: Record<string, MCPOptions>;
 };
 
 export type RunAgentResult = {
@@ -530,6 +543,7 @@ export const runAgent = async (
 		extraMessages: opts.extraMessages,
 		callStack: opts.callStack,
 		isTest: opts.isTest,
+		mcpOptions: opts.mcpOptions,
 	});
 
 	const {
