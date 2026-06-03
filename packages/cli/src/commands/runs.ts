@@ -11,6 +11,7 @@ interface AgentRef {
 interface RunSummary {
 	id: string;
 	version_id: string;
+	parent_run_id: string | null;
 	is_error: boolean;
 	is_test: boolean;
 	is_stream: boolean;
@@ -87,8 +88,11 @@ export async function runsListCommand(opts: RunsListOpts): Promise<void> {
 	for (const r of res.data) {
 		const status = r.is_error ? "failed" : "success";
 		const agentName = r.agent?.name ?? "(deleted)";
+		// Mark sub-runs (invoked by another agent via agent-as-tool) with their
+		// parent run id, so it can be inspected with `runs get <parentId>`.
+		const lineage = r.parent_run_id ? `  ↳ child of ${r.parent_run_id}` : "";
 		console.log(
-			`${r.id}  ${r.created_at}  ${status}  ${agentName}  ${formatCost(r.cost)}`,
+			`${r.id}  ${r.created_at}  ${status}  ${agentName}  ${formatCost(r.cost)}${lineage}`,
 		);
 	}
 }
