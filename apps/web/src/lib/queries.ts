@@ -340,6 +340,26 @@ export const runQuery = (runId: string) =>
 		enabled: !!runId,
 	});
 
+// Runs invoked by this run via an agent-as-tool (parent_run_id == runId).
+export const childRunsQuery = (parentRunId: string | null | undefined) =>
+	queryOptions({
+		queryKey: ["child-runs", parentRunId],
+		queryFn: async () => {
+			const { data, error } = await supabase
+				.from("runs")
+				.select(
+					"id, is_error, is_test, created_at, agent_versions(id, agents:agent_id(name))",
+				)
+				.eq("parent_run_id", parentRunId as string)
+				.order("created_at", { ascending: true });
+
+			if (error) throw error;
+
+			return data;
+		},
+		enabled: !!parentRunId,
+	});
+
 export const runDataQuery = (runId: string) =>
 	queryOptions({
 		queryKey: ["run-data", runId],

@@ -23,7 +23,7 @@ import {
 import { Messages, type MessageT } from "@/components/messages";
 import { MonacoJsonEditor } from "@/components/monaco-json-editor";
 import { PageHeader } from "@/components/page-header";
-import { runDataQuery, runQuery } from "@/lib/queries";
+import { childRunsQuery, runDataQuery, runQuery } from "@/lib/queries";
 import type { AgentFormValues } from "./_app.workspace.$workspaceId.agents.$agentId/types";
 
 export const Route = createFileRoute(
@@ -74,6 +74,11 @@ function RouteComponent() {
 		...runDataQuery(runId),
 		retry: 0,
 	});
+
+	// Parent/child run lineage (agent-as-tool). Both enable only once their id
+	// is known, so they're safe to call unconditionally before the early returns.
+	const { data: parentRun } = useQuery(runQuery(run?.parent_run_id ?? ""));
+	const { data: childRuns } = useQuery(childRunsQuery(runId));
 
 	const handleReplay = () => {
 		if (!runData?.request) return;
@@ -168,6 +173,62 @@ function RouteComponent() {
 							{agentName}
 						</Link>
 					</div>
+
+					{/* Run lineage (agent-as-tool) */}
+					{(parentRun || (childRuns && childRuns.length > 0)) && (
+						<Card>
+							<Card.Content className="space-y-3 text-sm">
+								{parentRun && (
+									<div className="flex items-center gap-2">
+										<span className="text-muted shrink-0">Called by</span>
+										<Link
+											to="/workspace/$workspaceId/runs/$runId"
+											params={{ workspaceId, runId: parentRun.id }}
+											className="text-foreground hover:underline"
+										>
+											{parentRun.agent_versions?.agents?.name ||
+												"Unknown Agent"}
+										</Link>
+									</div>
+								)}
+								{childRuns && childRuns.length > 0 && (
+									<div className="flex flex-col gap-1.5">
+										<span className="text-muted">
+											Sub-runs ({childRuns.length})
+										</span>
+										<ul className="flex flex-col gap-1.5">
+											{childRuns.map((child) => (
+												<li key={child.id} className="flex items-center gap-2">
+													{child.is_error ? (
+														<Chip variant="soft" color="danger" size="sm">
+															<AlertCircle className="size-3" />
+															Error
+														</Chip>
+													) : (
+														<Chip variant="soft" color="success" size="sm">
+															<CheckCircle2 className="size-3" />
+															Success
+														</Chip>
+													)}
+													<Link
+														to="/workspace/$workspaceId/runs/$runId"
+														params={{ workspaceId, runId: child.id }}
+														className="text-foreground hover:underline"
+													>
+														{child.agent_versions?.agents?.name ||
+															"Unknown Agent"}
+													</Link>
+													<span className="text-muted text-xs">
+														{format(child.created_at, "PPp")}
+													</span>
+												</li>
+											))}
+										</ul>
+									</div>
+								)}
+							</Card.Content>
+						</Card>
+					)}
 
 					{/* Metrics Row */}
 					<div className="flex flex-row items-center gap-4">
