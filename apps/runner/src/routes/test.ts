@@ -12,11 +12,15 @@ import {
 	resolveProviderModel,
 	uploadRunData,
 } from "../lib/helpers.js";
-import type { RunData, VersionData } from "../lib/types.js";
+import { buildAgentTools } from "../lib/run-agent.js";
+import type { AgentTool, RunData, VersionData } from "../lib/types.js";
 
 export async function registerTestRoute(fastify: FastifyInstance) {
 	fastify.post("/internal/test", async (request, reply) => {
 		const startTime = Date.now();
+		// Generate up front so agents exposed as tools can link their sub-runs
+		// back to this test run as parent_run_id.
+		const runId = nanoid();
 
 		const runData: RunData = {};
 
@@ -95,8 +99,30 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			systemAddendum,
 		);
 
+		// Resolve the edited agent's id so the cycle guard can detect a call back
+		// to it. version_id may not resolve for an unsaved draft, in which case we
+		// fall back to an empty chain (depth still bounds runaway fan-out).
+		const { data: versionRow } = await supabase
+			.from("agent_versions")
+			.select("agent_id")
+			.eq("id", version_id)
+			.maybeSingle();
+		const activeChain = versionRow?.agent_id ? [versionRow.agent_id] : [];
+
+		// Build tools for any agents exposed as tools (prepareMCPServers ignores
+		// "agent" tools). Sub-agents run their deployed versions via runAgent.
+		const agentToolDefs = (versionData.tools ?? []).filter(
+			(t): t is AgentTool => "type" in t && t.type === "agent",
+		);
+		const agentTools = buildAgentTools(
+			agentToolDefs,
+			provider.workspace_id,
+			activeChain,
+			runId,
+		);
+
 		// Skills win on name collision (see run.ts for rationale).
-		const allTools = { ...tools, ...skillTools };
+		const allTools = { ...tools, ...agentTools, ...skillTools };
 
 		runData.request = {
 			...versionData,
@@ -130,9 +156,9 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 				runData.steps = steps;
 				runData.totalUsage = totalUsage;
 
-				const id = nanoid();
 				await supabase.from("runs").insert({
-					id,
+					id: runId,
+					parent_run_id: null,
 					workspace_id: provider.workspace_id,
 					version_id,
 					created_at: new Date(startTime).toISOString(),
@@ -149,7 +175,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 						totalUsage,
 					),
 				});
-				await uploadRunData(id, runData);
+				await uploadRunData(runId, runData);
 			},
 			onError: async ({ error }) => {
 				streamCompleted = true;
@@ -169,9 +195,9 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 							: undefined,
 				};
 
-				const id = nanoid();
 				await supabase.from("runs").insert({
-					id,
+					id: runId,
+					parent_run_id: null,
 					workspace_id: provider.workspace_id,
 					version_id,
 					created_at: new Date(startTime).toISOString(),
@@ -183,7 +209,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 					response_time:
 						Date.now() - (firstTokenTime || 0) - preProcessingTime - startTime,
 				});
-				await uploadRunData(id, runData);
+				await uploadRunData(runId, runData);
 			},
 			onAbort: async ({ steps }) => {
 				if (streamCompleted) return;
@@ -203,9 +229,9 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 					message: "Run aborted by client disconnect",
 				};
 
-				const id = nanoid();
 				await supabase.from("runs").insert({
-					id,
+					id: runId,
+					parent_run_id: null,
 					workspace_id: provider.workspace_id,
 					version_id,
 					created_at: new Date(startTime).toISOString(),
@@ -222,7 +248,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 						totalUsage,
 					),
 				});
-				await uploadRunData(id, runData);
+				await uploadRunData(runId, runData);
 			},
 		});
 

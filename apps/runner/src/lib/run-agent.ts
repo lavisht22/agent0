@@ -52,7 +52,7 @@ const MAX_AGENT_DEPTH = 5;
  * `abortSignal` from each tool call (forwarded by the SDK from the parent run)
  * is threaded into the sub-agent so cancelling the parent cancels children.
  */
-const buildAgentTools = (
+export const buildAgentTools = (
 	agentTools: AgentTool[],
 	workspaceId: string,
 	activeChain: string[],
