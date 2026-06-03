@@ -29,6 +29,7 @@ const RunSummarySchema = {
 	properties: {
 		id: { type: "string" as const },
 		version_id: { type: "string" as const, nullable: true },
+		parent_run_id: { type: "string" as const, nullable: true, description: "ID of the run that invoked this one (agent-as-tool). Null for top-level runs." },
 		is_error: { type: "boolean" as const },
 		is_test: { type: "boolean" as const },
 		is_stream: { type: "boolean" as const, nullable: true },
@@ -118,7 +119,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 			let query = supabase
 				.from("runs")
-				.select("id, version_id, is_error, is_test, is_stream, cost, tokens, response_time, first_token_time, pre_processing_time, created_at, agent_versions!inner(id, agent_id, agents:agent_id(id, name))")
+				.select("id, version_id, parent_run_id, is_error, is_test, is_stream, cost, tokens, response_time, first_token_time, pre_processing_time, created_at, agent_versions!inner(id, agent_id, agents:agent_id(id, name))")
 				.eq("workspace_id", workspaceId);
 
 			if (agent_id) {
