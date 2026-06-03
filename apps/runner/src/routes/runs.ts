@@ -8,20 +8,11 @@ import {
 	type ToolSet,
 } from "ai";
 import type { FastifyInstance } from "fastify";
-import { nanoid } from "nanoid";
-import { calculateModelCost, sumUsage } from "../lib/cost.js";
+import { sumUsage } from "../lib/cost.js";
 import { supabase } from "../lib/db.js";
-import {
-	applyMessageVariables,
-	applySkillCatalog,
-	createSSEStream,
-	prepareMCPServers,
-	prepareSkills,
-	resolveProviderModel,
-	uploadRunData,
-} from "../lib/helpers.js";
-import type { RunData, RunOverrides, VersionData } from "../lib/types.js";
-import { cachedQuery } from "../lib/cache.js";
+import { createSSEStream } from "../lib/helpers.js";
+import { prepareRun, recordRun, RunPrepError } from "../lib/run-agent.js";
+import type { RunOverrides } from "../lib/types.js";
 import { hasScope, requireScope } from "../lib/scopes.js";
 
 const AgentRefSchema = {
@@ -307,8 +298,6 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 		handler: async (request, reply) => {
 		const startTime = Date.now();
 
-		const runData: RunData = {};
-
 		const {
 			agent_id,
 			environment = "production",
@@ -348,100 +337,42 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 		const { workspaceId } = request.params as { workspaceId: string };
 
-		// Get agent with its deployed version IDs, scoped to the authenticated workspace
-		const agent = await cachedQuery(
-			`agent:${agent_id}:${workspaceId}`,
-			30_000, // 30s TTL — short to pick up new deploys quickly
-			async () => {
-				const { data, error } = await supabase
-					.from("agents")
-					.select("staging_version_id, production_version_id, workspace_id")
-					.eq("id", agent_id)
-					.eq("workspace_id", workspaceId)
-					.single();
-				if (error || !data) return null;
-				return data;
-			},
-		);
-
-		if (!agent) {
-			return reply.code(404).send({ message: "Agent not found" });
+		// Resolve the agent version, apply overrides/variables, and load the
+		// provider model, tools, and skills. Throws RunPrepError (with an HTTP
+		// code) when the agent or version can't be found.
+		let prepared: Awaited<ReturnType<typeof prepareRun>>;
+		try {
+			prepared = await prepareRun({
+				workspaceId,
+				agentId: agent_id,
+				environment,
+				startTime,
+				variables,
+				overrides,
+				extraMessages: extra_messages,
+				extraTools: extra_tools,
+				mcpOptions: mcp_options,
+			});
+		} catch (err) {
+			if (err instanceof RunPrepError) {
+				return reply
+					.code(err.code as 400 | 404 | 500)
+					.send({ message: err.message });
+			}
+			throw err;
 		}
 
-		// Get the version ID for the requested environment
-		const versionId =
-			environment === "staging"
-				? agent.staging_version_id
-				: agent.production_version_id;
-
-		if (!versionId) {
-			return reply
-				.code(404)
-				.send({ message: `No ${environment} version found for this agent` });
-		}
-
-		// Fetch the version data (versions are immutable, cache aggressively)
-		const version = await cachedQuery(
-			`version:${versionId}`,
-			600_000, // 10 min TTL — versions are immutable once created
-			async () => {
-				const { data, error } = await supabase
-					.from("agent_versions")
-					.select("*")
-					.eq("id", versionId)
-					.single();
-				if (error || !data) return null;
-				return data;
-			},
-		);
-
-		if (!version) {
-			return reply
-				.code(404)
-				.send({ message: `No ${environment} version found for this agent` });
-		}
-
-		const data = JSON.parse(JSON.stringify(version.data)) as VersionData;
-
-		// Apply runtime overrides if provided
-		if (overrides) {
-			if (overrides.model?.provider_id)
-				data.model.provider_id = overrides.model.provider_id;
-			if (overrides.model?.name) data.model.name = overrides.model.name;
-			if (overrides.maxOutputTokens !== undefined)
-				data.maxOutputTokens = overrides.maxOutputTokens;
-			if (overrides.temperature !== undefined)
-				data.temperature = overrides.temperature;
-			if (overrides.maxStepCount !== undefined)
-				data.maxStepCount = overrides.maxStepCount;
-			if (overrides.providerOptions)
-				data.providerOptions = {
-					...data.providerOptions,
-					...overrides.providerOptions,
-				};
-		}
-
-		// Merge extra_tools with existing tools
-		if (extra_tools && extra_tools.length > 0) {
-			const customTools = extra_tools.map((tool) => ({
-				type: "custom" as const,
-				title: tool.title,
-				description: tool.description,
-				inputSchema: tool.inputSchema,
-			}));
-			data.tools = [...(data.tools || []), ...customTools];
-		}
-
-		const processedMessages = applyMessageVariables(data, variables);
-		const [
-			{ model },
-			{ tools, closeAll },
-			{ systemAddendum, skillTools },
-		] = await Promise.all([
-			resolveProviderModel(data, environment),
-			prepareMCPServers(data, environment, mcp_options),
-			prepareSkills(data),
-		]);
+		const {
+			model,
+			modelId,
+			versionId: preparedVersionId,
+			data,
+			finalMessages,
+			allTools,
+			closeAll,
+			preProcessingTime,
+			runData,
+		} = prepared;
 
 		// Wrap all remaining logic in try-finally to ensure MCP clients are always closed
 		try {
@@ -452,25 +383,6 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				maxStepCount,
 				providerOptions,
 			} = data;
-
-			// Inject the skills catalog into the system message (no-op when no
-			// skills are attached) before appending any extra messages.
-			const messagesWithSkills = applySkillCatalog(
-				processedMessages,
-				systemAddendum,
-			);
-
-			// Append extra messages if provided (used as-is, no variable substitution)
-			const finalMessages = extra_messages
-				? [...messagesWithSkills, ...extra_messages]
-				: messagesWithSkills;
-
-			// Skills win on name collision so the catalog's `read_skill` reference
-			// always routes to the built-in handler.
-			const allTools = { ...tools, ...skillTools };
-
-			runData.request = { ...data, messages: finalMessages, overrides };
-			const preProcessingTime = Date.now() - startTime;
 
 			if (stream) {
 				// Track if stream completed normally (via onFinish or onError)
@@ -511,29 +423,23 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						runData.steps = steps;
 						runData.totalUsage = totalUsage;
 
-						const id = nanoid();
-						await supabase.from("runs").insert({
-							id,
-							workspace_id: workspaceId,
-							version_id: version.id,
-							created_at: new Date(startTime).toISOString(),
-							is_error: false,
-							is_test: false,
-							is_stream: true,
-							pre_processing_time: preProcessingTime,
-							first_token_time: firstTokenTime as number,
-							response_time:
+						await recordRun({
+							workspaceId,
+							versionId: preparedVersionId,
+							startTime,
+							preProcessingTime,
+							firstTokenTime: firstTokenTime as number,
+							responseTime:
 								Date.now() -
 								(firstTokenTime || 0) -
 								preProcessingTime -
 								startTime,
-							tokens: totalUsage.totalTokens,
-							cost: calculateModelCost(
-								typeof model === "string" ? model : model.modelId,
-								totalUsage,
-							),
+							isError: false,
+							isStream: true,
+							modelId,
+							usage: totalUsage,
+							runData,
 						});
-						await uploadRunData(id, runData);
 					},
 					onError: async ({ error }) => {
 						if (streamCompleted) return;
@@ -556,24 +462,22 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 									: undefined,
 						};
 
-						const id = nanoid();
-						await supabase.from("runs").insert({
-							id,
-							workspace_id: workspaceId,
-							version_id: version.id,
-							created_at: new Date(startTime).toISOString(),
-							is_error: true,
-							is_test: false,
-							is_stream: true,
-							pre_processing_time: preProcessingTime,
-							first_token_time: firstTokenTime,
-							response_time:
+						await recordRun({
+							workspaceId,
+							versionId: preparedVersionId,
+							startTime,
+							preProcessingTime,
+							firstTokenTime,
+							responseTime:
 								Date.now() -
 								(firstTokenTime || 0) -
 								preProcessingTime -
 								startTime,
+							isError: true,
+							isStream: true,
+							modelId,
+							runData,
 						});
-						await uploadRunData(id, runData);
 					},
 					onAbort: async ({ steps }) => {
 						if (streamCompleted) return;
@@ -593,29 +497,23 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 							message: "Run aborted by client disconnect",
 						};
 
-						const id = nanoid();
-						await supabase.from("runs").insert({
-							id,
-							workspace_id: workspaceId,
-							version_id: version.id,
-							created_at: new Date(startTime).toISOString(),
-							is_error: true,
-							is_test: false,
-							is_stream: true,
-							pre_processing_time: preProcessingTime,
-							first_token_time: firstTokenTime,
-							response_time:
+						await recordRun({
+							workspaceId,
+							versionId: preparedVersionId,
+							startTime,
+							preProcessingTime,
+							firstTokenTime,
+							responseTime:
 								Date.now() -
 								(firstTokenTime || 0) -
 								preProcessingTime -
 								startTime,
-							tokens: totalUsage.totalTokens,
-							cost: calculateModelCost(
-								typeof model === "string" ? model : model.modelId,
-								totalUsage,
-							),
+							isError: true,
+							isStream: true,
+							modelId,
+							usage: totalUsage,
+							runData,
 						});
-						await uploadRunData(id, runData);
 					},
 				});
 
@@ -679,25 +577,19 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				runData.steps = steps;
 				runData.totalUsage = totalUsage;
 
-				const id = nanoid();
-				await supabase.from("runs").insert({
-					id,
-					workspace_id: workspaceId,
-					version_id: version.id,
-					created_at: new Date(startTime).toISOString(),
-					is_error: false,
-					is_test: false,
-					is_stream: false,
-					pre_processing_time: preProcessingTime,
-					first_token_time: Date.now() - preProcessingTime - startTime,
-					response_time: 0,
-					tokens: totalUsage.totalTokens,
-					cost: calculateModelCost(
-						typeof model === "string" ? model : model.modelId,
-						totalUsage,
-					),
+				await recordRun({
+					workspaceId,
+					versionId: preparedVersionId,
+					startTime,
+					preProcessingTime,
+					firstTokenTime: Date.now() - preProcessingTime - startTime,
+					responseTime: 0,
+					isError: false,
+					isStream: false,
+					modelId,
+					usage: totalUsage,
+					runData,
 				});
-				await uploadRunData(id, runData);
 
 				return reply.send({
 					text,
@@ -718,25 +610,19 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						message: "Run aborted by client disconnect",
 					};
 
-					const id = nanoid();
-					await supabase.from("runs").insert({
-						id,
-						workspace_id: workspaceId,
-						version_id: version.id,
-						created_at: new Date(startTime).toISOString(),
-						is_error: true,
-						is_test: false,
-						is_stream: false,
-						pre_processing_time: preProcessingTime,
-						first_token_time: Date.now() - preProcessingTime - startTime,
-						response_time: 0,
-						tokens: totalUsage.totalTokens,
-						cost: calculateModelCost(
-							typeof model === "string" ? model : model.modelId,
-							totalUsage,
-						),
+					await recordRun({
+						workspaceId,
+						versionId: preparedVersionId,
+						startTime,
+						preProcessingTime,
+						firstTokenTime: Date.now() - preProcessingTime - startTime,
+						responseTime: 0,
+						isError: true,
+						isStream: false,
+						modelId,
+						usage: totalUsage,
+						runData,
 					});
-					await uploadRunData(id, runData);
 					return;
 				}
 
@@ -750,20 +636,18 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 							: undefined,
 				};
 
-				const id = nanoid();
-				await supabase.from("runs").insert({
-					id,
-					workspace_id: workspaceId,
-					version_id: version.id,
-					created_at: new Date(startTime).toISOString(),
-					is_error: true,
-					is_test: false,
-					is_stream: false,
-					pre_processing_time: preProcessingTime,
-					first_token_time: Date.now() - preProcessingTime - startTime,
-					response_time: 0,
+				await recordRun({
+					workspaceId,
+					versionId: preparedVersionId,
+					startTime,
+					preProcessingTime,
+					firstTokenTime: Date.now() - preProcessingTime - startTime,
+					responseTime: 0,
+					isError: true,
+					isStream: false,
+					modelId,
+					runData,
 				});
-				await uploadRunData(id, runData);
 
 				return reply.code(500).send(error);
 			}
