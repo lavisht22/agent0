@@ -30,7 +30,6 @@ declare module "fastify" {
 		userId: string | undefined;
 		tokenId: string | undefined;
 		scopes: string[];
-		allowedOrigins: string[] | null;
 	}
 }
 
@@ -218,8 +217,10 @@ async function authenticateApiKey(
 
 /**
  * Project the resolved principal onto the request. The discrete `userId` /
- * `tokenId` / `scopes` / `allowedOrigins` decorations are kept for now so the
- * existing route handlers keep working unchanged while we migrate.
+ * `tokenId` / `scopes` decorations are kept for now so the existing route
+ * handlers keep working unchanged while we migrate. (Origin enforcement for API
+ * keys happens inside `authenticateApiKey`; no handler reads the allowlist, so
+ * it lives only on the principal.)
  */
 function applyPrincipal(request: FastifyRequest, principal: Principal): void {
 	request.principal = principal;
@@ -227,12 +228,10 @@ function applyPrincipal(request: FastifyRequest, principal: Principal): void {
 		request.userId = principal.userId;
 		request.tokenId = principal.tokenId;
 		request.scopes = principal.scopes;
-		request.allowedOrigins = null;
 	} else {
 		request.userId = undefined;
 		request.tokenId = undefined;
 		request.scopes = principal.scopes;
-		request.allowedOrigins = principal.allowedOrigins;
 	}
 }
 
@@ -263,7 +262,6 @@ export function addAuth(fastify: FastifyInstance) {
 	fastify.decorateRequest("userId", undefined);
 	fastify.decorateRequest("tokenId", undefined);
 	fastify.decorateRequest("scopes", null as unknown as string[]);
-	fastify.decorateRequest("allowedOrigins", null);
 
 	fastify.addHook(
 		"preHandler",
