@@ -1,10 +1,18 @@
+import type { Tables } from "@repo/database";
 import { queryOptions } from "@tanstack/react-query";
 import {
 	computeDateRangeFromPreset,
 	type DateRangeValue,
 } from "@/components/date-range-picker";
+import { api } from "./api-client";
 import { supabase } from "./supabase";
 import type { RunData } from "./types";
+
+// The runner's tags endpoints return this subset of the full row.
+export type Tag = Pick<
+	Tables<"tags">,
+	"id" | "name" | "color" | "workspace_id"
+>;
 
 export const workspacesQuery = queryOptions({
 	queryKey: ["workspaces"],
@@ -82,18 +90,26 @@ export const tagsQuery = (workspaceId: string) =>
 	queryOptions({
 		queryKey: ["tags", workspaceId],
 		queryFn: async () => {
-			const { data, error } = await supabase
-				.from("tags")
-				.select("*")
-				.eq("workspace_id", workspaceId)
-				.order("name", { ascending: true });
-
-			if (error) throw error;
+			const { data } = await api.get<{ data: Tag[] }>(
+				`/api/v1/workspaces/${workspaceId}/tags`,
+			);
 
 			return data;
 		},
 		enabled: !!workspaceId,
 	});
+
+export async function createTag(
+	workspaceId: string,
+	input: { name: string; color: string },
+) {
+	const { data } = await api.post<{ data: Tag }>(
+		`/api/v1/workspaces/${workspaceId}/tags`,
+		input,
+	);
+
+	return data;
+}
 
 export const agentTagsQuery = (agentId: string) =>
 	queryOptions({
