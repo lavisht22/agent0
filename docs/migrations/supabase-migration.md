@@ -1,6 +1,6 @@
 # Supabase → Self-Contained Database Migration
 
-**Status:** Not started
+**Status:** In progress — Phase 1, step 1a complete (runner middleware now accepts the browser-session credential)
 **Goal:** Remove agent0's hard dependency on hosted Supabase so it can be self-hosted with only components that ship in this repo — *without* moving production data until the very end. We peel off the Supabase *platform layers* (data SDK → auth → DB driver) one at a time, keeping Supabase's Postgres as the single source of truth throughout.
 
 > Long, multi-phase migration. Each phase is independently shippable and leaves `main` working. agent0 is **in production with live data**, so the ordering below is deliberately incremental and reversible: **the data never migrates until Phase 4.** Check items off as we go; update the **Status** lines.
@@ -162,14 +162,16 @@ Core stack decided. Remaining decisions are deferred to their phases.
 > The four phases below match the agreed sequence: (1) frontend off the Supabase **data** SDK, (2) replace **auth**, (3) replace the **DB driver** with Drizzle, (4) **package** for self-hosting. Auth (2) and the Drizzle driver (3) share a foundation — see the note in Phase 2.
 
 ### Phase 1 — Frontend off the Supabase data SDK (keep Supabase auth)
-**Status:** Not started
+**Status:** In progress — 1a shipped; 1b/1c not started
 Build the missing runner APIs and route *all* web data access through them. The browser keeps using Supabase **auth** (JWT) but stops touching Postgres for **data**. Non-destructive: schema, RLS, and the Supabase SDK on the runner all stay.
 
-**1a — Teach the runner middleware the browser-session credential**
-- [ ] Define the `Principal` type and refactor `addAuth` into ordered authenticators (browser-session → PAT → API key), all yielding `Principal`.
-- [ ] Add the **browser JWT** authenticator (validate the Supabase access token via `getClaims`), deriving `userId` → workspace role → scopes (reuse `scopesForRole`). Selected when the Bearer token does not start with `agent0_pat_`.
-- [ ] Fold `/internal/test` + `/internal/refresh-mcp` onto the unified middleware (or leave until Phase 2 — decide).
-- [ ] Replace ad-hoc `requireUserId` checks with `principal.kind === "user"`.
+**1a — Teach the runner middleware the browser-session credential** ✅ done
+- [x] Define the `Principal` type and refactor `addAuth` into ordered authenticators (browser-session → PAT → API key), all yielding `Principal`. (`apps/runner/src/lib/auth.ts`)
+- [x] Add the **browser JWT** authenticator (validate the Supabase access token via `getClaims`), deriving `userId` → workspace role → scopes (reuse `scopesForRole` via the shared `resolveUserScopes` helper). Selected when the Bearer token does not start with `agent0_pat_`.
+- [x] **Decided: defer** folding `/internal/test` + `/internal/refresh-mcp` onto the unified middleware to **Phase 2** — they still call `getClaims` directly. Kept 1a tight and reviewable; they get swapped to better-auth verification in Phase 2 anyway (see Phase 2 task "Replace remaining runner `getClaims`").
+- [x] Replace ad-hoc `requireUserId` checks with `principal.kind === "user"` (`apps/runner/src/lib/scopes.ts`). The discrete `request.userId/tokenId/scopes/allowedOrigins` decorations are still populated from the `Principal` so existing route handlers work unchanged.
+
+> **Note for 1b/1c:** the browser-session authenticator only resolves scopes when the route has a `:workspaceId` path param. Unscoped routes (`/me`, `/auth/logout`, `/workspaces` create) get empty scopes — same as PATs today — so those handlers must gate on `principal.kind`/`userId`, not `scopes`. The machine API-key path is untouched.
 
 **1b — Fill the runner API gaps** (enforce scopes + re-implement the matching RLS rule per endpoint; **security review each**)
 - [ ] Providers: create / update / delete (GET exists)
@@ -265,4 +267,4 @@ Only now is moving the actual rows on the table. Bundle Postgres and make self-h
 
 _Append dated entries as phases complete._
 
-- (none yet)
+- **2026-06-04 — Phase 1, step 1a shipped.** Refactored `apps/runner/src/lib/auth.ts`: introduced the `Principal` discriminated union (`kind: "user" | "apiKey"`) and split the monolithic `addAuth` preHandler into three authenticators (browser-session → PAT → API key), each normalizing to a `Principal`. Added the **browser-session authenticator** validating the Supabase JWT via `supabase.auth.getClaims` and resolving scopes through the new shared `resolveUserScopes` helper (also used by the PAT path). Credential dispatch is an O(1) check: `Authorization: Bearer` starting with `agent0_pat_` → PAT, otherwise → browser session; `x-api-key` → API key. Verified PATs are already `agent0_pat_`-prefixed (web generates them so, CLI enforces it), so no existing PAT is misrouted. `requireUserId` now keys off `principal.kind !== "user"` (`scopes.ts`); discrete request decorations still populated for unchanged route handlers. **Deferred** folding `/internal/test` + `/internal/refresh-mcp` to Phase 2. Non-destructive: tsc clean, biome clean, no route/web changes. **Next:** Phase 1b — fill the runner API gaps (providers/mcps/api_keys/PATs/workspaces CRUD + dashboard RPCs), security-reviewing each against its RLS rule.

@@ -3,8 +3,30 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { supabase } from "./db.js";
 import { scopesForRole } from "./scopes.js";
 
+/**
+ * One principal, many credentials. Every authenticator below normalizes its
+ * credential (browser session, PAT, API key) into this single shape; route
+ * handlers depend only on `principal.scopes` (and, for mutations, `kind`),
+ * never on *how* the caller authenticated.
+ *
+ *   - `kind: "user"`   — a human identity. Browser session (Supabase JWT) or
+ *     PAT (`agent0_pat_…`). Scopes are resolved per-request from the user's
+ *     current `workspace_user.role` against the path's workspace.
+ *   - `kind: "apiKey"` — a machine identity. Workspace-pinned, fixed scopes,
+ *     optional origin allowlist. No user.
+ */
+export type Principal =
+	| { kind: "user"; userId: string; tokenId?: string; scopes: string[] }
+	| {
+			kind: "apiKey";
+			workspaceId: string;
+			scopes: string[];
+			allowedOrigins: string[] | null;
+	  };
+
 declare module "fastify" {
 	interface FastifyRequest {
+		principal: Principal | undefined;
 		userId: string | undefined;
 		tokenId: string | undefined;
 		scopes: string[];
@@ -12,32 +34,224 @@ declare module "fastify" {
 	}
 }
 
+/** Bearer tokens with this prefix are PATs; anything else is a browser session. */
+const PAT_PREFIX = "agent0_pat_";
+
 function sha256Hex(input: string): string {
 	return createHash("sha256").update(input).digest("hex");
 }
 
 /**
- * Registers dual authentication on the given Fastify instance.
+ * Outcome of an authenticator. On failure the authenticator has already sent a
+ * reply (so the caller just `return`s); on success it yields a `Principal`.
+ */
+type AuthResult = { ok: true; principal: Principal } | { ok: false };
+
+/**
+ * Resolve a user's effective scopes for the request's target workspace.
  *
- * The workspace a request targets is taken from the `:workspaceId` path
- * param (see the prefix block in routes/index.ts), not from the credential.
+ * The workspace a request targets is taken from the `:workspaceId` path param
+ * (see the prefix block in routes/index.ts), not from the credential. Shared by
+ * the browser-session and PAT authenticators so both derive identical scopes.
  *
- * Order of attempts:
- *   1. `Authorization: Bearer <pat>` — personal access token (user-bound).
- *      Populates userId + scopes derived from the user's current
- *      `workspace_user.role` against the path's workspace (see scopesForRole).
- *      403s if the user isn't a member of that workspace. On unscoped routes
- *      (no path param — e.g. /api/v1/me) the membership check is skipped and
- *      scopes default to empty. Origin allowlist is skipped (PATs are
- *      CLI-issued, no browser origin to validate).
- *   2. `x-api-key: <key>` — API key (workspace-pinned, machine identity).
- *      403s if the path's workspaceId differs from the key's pinned workspace.
- *      Populates scopes + allowedOrigins, leaves userId undefined, enforces
- *      origin allowlist when configured.
+ * Returns the scopes, or `null` if the user isn't a member of the path's
+ * workspace (a 403 has already been sent). On unscoped routes (no path param —
+ * e.g. /api/v1/me) the membership check is skipped and scopes default to empty;
+ * routes there must not depend on `scopes` for resource access.
+ */
+async function resolveUserScopes(
+	request: FastifyRequest,
+	reply: FastifyReply,
+	userId: string,
+): Promise<string[] | null> {
+	const pathWorkspaceId = (request.params as { workspaceId?: string })
+		?.workspaceId;
+
+	if (!pathWorkspaceId) {
+		return [];
+	}
+
+	// Resolve the user's current role in this workspace. A user-kind credential
+	// is only as powerful as the holder's role — demote a user and their browser
+	// sessions and PATs lose access on the next request.
+	const { data: membership, error } = await supabase
+		.from("workspace_user")
+		.select("role")
+		.eq("user_id", userId)
+		.eq("workspace_id", pathWorkspaceId)
+		.maybeSingle();
+
+	if (error || !membership) {
+		reply.code(403).send({ message: "User is not a member of this workspace" });
+		return null;
+	}
+
+	return scopesForRole(membership.role);
+}
+
+/**
+ * Browser session → `kind: "user"`. Validates the Supabase access token and
+ * derives scopes from the user's current workspace role. Selected when the
+ * Bearer token does NOT start with `agent0_pat_`.
+ */
+async function authenticateBrowserSession(
+	request: FastifyRequest,
+	reply: FastifyReply,
+	token: string,
+): Promise<AuthResult> {
+	const { data, error } = await supabase.auth.getClaims(token);
+
+	if (error || !data) {
+		reply.code(401).send({ message: "Invalid token" });
+		return { ok: false };
+	}
+
+	const userId = data.claims.sub;
+
+	const scopes = await resolveUserScopes(request, reply, userId);
+	if (scopes === null) {
+		return { ok: false };
+	}
+
+	return { ok: true, principal: { kind: "user", userId, scopes } };
+}
+
+/**
+ * PAT → `kind: "user"`. Looks up the hashed token, checks revocation/expiry,
+ * then resolves scopes from the holder's current workspace role. Selected when
+ * the Bearer token starts with `agent0_pat_`.
+ */
+async function authenticatePat(
+	request: FastifyRequest,
+	reply: FastifyReply,
+	token: string,
+): Promise<AuthResult> {
+	const tokenHash = sha256Hex(token);
+	const { data: pat, error } = await supabase
+		.from("personal_access_tokens")
+		.select("id, user_id, expires_at, revoked_at")
+		.eq("token_hash", tokenHash)
+		.maybeSingle();
+
+	if (error || !pat) {
+		reply.code(401).send({ message: "Invalid token" });
+		return { ok: false };
+	}
+	if (pat.revoked_at !== null) {
+		reply.code(401).send({ message: "Token has been revoked" });
+		return { ok: false };
+	}
+	if (
+		pat.expires_at !== null &&
+		new Date(pat.expires_at).getTime() <= Date.now()
+	) {
+		reply.code(401).send({ message: "Token has expired" });
+		return { ok: false };
+	}
+
+	const scopes = await resolveUserScopes(request, reply, pat.user_id);
+	if (scopes === null) {
+		return { ok: false };
+	}
+
+	void supabase
+		.from("personal_access_tokens")
+		.update({ last_used_at: new Date().toISOString() })
+		.eq("id", pat.id);
+
+	return {
+		ok: true,
+		principal: { kind: "user", userId: pat.user_id, tokenId: pat.id, scopes },
+	};
+}
+
+/**
+ * API key → `kind: "apiKey"`. Workspace-pinned machine identity on the distinct
+ * `x-api-key` header. 403s if the path's workspace differs from the key's pinned
+ * workspace, and enforces the origin allowlist when configured.
+ */
+async function authenticateApiKey(
+	request: FastifyRequest,
+	reply: FastifyReply,
+	apiKey: string,
+): Promise<AuthResult> {
+	const { data: apiKeyData, error } = await supabase
+		.from("api_keys")
+		.select("workspace_id, scopes, allowed_origins")
+		.eq("key", apiKey)
+		.single();
+
+	if (error || !apiKeyData) {
+		reply.code(403).send({ message: "Invalid API key" });
+		return { ok: false };
+	}
+
+	const pathWorkspaceId = (request.params as { workspaceId?: string })
+		?.workspaceId;
+	if (pathWorkspaceId && pathWorkspaceId !== apiKeyData.workspace_id) {
+		reply
+			.code(403)
+			.send({ message: "API key is not scoped to this workspace" });
+		return { ok: false };
+	}
+
+	const allowedOrigins = apiKeyData.allowed_origins ?? null;
+
+	if (allowedOrigins && allowedOrigins.length > 0) {
+		const origin = request.headers.origin as string | undefined;
+		if (!origin || !allowedOrigins.includes(origin)) {
+			reply.code(403).send({ message: "Origin not allowed for this API key" });
+			return { ok: false };
+		}
+	}
+
+	return {
+		ok: true,
+		principal: {
+			kind: "apiKey",
+			workspaceId: apiKeyData.workspace_id,
+			scopes: apiKeyData.scopes ?? [],
+			allowedOrigins,
+		},
+	};
+}
+
+/**
+ * Project the resolved principal onto the request. The discrete `userId` /
+ * `tokenId` / `scopes` / `allowedOrigins` decorations are kept for now so the
+ * existing route handlers keep working unchanged while we migrate.
+ */
+function applyPrincipal(request: FastifyRequest, principal: Principal): void {
+	request.principal = principal;
+	if (principal.kind === "user") {
+		request.userId = principal.userId;
+		request.tokenId = principal.tokenId;
+		request.scopes = principal.scopes;
+		request.allowedOrigins = null;
+	} else {
+		request.userId = undefined;
+		request.tokenId = undefined;
+		request.scopes = principal.scopes;
+		request.allowedOrigins = principal.allowedOrigins;
+	}
+}
+
+/**
+ * Registers authentication on the given Fastify instance.
+ *
+ * The middleware is an ordered list of authenticators (Passport-style
+ * strategies); the credential present on the request selects which one runs,
+ * and the winner is normalized to a single `Principal`:
+ *
+ *   1. `Authorization: Bearer <token>`
+ *        - starts with `agent0_pat_` → PAT          → kind "user"
+ *        - otherwise                 → browser session (Supabase JWT) → kind "user"
+ *   2. `x-api-key: <key>`            → API key       → kind "apiKey"
  *
  * If a bearer token is present but invalid/expired/revoked, the request is
- * rejected with 401 — we do not fall through to the API-key path, since
- * silently masking token issues would be confusing.
+ * rejected (we do not fall through to the API-key path, since silently masking
+ * token issues would be confusing). Discrimination is a clean prefix/header
+ * check — no shape-sniffing.
  *
  * Per-route scope checks: see `requireScope` / `checkScope` in ./scopes.js.
  * Mutating endpoints should chain `requireUserId` to keep API keys out.
@@ -45,6 +259,7 @@ function sha256Hex(input: string): string {
  * Call this directly on a scoped instance — not via fastify.register().
  */
 export function addAuth(fastify: FastifyInstance) {
+	fastify.decorateRequest("principal", undefined);
 	fastify.decorateRequest("userId", undefined);
 	fastify.decorateRequest("tokenId", undefined);
 	fastify.decorateRequest("scopes", null as unknown as string[]);
@@ -55,108 +270,36 @@ export function addAuth(fastify: FastifyInstance) {
 		async (request: FastifyRequest, reply: FastifyReply) => {
 			const authHeader = request.headers.authorization;
 
+			let result: AuthResult;
+
 			if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
 				const token = authHeader.slice("Bearer ".length).trim();
 				if (!token) {
 					return reply.code(401).send({ message: "Empty bearer token" });
 				}
 
-				const tokenHash = sha256Hex(token);
-				const { data: pat, error } = await supabase
-					.from("personal_access_tokens")
-					.select("id, user_id, expires_at, revoked_at")
-					.eq("token_hash", tokenHash)
-					.maybeSingle();
+				result = token.startsWith(PAT_PREFIX)
+					? await authenticatePat(request, reply, token)
+					: await authenticateBrowserSession(request, reply, token);
+			} else {
+				const apiKey = request.headers["x-api-key"] as string | undefined;
 
-				if (error || !pat) {
-					return reply.code(401).send({ message: "Invalid token" });
-				}
-				if (pat.revoked_at !== null) {
-					return reply.code(401).send({ message: "Token has been revoked" });
-				}
-				if (
-					pat.expires_at !== null &&
-					new Date(pat.expires_at).getTime() <= Date.now()
-				) {
-					return reply.code(401).send({ message: "Token has expired" });
+				if (!apiKey) {
+					return reply.code(401).send({
+						message:
+							"Authentication required (Authorization: Bearer or x-api-key)",
+					});
 				}
 
-				request.userId = pat.user_id;
-				request.tokenId = pat.id;
-				request.allowedOrigins = null;
+				result = await authenticateApiKey(request, reply, apiKey);
+			}
 
-				const pathWorkspaceId = (request.params as { workspaceId?: string })
-					?.workspaceId;
-
-				if (pathWorkspaceId) {
-					// Resolve the user's current role in this workspace. A PAT is
-					// only as powerful as its holder's role — demote a user and
-					// their PATs lose access on the next request.
-					const { data: membership, error: membershipError } = await supabase
-						.from("workspace_user")
-						.select("role")
-						.eq("user_id", pat.user_id)
-						.eq("workspace_id", pathWorkspaceId)
-						.maybeSingle();
-
-					if (membershipError || !membership) {
-						return reply.code(403).send({
-							message: "User is not a member of this workspace",
-						});
-					}
-
-					request.scopes = scopesForRole(membership.role);
-				} else {
-					// Unscoped route (e.g. /api/v1/me, /api/v1/auth/logout).
-					// No workspace context — routes here must not depend on
-					// request.scopes for resource access.
-					request.scopes = [];
-				}
-
-				void supabase
-					.from("personal_access_tokens")
-					.update({ last_used_at: new Date().toISOString() })
-					.eq("id", pat.id);
+			// Authenticator already sent the failure reply.
+			if (!result.ok) {
 				return;
 			}
 
-			const apiKey = request.headers["x-api-key"] as string | undefined;
-
-			if (!apiKey) {
-				return reply.code(401).send({
-					message:
-						"Authentication required (Authorization: Bearer or x-api-key)",
-				});
-			}
-
-			const { data: apiKeyData, error } = await supabase
-				.from("api_keys")
-				.select("workspace_id, scopes, allowed_origins")
-				.eq("key", apiKey)
-				.single();
-
-			if (error || !apiKeyData) {
-				return reply.code(403).send({ message: "Invalid API key" });
-			}
-
-			const pathWorkspaceId = (request.params as { workspaceId?: string })?.workspaceId;
-			if (pathWorkspaceId && pathWorkspaceId !== apiKeyData.workspace_id) {
-				return reply.code(403).send({ message: "API key is not scoped to this workspace" });
-			}
-
-			request.userId = undefined;
-			request.tokenId = undefined;
-			request.scopes = apiKeyData.scopes ?? [];
-			request.allowedOrigins = apiKeyData.allowed_origins ?? null;
-
-			if (request.allowedOrigins && request.allowedOrigins.length > 0) {
-				const origin = request.headers.origin as string | undefined;
-				if (!origin || !request.allowedOrigins.includes(origin)) {
-					return reply
-						.code(403)
-						.send({ message: "Origin not allowed for this API key" });
-				}
-			}
+			applyPrincipal(request, result.principal);
 		},
 	);
 }
