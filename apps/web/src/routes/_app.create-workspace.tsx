@@ -10,9 +10,8 @@ import {
 } from "@heroui/react";
 import { useMutation } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { nanoid } from "nanoid";
 import { useState } from "react";
-import { supabase } from "../lib/supabase";
+import { createWorkspace } from "../lib/queries";
 
 export const Route = createFileRoute("/_app/create-workspace")({
 	component: RouteComponent,
@@ -23,25 +22,8 @@ function RouteComponent() {
 
 	const [name, setName] = useState("");
 
-	const createWorkspace = useMutation({
-		mutationFn: async (name: string) => {
-			const id = nanoid();
-
-			const { data, error } = await supabase
-				.from("workspaces")
-				.insert({
-					id,
-					name,
-				})
-				.select()
-				.single();
-
-			if (error) {
-				throw error;
-			}
-
-			return data;
-		},
+	const createWorkspaceMutation = useMutation({
+		mutationFn: (name: string) => createWorkspace(name),
 		onError: (error) => {
 			toast.danger(
 				error instanceof Error ? error.message : "Failed to create workspace.",
@@ -55,7 +37,7 @@ function RouteComponent() {
 
 	const handleCreateWorkspace = async (e: React.FormEvent) => {
 		e.preventDefault();
-		createWorkspace.mutate(name);
+		createWorkspaceMutation.mutate(name);
 	};
 
 	return (
@@ -78,7 +60,7 @@ function RouteComponent() {
 					<Button
 						type="submit"
 						variant="primary"
-						isPending={createWorkspace.isPending}
+						isPending={createWorkspaceMutation.isPending}
 						size="lg"
 						className="w-full"
 					>

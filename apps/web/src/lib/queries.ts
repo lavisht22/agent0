@@ -14,18 +14,74 @@ export type Tag = Pick<
 	"id" | "name" | "color" | "workspace_id"
 >;
 
+// The runner returns a flat per-membership view (the caller's role in each
+// workspace), not the nested member roster the old direct query embedded.
+// Member rosters now come from `membersQuery`.
+export type Workspace = {
+	id: string;
+	name: string;
+	role: "admin" | "writer" | "reader";
+	created_at: string;
+};
+
+export type WorkspaceMember = {
+	user_id: string;
+	role: "admin" | "writer" | "reader";
+	created_at: string;
+	updated_at: string;
+	user: { id: string; name: string | null } | null;
+};
+
 export const workspacesQuery = queryOptions({
 	queryKey: ["workspaces"],
 	queryFn: async () => {
-		const { data, error } = await supabase
-			.from("workspaces")
-			.select("*, workspace_user(*, users(*))");
-
-		if (error) throw error;
+		const { data } = await api.get<{ data: Workspace[] }>("/api/v1/workspaces");
 
 		return data;
 	},
 });
+
+export const membersQuery = (workspaceId: string) =>
+	queryOptions({
+		queryKey: ["workspace-members", workspaceId],
+		queryFn: async () => {
+			const { data } = await api.get<{ data: WorkspaceMember[] }>(
+				`/api/v1/workspaces/${workspaceId}/members`,
+			);
+
+			return data;
+		},
+		enabled: !!workspaceId,
+	});
+
+export async function createWorkspace(name: string) {
+	const { data } = await api.post<{ data: Workspace }>("/api/v1/workspaces", {
+		name,
+	});
+
+	return data;
+}
+
+export async function updateWorkspace(workspaceId: string, name: string) {
+	const { data } = await api.patch<{ data: Workspace }>(
+		`/api/v1/workspaces/${workspaceId}`,
+		{ name },
+	);
+
+	return data;
+}
+
+export async function deleteWorkspace(workspaceId: string) {
+	await api.delete(`/api/v1/workspaces/${workspaceId}`);
+}
+
+// Remove a member (admin) or leave the workspace (self).
+export async function removeWorkspaceMember(
+	workspaceId: string,
+	userId: string,
+) {
+	await api.delete(`/api/v1/workspaces/${workspaceId}/members/${userId}`);
+}
 
 // The runner derives `has_staging_config` from the encrypted blob and never
 // returns the blobs themselves on the list/CRUD endpoints.
@@ -553,6 +609,8 @@ export const workspaceUserQuery = (workspaceId: string) =>
 	queryOptions({
 		queryKey: ["workspace-user", workspaceId],
 		queryFn: async () => {
+			// Identity (id + email) comes from the Supabase session — auth stays on
+			// Supabase until Phase 2. Role + display name come from the members API.
 			const { data: claimsData, error: claimsError } =
 				await supabase.auth.getClaims();
 
@@ -562,29 +620,20 @@ export const workspaceUserQuery = (workspaceId: string) =>
 
 			if (!claims?.sub) throw new Error("User not found");
 
-			const { data: user, error: userError } = await supabase
-				.from("users")
-				.select("*")
-				.eq("id", claims.sub)
-				.single();
+			const { data: members } = await api.get<{ data: WorkspaceMember[] }>(
+				`/api/v1/workspaces/${workspaceId}/members`,
+			);
 
-			if (userError) throw userError;
+			const me = members.find((m) => m.user_id === claims.sub);
 
-			const { data: workspaceUser, error: workspaceUserError } = await supabase
-				.from("workspace_user")
-				.select("*")
-				.eq("workspace_id", workspaceId)
-				.eq("user_id", claims.sub)
-				.single();
-
-			if (workspaceUserError) throw workspaceUserError;
+			if (!me) throw new Error("User not found");
 
 			return {
-				id: user.id,
-				name: user.name,
+				id: claims.sub,
+				name: me.user?.name ?? null,
 				email: claims.email,
-				workspace_id: workspaceUser.workspace_id,
-				role: workspaceUser.role,
+				workspace_id: workspaceId,
+				role: me.role,
 			};
 		},
 		enabled: !!workspaceId,
