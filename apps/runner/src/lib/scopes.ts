@@ -105,7 +105,7 @@ export async function requireUserId(
 	request: FastifyRequest,
 	reply: FastifyReply,
 ) {
-	if (request.userId === undefined) {
+	if (request.principal?.kind !== "user") {
 		return reply.code(403).send({
 			message:
 				"This endpoint requires a personal access token; API keys cannot mutate state",
