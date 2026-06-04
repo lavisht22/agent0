@@ -324,22 +324,64 @@ export const agentVersionsQuery = (agentId: string) =>
 		enabled: !!agentId,
 	});
 
+// API keys are an admin-only resource; the row holds the plaintext `key` (only
+// shown once on create, redacted thereafter in the list).
+export type ApiKey = {
+	id: string;
+	key: string;
+	name: string;
+	scopes: string[];
+	allowed_origins: string[] | null;
+	user_id: string;
+	workspace_id: string;
+	created_at: string;
+};
+
 export const apiKeysQuery = (workspaceId: string) =>
 	queryOptions({
 		queryKey: ["api-keys", workspaceId],
 		queryFn: async () => {
-			const { data, error } = await supabase
-				.from("api_keys")
-				.select("*")
-				.eq("workspace_id", workspaceId)
-				.order("created_at", { ascending: false });
-
-			if (error) throw error;
+			const { data } = await api.get<{ data: ApiKey[] }>(
+				`/api/v1/workspaces/${workspaceId}/api-keys`,
+			);
 
 			return data;
 		},
 		enabled: !!workspaceId,
 	});
+
+// The runner mints the key server-side and sets the owner from the caller; an
+// empty `allowed_origins` is normalized to null ("any origin"). The returned row
+// carries the plaintext `key` for the one-time reveal.
+export async function createApiKey(
+	workspaceId: string,
+	input: { name: string; scopes: string[]; allowed_origins: string[] },
+) {
+	const { data } = await api.post<{ data: ApiKey }>(
+		`/api/v1/workspaces/${workspaceId}/api-keys`,
+		input,
+	);
+
+	return data;
+}
+
+// key/owner/workspace are immutable; only name/scopes/origins are editable.
+export async function updateApiKey(
+	workspaceId: string,
+	apiKeyId: string,
+	input: { name?: string; scopes?: string[]; allowed_origins?: string[] },
+) {
+	const { data } = await api.patch<{ data: ApiKey }>(
+		`/api/v1/workspaces/${workspaceId}/api-keys/${apiKeyId}`,
+		input,
+	);
+
+	return data;
+}
+
+export async function deleteApiKey(workspaceId: string, apiKeyId: string) {
+	await api.delete(`/api/v1/workspaces/${workspaceId}/api-keys/${apiKeyId}`);
+}
 
 // PATs are user-bound (not workspace-bound) and RLS restricts this to the
 // caller's own tokens, so no workspace filter is needed.

@@ -16,8 +16,7 @@ import { ConfirmationModal } from "@/components/confirmation-modal";
 import IDCopy from "@/components/id-copy";
 import { PageHeader } from "@/components/page-header";
 
-import { apiKeysQuery, workspacesQuery } from "@/lib/queries";
-import { supabase } from "@/lib/supabase";
+import { apiKeysQuery, deleteApiKey, workspacesQuery } from "@/lib/queries";
 
 export const Route = createFileRoute("/_app/workspace/$workspaceId/api-keys/")({
 	component: RouteComponent,
@@ -45,14 +44,7 @@ function RouteComponent() {
 
 	// Delete mutation
 	const deleteMutation = useMutation({
-		mutationFn: async (keyId: string) => {
-			const { error } = await supabase
-				.from("api_keys")
-				.delete()
-				.eq("id", keyId);
-
-			if (error) throw error;
-		},
+		mutationFn: (keyId: string) => deleteApiKey(workspaceId, keyId),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["api-keys", workspaceId] });
 			toast.success("API key deleted successfully.");
