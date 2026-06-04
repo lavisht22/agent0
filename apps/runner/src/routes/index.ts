@@ -5,6 +5,7 @@ import { registerApiKeysRoutes } from "./api-keys.js";
 import { registerAuthRoutes } from "./auth.js";
 import { registerEmbedRoutes } from "./embed.js";
 import { registerMcpsRoutes } from "./mcps.js";
+import { registerPersonalAccessTokensRoutes } from "./personal-access-tokens.js";
 import { registerProvidersRoutes } from "./providers.js";
 import { registerRefreshMCPRoute } from "./refresh-mcp.js";
 import { registerRunsRoutes } from "./runs.js";
@@ -42,5 +43,6 @@ export async function registerRoutes(fastify: FastifyInstance) {
 
 		await registerAuthRoutes(scoped);
 		await registerWorkspacesRoute(scoped);
+		await registerPersonalAccessTokensRoutes(scoped);
 	});
 }
