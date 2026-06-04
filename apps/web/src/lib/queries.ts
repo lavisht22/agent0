@@ -27,27 +27,73 @@ export const workspacesQuery = queryOptions({
 	},
 });
 
+// The runner derives `has_staging_config` from the encrypted blob and never
+// returns the blobs themselves on the list/CRUD endpoints.
+export type Provider = {
+	id: string;
+	name: string;
+	type: string;
+	has_staging_config: boolean;
+	created_at: string;
+	updated_at: string;
+};
+
 export const providersQuery = (workspaceId: string) =>
 	queryOptions({
 		queryKey: ["providers", workspaceId],
 		queryFn: async () => {
-			const { data, error } = await supabase
-				.from("providers")
-				.select(
-					"id, name, type, created_at, updated_at, encrypted_data_staging",
-				)
-				.eq("workspace_id", workspaceId)
-				.order("created_at", { ascending: false });
+			const { data } = await api.get<{ data: Provider[] }>(
+				`/api/v1/workspaces/${workspaceId}/providers`,
+			);
 
-			if (error) throw error;
-
-			return data.map(({ encrypted_data_staging, ...rest }) => ({
-				...rest,
-				has_staging_config: !!encrypted_data_staging,
-			}));
+			return data;
 		},
 		enabled: !!workspaceId,
 	});
+
+// Config blobs are PGP-encrypted in the browser; the API only ever sees the
+// armored ciphertext. `encrypted_data_staging: null` clears the staging override.
+export async function createProvider(
+	workspaceId: string,
+	input: {
+		name: string;
+		type: string;
+		encrypted_data_production: string;
+		encrypted_data_staging: string | null;
+	},
+) {
+	const { data } = await api.post<{ data: Provider }>(
+		`/api/v1/workspaces/${workspaceId}/providers`,
+		input,
+	);
+
+	return data;
+}
+
+// Partial update: omit a field to leave it untouched. Pass
+// `encrypted_data_staging: null` to clear the staging override. The runner
+// stamps `updated_at`, so the caller never sends it.
+export async function updateProvider(
+	workspaceId: string,
+	providerId: string,
+	input: {
+		name?: string;
+		type?: string;
+		encrypted_data_production?: string;
+		encrypted_data_staging?: string | null;
+	},
+) {
+	const { data } = await api.patch<{ data: Provider }>(
+		`/api/v1/workspaces/${workspaceId}/providers/${providerId}`,
+		input,
+	);
+
+	return data;
+}
+
+export async function deleteProvider(workspaceId: string, providerId: string) {
+	await api.delete(`/api/v1/workspaces/${workspaceId}/providers/${providerId}`);
+}
 
 export const mcpsQuery = (workspaceId: string) =>
 	queryOptions({

@@ -15,14 +15,12 @@ import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Pencil, ShieldAlert } from "lucide-react";
-import { nanoid } from "nanoid";
 import * as openpgp from "openpgp";
 import { useState } from "react";
 import { MonacoJsonField } from "@/components/monaco-json-field";
 import { PageHeader } from "@/components/page-header";
 import { PROVIDER_TYPES } from "@/lib/providers";
-import { providersQuery } from "@/lib/queries";
-import { supabase } from "@/lib/supabase";
+import { createProvider, providersQuery, updateProvider } from "@/lib/queries";
 
 export const Route = createFileRoute(
 	"/_app/workspace/$workspaceId/providers/$providerId",
@@ -110,16 +108,12 @@ function RouteComponent() {
 				? await encryptConfig(values.data_staging)
 				: null;
 
-			const { error } = await supabase.from("providers").insert({
-				id: nanoid(),
+			await createProvider(workspaceId, {
 				name: values.name,
 				type: values.type,
 				encrypted_data_production,
 				encrypted_data_staging,
-				workspace_id: workspaceId,
 			});
-
-			if (error) throw error;
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["providers", workspaceId] });
@@ -146,10 +140,14 @@ function RouteComponent() {
 			updateProduction: boolean;
 			updateStaging: boolean;
 		}) => {
-			const updatePayload: Record<string, unknown> = {
+			const updatePayload: {
+				name: string;
+				type: string;
+				encrypted_data_production?: string;
+				encrypted_data_staging?: string | null;
+			} = {
 				name: values.name,
 				type: values.type,
-				updated_at: new Date().toISOString(),
 			};
 
 			if (values.updateProduction) {
@@ -169,12 +167,7 @@ function RouteComponent() {
 				updatePayload.encrypted_data_staging = null;
 			}
 
-			const { error } = await supabase
-				.from("providers")
-				.update(updatePayload)
-				.eq("id", providerId);
-
-			if (error) throw error;
+			await updateProvider(workspaceId, providerId, updatePayload);
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["providers", workspaceId] });

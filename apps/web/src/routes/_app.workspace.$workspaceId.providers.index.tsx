@@ -15,8 +15,11 @@ import { ConfirmationModal } from "@/components/confirmation-modal";
 import IDCopy from "@/components/id-copy";
 import { PageHeader } from "@/components/page-header";
 import { PROVIDER_TYPES } from "@/lib/providers";
-import { providersQuery, workspaceUserQuery } from "@/lib/queries";
-import { supabase } from "@/lib/supabase";
+import {
+	deleteProvider,
+	providersQuery,
+	workspaceUserQuery,
+} from "@/lib/queries";
 
 export const Route = createFileRoute("/_app/workspace/$workspaceId/providers/")(
 	{
@@ -42,14 +45,7 @@ function RouteComponent() {
 
 	// Delete mutation
 	const deleteMutation = useMutation({
-		mutationFn: async (providerId: string) => {
-			const { error } = await supabase
-				.from("providers")
-				.delete()
-				.eq("id", providerId);
-
-			if (error) throw error;
-		},
+		mutationFn: (providerId: string) => deleteProvider(workspaceId, providerId),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["providers", workspaceId] });
 			toast.success("Provider deleted successfully.");
