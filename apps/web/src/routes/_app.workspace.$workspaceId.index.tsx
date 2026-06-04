@@ -317,9 +317,7 @@ function RouteComponent() {
 										<ListBox.Item
 											key={run.id}
 											id={run.id}
-											textValue={
-												run.agent_versions?.agents?.name || "Unknown Agent"
-											}
+											textValue={run.agent?.name || "Unknown Agent"}
 											className="px-4 py-3"
 											onAction={() =>
 												navigate({
@@ -348,8 +346,7 @@ function RouteComponent() {
 													)}
 													<div className="flex flex-col min-w-0">
 														<span className="text-sm font-medium truncate">
-															{run.agent_versions?.agents?.name ||
-																"Unknown Agent"}
+															{run.agent?.name || "Unknown Agent"}
 														</span>
 														<span className="text-xs text-muted truncate">
 															{format(run.created_at, "MMM d, h:mm a")}

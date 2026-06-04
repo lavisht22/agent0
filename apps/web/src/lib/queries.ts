@@ -477,6 +477,29 @@ export async function revokePersonalAccessToken(tokenId: string) {
 	await api.delete(`/api/v1/personal-access-tokens/${tokenId}`);
 }
 
+// The runner flattens the version/agent embed to a single `agent` ref and (on
+// the detail endpoint) inlines the run-log blob as `run_data`.
+export type RunListItem = {
+	id: string;
+	version_id: string | null;
+	parent_run_id: string | null;
+	is_error: boolean;
+	is_test: boolean;
+	is_stream: boolean | null;
+	cost: number | null;
+	tokens: number | null;
+	response_time: number;
+	first_token_time: number;
+	pre_processing_time: number;
+	created_at: string;
+	agent: { id: string; name: string | null } | null;
+};
+
+export type RunDetail = RunListItem & {
+	workspace_id: string;
+	run_data: RunData | null;
+};
+
 export const runsQuery = (
 	workspaceId: string,
 	page: number,
@@ -498,20 +521,8 @@ export const runsQuery = (
 			status,
 		],
 		queryFn: async () => {
-			// Inner join only when filtering by a specific agent (untagged runs
-			// don't belong to any agent). Otherwise left join so runs from unsaved
-			// agents (null version_id) still appear in the list.
-			let query = supabase
-				.from("runs")
-				.select(
-					agentId
-						? "*, agent_versions!inner(id, agent_id, agents:agent_id(name))"
-						: "*, agent_versions(id, agent_id, agents:agent_id(name))",
-				)
-				.eq("workspace_id", workspaceId);
-
-			// Compute date range at query time
-			// For presets, this ensures we always query with fresh dates
+			// Compute date range at query time. For presets, this ensures we always
+			// query with fresh dates.
 			let dateRange: { from: string; to: string } | null = null;
 			if (dateFilter.datePreset) {
 				dateRange = computeDateRangeFromPreset(dateFilter.datePreset);
@@ -519,47 +530,32 @@ export const runsQuery = (
 				dateRange = { from: dateFilter.startDate, to: dateFilter.endDate };
 			}
 
-			// Apply date filtering if computed
-			if (dateRange) {
-				query = query.gte("created_at", dateRange.from);
-				query = query.lte("created_at", dateRange.to);
-			}
-
-			// Apply agent filtering if provided
-			if (agentId) {
-				query = query.eq("agent_versions.agent_id", agentId);
-			}
-
-			// Apply status filtering if provided
-			if (status === "success") {
-				query = query.eq("is_error", false);
-			} else if (status === "failed") {
-				query = query.eq("is_error", true);
-			}
-
-			query = query
-				.order("created_at", { ascending: false })
-				.range((page - 1) * 20, page * 20);
-
-			const { data, error } = await query;
-
-			if (error) throw error;
+			const { data } = await api.get<{ data: RunListItem[] }>(
+				`/api/v1/workspaces/${workspaceId}/runs`,
+				{
+					query: {
+						page,
+						limit: 20,
+						agent_id: agentId,
+						status,
+						start_date: dateRange?.from,
+						end_date: dateRange?.to,
+					},
+				},
+			);
 
 			return data;
 		},
 		enabled: !!workspaceId,
 	});
 
-export const runQuery = (runId: string) =>
+export const runQuery = (workspaceId: string, runId: string) =>
 	queryOptions({
 		queryKey: ["run", runId],
 		queryFn: async () => {
-			const { data } = await supabase
-				.from("runs")
-				.select("*, agent_versions(id, agents:agent_id(id, name))")
-				.eq("id", runId)
-				.single()
-				.throwOnError();
+			const { data } = await api.get<{ data: RunDetail }>(
+				`/api/v1/workspaces/${workspaceId}/runs/${runId}`,
+			);
 
 			return data;
 		},
@@ -567,42 +563,23 @@ export const runQuery = (runId: string) =>
 	});
 
 // Runs invoked by this run via an agent-as-tool (parent_run_id == runId).
-export const childRunsQuery = (parentRunId: string | null | undefined) =>
+export const childRunsQuery = (
+	workspaceId: string,
+	parentRunId: string | null | undefined,
+) =>
 	queryOptions({
 		queryKey: ["child-runs", parentRunId],
 		queryFn: async () => {
-			const { data, error } = await supabase
-				.from("runs")
-				.select(
-					"id, is_error, is_test, created_at, agent_versions(id, agents:agent_id(name))",
-				)
-				.eq("parent_run_id", parentRunId as string)
-				.order("created_at", { ascending: true });
+			const { data } = await api.get<{ data: RunListItem[] }>(
+				`/api/v1/workspaces/${workspaceId}/runs`,
+				{ query: { parent_run_id: parentRunId } },
+			);
 
-			if (error) throw error;
-
-			return data;
+			// The runner returns newest-first; sub-runs read better in call order
+			// (oldest-first), matching the old ascending sort.
+			return [...data].reverse();
 		},
-		enabled: !!parentRunId,
-	});
-
-export const runDataQuery = (runId: string) =>
-	queryOptions({
-		queryKey: ["run-data", runId],
-		queryFn: async () => {
-			const { data: runData, error: runDataError } = await supabase.storage
-				.from("runs-data")
-				.download(`${runId}`);
-
-			if (runDataError) throw runDataError;
-
-			// Convert blob into string and parse as JSON
-			const runDataString = await runData.text();
-			const data = JSON.parse(runDataString) as RunData;
-
-			return data;
-		},
-		enabled: !!runId,
+		enabled: !!workspaceId && !!parentRunId,
 	});
 
 export const workspaceUserQuery = (workspaceId: string) =>
@@ -660,25 +637,21 @@ export const dashboardStatsQuery = (
 				dateRange = { from: dateFilter.startDate, to: dateFilter.endDate };
 			}
 
-			// Use RPC function to calculate stats at database level (avoids 1000 row limit)
-			const { data, error } = await supabase.rpc("get_dashboard_stats", {
-				p_workspace_id: workspaceId,
-				p_start_date: dateRange?.from,
-				p_end_date: dateRange?.to,
+			// The runner proxies the get_dashboard_stats Postgres function so the
+			// aggregation still happens DB-side (no 1000-row cap).
+			const { data: stats } = await api.get<{
+				data: {
+					total_runs: number;
+					successful_runs: number;
+					failed_runs: number;
+					success_rate: number;
+					total_cost: number;
+					total_tokens: number;
+					avg_response_time: number;
+				};
+			}>(`/api/v1/workspaces/${workspaceId}/dashboard/stats`, {
+				query: { start_date: dateRange?.from, end_date: dateRange?.to },
 			});
-
-			if (error) throw error;
-
-			// Parse the response - RPC returns json object
-			const stats = data as {
-				total_runs: number;
-				successful_runs: number;
-				failed_runs: number;
-				success_rate: number;
-				total_cost: number;
-				total_tokens: number;
-				avg_response_time: number;
-			};
 
 			return {
 				totalRuns: stats.total_runs,
@@ -697,15 +670,10 @@ export const recentRunsQuery = (workspaceId: string) =>
 	queryOptions({
 		queryKey: ["recent-runs", workspaceId],
 		queryFn: async () => {
-			// Left join so runs from unsaved agents (null version_id) still appear.
-			const { data, error } = await supabase
-				.from("runs")
-				.select("*, agent_versions(id, agent_id, agents:agent_id(name))")
-				.eq("workspace_id", workspaceId)
-				.order("created_at", { ascending: false })
-				.limit(5);
-
-			if (error) throw error;
+			const { data } = await api.get<{ data: RunListItem[] }>(
+				`/api/v1/workspaces/${workspaceId}/runs`,
+				{ query: { page: 1, limit: 5 } },
+			);
 
 			return data;
 		},
@@ -733,26 +701,25 @@ export const topAgentsQuery = (
 				dateRange = { from: dateFilter.startDate, to: dateFilter.endDate };
 			}
 
-			// Use RPC function to aggregate at database level (avoids 1000 row limit)
-			const { data, error } = await supabase.rpc("get_top_agents", {
-				p_workspace_id: workspaceId,
-				p_start_date: dateRange?.from,
-				p_end_date: dateRange?.to,
-				p_limit: 5,
+			// The runner proxies the get_top_agents Postgres function (DB-side
+			// aggregation, no 1000-row cap).
+			const { data } = await api.get<{
+				data: Array<{
+					id: string;
+					name: string;
+					runs: number;
+					errors: number;
+					cost: number;
+				}>;
+			}>(`/api/v1/workspaces/${workspaceId}/dashboard/top-agents`, {
+				query: {
+					start_date: dateRange?.from,
+					end_date: dateRange?.to,
+					limit: 5,
+				},
 			});
 
-			if (error) throw error;
-
-			// Parse the response - RPC returns json array
-			const agents = data as Array<{
-				id: string;
-				name: string;
-				runs: number;
-				errors: number;
-				cost: number;
-			}>;
-
-			return agents;
+			return data;
 		},
 		enabled: !!workspaceId,
 	});
