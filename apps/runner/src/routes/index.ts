@@ -3,6 +3,7 @@ import { addAuth } from "../lib/auth.js";
 import { registerAgentRoutes } from "./agents.js";
 import { registerApiKeysRoutes } from "./api-keys.js";
 import { registerAuthRoutes } from "./auth.js";
+import { registerDashboardRoutes } from "./dashboard.js";
 import { registerEmbedRoutes } from "./embed.js";
 import { registerMcpsRoutes } from "./mcps.js";
 import { registerPersonalAccessTokensRoutes } from "./personal-access-tokens.js";
@@ -37,6 +38,7 @@ export async function registerRoutes(fastify: FastifyInstance) {
 				await registerProvidersRoutes(workspaceScoped);
 				await registerMcpsRoutes(workspaceScoped);
 				await registerApiKeysRoutes(workspaceScoped);
+				await registerDashboardRoutes(workspaceScoped);
 			},
 			{ prefix: "/api/v1/workspaces/:workspaceId" },
 		);
