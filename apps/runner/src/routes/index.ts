@@ -1,16 +1,17 @@
 import type { FastifyInstance } from "fastify";
 import { addAuth } from "../lib/auth.js";
 import { registerAgentRoutes } from "./agents.js";
+import { registerApiKeysRoutes } from "./api-keys.js";
 import { registerAuthRoutes } from "./auth.js";
 import { registerEmbedRoutes } from "./embed.js";
+import { registerMcpsRoutes } from "./mcps.js";
+import { registerProvidersRoutes } from "./providers.js";
 import { registerRefreshMCPRoute } from "./refresh-mcp.js";
 import { registerRunsRoutes } from "./runs.js";
+import { registerTagsRoutes } from "./tags.js";
 import { registerTestRoute } from "./test.js";
 import { registerVersionRoute } from "./version.js";
 import { registerWorkspacesRoute } from "./workspaces.js";
-import { registerTagsRoutes } from "./tags.js";
-import { registerProvidersRoutes } from "./providers.js";
-import { registerMcpsRoutes } from "./mcps.js";
 
 export async function registerRoutes(fastify: FastifyInstance) {
 	// Internal routes — JWT-authenticated, called by the frontend
@@ -34,6 +35,7 @@ export async function registerRoutes(fastify: FastifyInstance) {
 				await registerTagsRoutes(workspaceScoped);
 				await registerProvidersRoutes(workspaceScoped);
 				await registerMcpsRoutes(workspaceScoped);
+				await registerApiKeysRoutes(workspaceScoped);
 			},
 			{ prefix: "/api/v1/workspaces/:workspaceId" },
 		);
