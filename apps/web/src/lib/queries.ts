@@ -1,4 +1,4 @@
-import type { Tables } from "@repo/database";
+import type { Json, Tables } from "@repo/database";
 import { queryOptions } from "@tanstack/react-query";
 import {
 	computeDateRangeFromPreset,
@@ -95,27 +95,74 @@ export async function deleteProvider(workspaceId: string, providerId: string) {
 	await api.delete(`/api/v1/workspaces/${workspaceId}/providers/${providerId}`);
 }
 
+// `tools` is populated by the refresh endpoint, never on create/update;
+// `has_staging_config` is derived from the (never-returned) encrypted blob.
+export type Mcp = {
+	id: string;
+	name: string;
+	tools: Json | null;
+	custom_headers: string;
+	has_staging_config: boolean;
+	created_at: string;
+	updated_at: string;
+};
+
 export const mcpsQuery = (workspaceId: string) =>
 	queryOptions({
 		queryKey: ["mcps", workspaceId],
 		queryFn: async () => {
-			const { data, error } = await supabase
-				.from("mcps")
-				.select(
-					"id, name, tools, custom_headers, created_at, updated_at, encrypted_data_staging",
-				)
-				.eq("workspace_id", workspaceId)
-				.order("created_at", { ascending: false });
+			const { data } = await api.get<{ data: Mcp[] }>(
+				`/api/v1/workspaces/${workspaceId}/mcps`,
+			);
 
-			if (error) throw error;
-
-			return data.map(({ encrypted_data_staging, ...rest }) => ({
-				...rest,
-				has_staging_config: !!encrypted_data_staging,
-			}));
+			return data;
 		},
 		enabled: !!workspaceId,
 	});
+
+// Config blobs are PGP-encrypted in the browser; the API only sees ciphertext.
+// `custom_headers` is a comma-separated header-name list (the runner trims it).
+export async function createMcp(
+	workspaceId: string,
+	input: {
+		name: string;
+		encrypted_data_production: string;
+		encrypted_data_staging: string | null;
+		custom_headers: string;
+	},
+) {
+	const { data } = await api.post<{ data: Mcp }>(
+		`/api/v1/workspaces/${workspaceId}/mcps`,
+		input,
+	);
+
+	return data;
+}
+
+// Partial update; omit a field to leave it untouched, pass
+// `encrypted_data_staging: null` to clear the staging override. The runner
+// stamps `updated_at`.
+export async function updateMcp(
+	workspaceId: string,
+	mcpId: string,
+	input: {
+		name?: string;
+		encrypted_data_production?: string;
+		encrypted_data_staging?: string | null;
+		custom_headers?: string;
+	},
+) {
+	const { data } = await api.patch<{ data: Mcp }>(
+		`/api/v1/workspaces/${workspaceId}/mcps/${mcpId}`,
+		input,
+	);
+
+	return data;
+}
+
+export async function deleteMcp(workspaceId: string, mcpId: string) {
+	await api.delete(`/api/v1/workspaces/${workspaceId}/mcps/${mcpId}`);
+}
 
 export const agentsLiteQuery = (workspaceId: string) =>
 	queryOptions({
