@@ -383,24 +383,43 @@ export async function deleteApiKey(workspaceId: string, apiKeyId: string) {
 	await api.delete(`/api/v1/workspaces/${workspaceId}/api-keys/${apiKeyId}`);
 }
 
-// PATs are user-bound (not workspace-bound) and RLS restricts this to the
-// caller's own tokens, so no workspace filter is needed.
+// PATs are user-bound, not workspace-bound — the runner scopes every op to the
+// caller's own tokens, so these paths carry no workspaceId.
+export type PersonalAccessToken = {
+	id: string;
+	name: string;
+	token_prefix: string;
+	created_at: string;
+	last_used_at: string | null;
+	expires_at: string | null;
+	revoked_at: string | null;
+};
+
 export const personalAccessTokensQuery = queryOptions({
 	queryKey: ["personal-access-tokens"],
 	queryFn: async () => {
-		const { data, error } = await supabase
-			.from("personal_access_tokens")
-			.select(
-				"id, name, token_prefix, created_at, last_used_at, expires_at, revoked_at",
-			)
-			.is("revoked_at", null)
-			.order("created_at", { ascending: false });
-
-		if (error) throw error;
+		const { data } = await api.get<{ data: PersonalAccessToken[] }>(
+			"/api/v1/personal-access-tokens",
+		);
 
 		return data;
 	},
 });
+
+// The runner mints the token (hash + prefix persisted server-side) and returns
+// the raw secret exactly once, alongside the new row's metadata.
+export async function createPersonalAccessToken(name: string) {
+	const { data } = await api.post<{
+		data: PersonalAccessToken & { token: string };
+	}>("/api/v1/personal-access-tokens", { name });
+
+	return data;
+}
+
+// Soft delete (sets revoked_at) scoped to the caller's own tokens.
+export async function revokePersonalAccessToken(tokenId: string) {
+	await api.delete(`/api/v1/personal-access-tokens/${tokenId}`);
+}
 
 export const runsQuery = (
 	workspaceId: string,

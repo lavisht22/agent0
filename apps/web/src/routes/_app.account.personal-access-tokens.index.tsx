@@ -13,12 +13,12 @@ import { LucideEllipsisVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { ConfirmationModal } from "@/components/confirmation-modal";
 import { PageHeader } from "@/components/page-header";
-import { personalAccessTokensQuery } from "@/lib/queries";
-import { supabase } from "@/lib/supabase";
+import {
+	personalAccessTokensQuery,
+	revokePersonalAccessToken,
+} from "@/lib/queries";
 
-export const Route = createFileRoute(
-	"/_app/account/personal-access-tokens/",
-)({
+export const Route = createFileRoute("/_app/account/personal-access-tokens/")({
 	component: RouteComponent,
 });
 
@@ -35,14 +35,7 @@ function RouteComponent() {
 	const { data: tokens, isLoading } = useQuery(personalAccessTokensQuery);
 
 	const revokeMutation = useMutation({
-		mutationFn: async (tokenId: string) => {
-			const { error } = await supabase
-				.from("personal_access_tokens")
-				.update({ revoked_at: new Date().toISOString() })
-				.eq("id", tokenId);
-
-			if (error) throw error;
-		},
+		mutationFn: (tokenId: string) => revokePersonalAccessToken(tokenId),
 		onSuccess: () => {
 			queryClient.invalidateQueries({
 				queryKey: ["personal-access-tokens"],
