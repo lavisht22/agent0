@@ -3,10 +3,9 @@ import { nanoid } from "nanoid";
 import { supabase } from "../lib/db.js";
 import { requireScope, requireUserId } from "../lib/scopes.js";
 
-// Provider config is encrypted client-side with the PGP public key before it
-// ever reaches the runner; these endpoints persist the opaque armored blobs as
-// the browser used to write them directly. The private key lives only on the
-// runner's run path (helpers.ts), so create/update never see plaintext.
+// Provider config arrives already encrypted (PGP-armored) from the client; these
+// endpoints only ever persist the opaque blobs. Decryption happens solely on the
+// run path (helpers.ts), so create/update never see plaintext.
 const SELECT_COLUMNS =
 	"id, name, type, created_at, updated_at, encrypted_data_staging";
 
@@ -135,15 +134,15 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 		},
 	});
 
-	fastify.patch("/providers/:id", {
+	fastify.patch("/providers/:providerId", {
 		preHandler: [requireScope("providers:write:*"), requireUserId],
 		schema: {
 			tags: ["Providers"],
 			summary: "Update a provider",
 			params: {
 				type: "object" as const,
-				properties: { id: { type: "string" as const } },
-				required: ["id"],
+				properties: { providerId: { type: "string" as const } },
+				required: ["providerId"],
 			},
 			body: {
 				type: "object" as const,
@@ -171,9 +170,9 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			const { workspaceId, id } = request.params as {
+			const { workspaceId, providerId } = request.params as {
 				workspaceId: string;
-				id: string;
+				providerId: string;
 			};
 			const body = request.body as {
 				name?: string;
@@ -206,7 +205,7 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 			const { data, error } = await supabase
 				.from("providers")
 				.update(updates)
-				.eq("id", id)
+				.eq("id", providerId)
 				.eq("workspace_id", workspaceId)
 				.select(SELECT_COLUMNS)
 				.maybeSingle();
@@ -222,15 +221,15 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 		},
 	});
 
-	fastify.delete("/providers/:id", {
+	fastify.delete("/providers/:providerId", {
 		preHandler: [requireScope("providers:write:*"), requireUserId],
 		schema: {
 			tags: ["Providers"],
 			summary: "Delete a provider",
 			params: {
 				type: "object" as const,
-				properties: { id: { type: "string" as const } },
-				required: ["id"],
+				properties: { providerId: { type: "string" as const } },
+				required: ["providerId"],
 			},
 			response: {
 				200: {
@@ -242,15 +241,15 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			const { workspaceId, id } = request.params as {
+			const { workspaceId, providerId } = request.params as {
 				workspaceId: string;
-				id: string;
+				providerId: string;
 			};
 
 			const { error, count } = await supabase
 				.from("providers")
 				.delete({ count: "exact" })
-				.eq("id", id)
+				.eq("id", providerId)
 				.eq("workspace_id", workspaceId);
 
 			if (error) {

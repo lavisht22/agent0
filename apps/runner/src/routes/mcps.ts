@@ -9,10 +9,10 @@ import {
 	type ToolsByEnv,
 } from "./refresh-mcp.js";
 
-// MCP config is encrypted client-side with the PGP public key before it reaches
-// the runner; these endpoints persist the opaque armored blobs as the browser
-// used to write them directly (mirroring the providers CRUD). The private key
-// lives only on the runner's run path, so create/update never see plaintext.
+// MCP config arrives already encrypted (PGP-armored) from the client; these
+// endpoints only ever persist the opaque blobs. Decryption happens solely on the
+// run path, so create/update never see plaintext. `tools` is populated separately
+// by the refresh endpoint below, never on create/update.
 const SELECT_COLUMNS =
 	"id, name, tools, custom_headers, created_at, updated_at, encrypted_data_staging";
 

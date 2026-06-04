@@ -216,11 +216,10 @@ async function authenticateApiKey(
 }
 
 /**
- * Project the resolved principal onto the request. The discrete `userId` /
- * `tokenId` / `scopes` decorations are kept for now so the existing route
- * handlers keep working unchanged while we migrate. (Origin enforcement for API
- * keys happens inside `authenticateApiKey`; no handler reads the allowlist, so
- * it lives only on the principal.)
+ * Project the resolved principal onto the request. Route handlers read the
+ * discrete `userId` / `tokenId` / `scopes` decorations directly. (Origin
+ * enforcement for API keys happens inside `authenticateApiKey`; no handler reads
+ * the allowlist, so it lives only on the principal.)
  */
 function applyPrincipal(request: FastifyRequest, principal: Principal): void {
 	request.principal = principal;

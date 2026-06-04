@@ -45,7 +45,7 @@ const RunSummarySchema = {
 		pre_processing_time: { type: "number" as const },
 		created_at: { type: "string" as const, format: "date-time" },
 		// Null for runs whose agent version was never saved/since deleted
-		// (null version_id) — surfaced via a left join, matching the web list.
+		// (null version_id) — surfaced via a left join.
 		agent: { ...AgentRefSchema, nullable: true },
 	},
 };
@@ -172,10 +172,10 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 			const offset = (pageNum - 1) * limitNum;
 
 			// Left join by default so runs whose agent version is null (unsaved or
-			// since-deleted agents) still appear — matching the web list. Switch to
-			// an inner join only when filtering by agent_id, since filtering on an
-			// embedded column requires the embed to be inner (PostgREST), and such a
-			// filter inherently excludes null-version runs anyway.
+			// since-deleted agents) still appear. Switch to an inner join only when
+			// filtering by agent_id, since filtering on an embedded column requires
+			// the embed to be inner (PostgREST), and such a filter inherently
+			// excludes null-version runs anyway.
 			const versionEmbed = agent_id
 				? "agent_versions!inner(id, agent_id, agents:agent_id(id, name))"
 				: "agent_versions(id, agent_id, agents:agent_id(id, name))";

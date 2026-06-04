@@ -2,13 +2,10 @@ import type { FastifyInstance } from "fastify";
 import { supabase } from "../lib/db.js";
 import { requireScope } from "../lib/scopes.js";
 
-// The dashboard is run analytics, so it reads at `runs:read:*` — held by every
-// workspace role (readers' `*:read:*` matches it), same as the runs list. The
-// `:workspaceId` prefix already verified membership. We proxy the existing
-// Postgres RPCs (`get_dashboard_stats`, `get_top_agents`) rather than
-// re-aggregate in JS: they aggregate DB-side without the 1000-row cap, and
-// translating them to Drizzle SQL is a Phase 3 concern. Results are returned in
-// the RPCs' native snake_case shape.
+// The dashboard is run analytics, so it reads at `runs:read:*` (held by every
+// workspace role), same as the runs list. Aggregation is delegated to the
+// `get_dashboard_stats` / `get_top_agents` Postgres functions so it happens
+// DB-side rather than over a capped row fetch.
 
 const ErrorSchema = {
 	type: "object" as const,

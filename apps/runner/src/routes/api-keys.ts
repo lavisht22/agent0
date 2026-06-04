@@ -3,18 +3,15 @@ import { customAlphabet, nanoid } from "nanoid";
 import { supabase } from "../lib/db.js";
 import { requireScope, requireUserId } from "../lib/scopes.js";
 
-// API keys are an admin-only resource. The single Supabase `ALL` RLS policy
-// gated every operation — including SELECT — on `is_workspace_admin`, because
-// the stored `key` is a plaintext credential. Our scope model only has one
-// admin-only shape: `*:*:*`. A `:read:` scope would be matched by readers' and
-// writers' `*:read:*` grant and leak the keys, so EVERY endpoint here gates on
-// `api_keys:write:*` (matched only by admin's `*:*:*`), faithfully porting that
-// single `ALL` policy. `requireUserId` additionally blocks machine API keys.
+// API keys are an admin-only resource for the whole workspace — including reads,
+// since each row holds a plaintext `key`. The scope model only expresses
+// "admin-only" as `*:*:*`; any `:read:` scope would also be granted to readers
+// and writers (via `*:read:*`) and leak the keys. So every endpoint here gates on
+// the write scope, matched only by an admin's `*:*:*`. `requireUserId` keeps
+// machine API keys out.
 const ADMIN_SCOPE = "api_keys:write:*";
 
-// Same character space the web used to generate keys client-side. We now mint
-// them server-side instead (no weak browser RNG; the key never has to round-trip
-// from an untrusted caller), but keep the format identical for parity.
+// Keys are minted server-side so the secret never round-trips from the client.
 const generateKey = customAlphabet("abcdefghijklmnopqrstuvwxyz1234567890", 21);
 
 const SELECT_COLUMNS =
@@ -45,7 +42,7 @@ const ErrorSchema = {
 	},
 };
 
-/** Empty origin list means "any origin" — stored as null, matching the web. */
+/** An empty origin list means "any origin" — stored as null. */
 function normalizeOrigins(origins?: string[] | null): string[] | null {
 	if (!origins) return null;
 	const cleaned = origins.map((o) => o.trim()).filter(Boolean);
@@ -159,15 +156,15 @@ export async function registerApiKeysRoutes(fastify: FastifyInstance) {
 		},
 	});
 
-	fastify.patch("/api-keys/:id", {
+	fastify.patch("/api-keys/:apiKeyId", {
 		preHandler: [requireScope(ADMIN_SCOPE), requireUserId],
 		schema: {
 			tags: ["API Keys"],
 			summary: "Update an API key",
 			params: {
 				type: "object" as const,
-				properties: { id: { type: "string" as const } },
-				required: ["id"],
+				properties: { apiKeyId: { type: "string" as const } },
+				required: ["apiKeyId"],
 			},
 			body: {
 				type: "object" as const,
@@ -196,9 +193,9 @@ export async function registerApiKeysRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			const { workspaceId, id } = request.params as {
+			const { workspaceId, apiKeyId } = request.params as {
 				workspaceId: string;
-				id: string;
+				apiKeyId: string;
 			};
 			const body = request.body as {
 				name?: string;
@@ -207,7 +204,7 @@ export async function registerApiKeysRoutes(fastify: FastifyInstance) {
 			};
 
 			// The key, owner, and workspace are immutable — only name/scopes/origins
-			// are editable, mirroring the web update.
+			// are editable.
 			const updates: Record<string, unknown> = {};
 			if (body.name !== undefined) {
 				const trimmedName = body.name.trim();
@@ -230,7 +227,7 @@ export async function registerApiKeysRoutes(fastify: FastifyInstance) {
 			const { data, error } = await supabase
 				.from("api_keys")
 				.update(updates)
-				.eq("id", id)
+				.eq("id", apiKeyId)
 				.eq("workspace_id", workspaceId)
 				.select(SELECT_COLUMNS)
 				.maybeSingle();
@@ -246,15 +243,15 @@ export async function registerApiKeysRoutes(fastify: FastifyInstance) {
 		},
 	});
 
-	fastify.delete("/api-keys/:id", {
+	fastify.delete("/api-keys/:apiKeyId", {
 		preHandler: [requireScope(ADMIN_SCOPE), requireUserId],
 		schema: {
 			tags: ["API Keys"],
 			summary: "Revoke (delete) an API key",
 			params: {
 				type: "object" as const,
-				properties: { id: { type: "string" as const } },
-				required: ["id"],
+				properties: { apiKeyId: { type: "string" as const } },
+				required: ["apiKeyId"],
 			},
 			response: {
 				200: {
@@ -266,15 +263,15 @@ export async function registerApiKeysRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			const { workspaceId, id } = request.params as {
+			const { workspaceId, apiKeyId } = request.params as {
 				workspaceId: string;
-				id: string;
+				apiKeyId: string;
 			};
 
 			const { error, count } = await supabase
 				.from("api_keys")
 				.delete({ count: "exact" })
-				.eq("id", id)
+				.eq("id", apiKeyId)
 				.eq("workspace_id", workspaceId);
 
 			if (error) {
