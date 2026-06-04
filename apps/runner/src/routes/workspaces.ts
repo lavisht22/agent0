@@ -42,16 +42,14 @@ const MemberSchema = {
 	},
 };
 
-// Admin ⟺ the resolved scopes include `*:*:*` (only admins get it). This is the
-// `is_workspace_admin(...)` half of the RLS predicates.
+// Admin ⟺ the resolved scopes include `*:*:*` (only admins get it).
 function isAdmin(request: FastifyRequest): boolean {
 	return hasScope(request.scopes, "workspaces:write:*");
 }
 
-// The workspace-management RLS policies are `is_workspace_admin OR uid = user_id`
-// — the trailing clause is an owner escape hatch so the creator can never lock
-// themselves out (e.g. after being demoted). The runner bypasses RLS, so port
-// the owner check explicitly. Only consulted when the caller isn't already admin.
+// Workspace management is allowed for admins OR the workspace owner. The owner
+// check is an escape hatch so the creator can never lock themselves out (e.g.
+// after being demoted). Only consulted when the caller isn't already an admin.
 async function isOwner(workspaceId: string, userId: string): Promise<boolean> {
 	const { data } = await supabase
 		.from("workspaces")
@@ -135,12 +133,10 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 		},
 	});
 
-	// Create a workspace. Any authenticated user may create one; the
-	// `workspace_assign_owner_admin` AFTER INSERT trigger seeds the creator's
-	// admin membership in `workspace_user`, so we only insert the workspace row.
-	// `user_id` defaults to `auth.uid()` in Postgres, which is null under the
-	// service role — set it explicitly to the caller (the INSERT RLS required
-	// `user_id = auth.uid()`).
+	// Create a workspace. Any authenticated user may create one. The
+	// `workspace_assign_owner_admin` trigger seeds the creator's admin membership
+	// in `workspace_user`, so we only insert the workspace row, setting `user_id`
+	// to the caller as the owner.
 	fastify.post("/api/v1/workspaces", {
 		preHandler: requireUserId,
 		schema: {
@@ -187,7 +183,7 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 		},
 	});
 
-	// Rename a workspace. RLS: admin OR owner.
+	// Rename a workspace. Admin or owner only.
 	fastify.patch("/api/v1/workspaces/:workspaceId", {
 		preHandler: requireUserId,
 		schema: {
@@ -251,7 +247,7 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 		},
 	});
 
-	// Delete a workspace (cascades to its data via FKs). RLS: admin OR owner.
+	// Delete a workspace (cascades to its data via FKs). Admin or owner only.
 	fastify.delete("/api/v1/workspaces/:workspaceId", {
 		preHandler: requireUserId,
 		schema: {
@@ -296,10 +292,9 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 		},
 	});
 
-	// List members of a workspace. RLS SELECT was `is_workspace_reader OR self`,
-	// i.e. any member can see the roster — the `members:read:*` scope is held by
-	// every role (readers' `*:read:*` matches it). `requireUserId` keeps member
-	// PII (names) out of reach of machine API keys.
+	// List members of a workspace. Any member can see the roster, so this reads at
+	// `members:read:*` (held by every role). `requireUserId` keeps member PII
+	// (names) out of reach of machine API keys.
 	fastify.get("/api/v1/workspaces/:workspaceId/members", {
 		preHandler: [requireScope("members:read:*"), requireUserId],
 		schema: {
@@ -343,11 +338,9 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 		},
 	});
 
-	// Change a member's role. RLS allowed `is_workspace_admin OR self`, but we
-	// intentionally gate this on **admin only**: porting the self-clause to an
-	// UPDATE of `role` would let a reader/writer promote themselves to admin
-	// (privilege escalation). The web has no self-role-change path, so this is a
-	// safe tightening, not a behavior regression.
+	// Change a member's role. Admin only: letting a member change their own role
+	// would be a privilege-escalation path (a reader could promote themselves to
+	// admin).
 	fastify.patch("/api/v1/workspaces/:workspaceId/members/:userId", {
 		preHandler: [requireScope("workspaces:write:*"), requireUserId],
 		schema: {
@@ -411,8 +404,8 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 		},
 	});
 
-	// Remove a member (or leave the workspace). RLS: `is_workspace_admin OR self`
-	// — an admin can remove anyone; any member can remove themselves.
+	// Remove a member (or leave the workspace). An admin can remove anyone; any
+	// member can remove themselves.
 	fastify.delete("/api/v1/workspaces/:workspaceId/members/:userId", {
 		preHandler: requireUserId,
 		schema: {

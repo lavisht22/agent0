@@ -111,7 +111,7 @@ export async function registerTagsRoutes(fastify: FastifyInstance) {
 		},
 	});
 
-	fastify.delete("/tags/:id", {
+	fastify.delete("/tags/:tagId", {
 		preHandler: requireUserId,
 		schema: {
 			tags: ["Tags"],
@@ -119,9 +119,9 @@ export async function registerTagsRoutes(fastify: FastifyInstance) {
 			params: {
 				type: "object" as const,
 				properties: {
-					id: { type: "string" as const },
+					tagId: { type: "string" as const },
 				},
-				required: ["id"],
+				required: ["tagId"],
 			},
 			response: {
 				200: {
@@ -135,15 +135,15 @@ export async function registerTagsRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			const { workspaceId, id } = request.params as {
+			const { workspaceId, tagId } = request.params as {
 				workspaceId: string;
-				id: string;
+				tagId: string;
 			};
 
 			const { error, count } = await supabase
 				.from("tags")
 				.delete({ count: "exact" })
-				.eq("id", id)
+				.eq("id", tagId)
 				.eq("workspace_id", workspaceId);
 
 			if (error) {
