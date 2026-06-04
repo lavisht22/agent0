@@ -220,19 +220,46 @@ export async function deleteMcp(workspaceId: string, mcpId: string) {
 	await api.delete(`/api/v1/workspaces/${workspaceId}/mcps/${mcpId}`);
 }
 
+// The runner derives the model summaries server-side from the deployed versions'
+// data, so the list no longer ships the full prompt blob per agent.
+export type Agent = {
+	id: string;
+	name: string;
+	staging_version_id: string | null;
+	production_version_id: string | null;
+	staging_model: { provider_id: string; name: string } | null;
+	production_model: { provider_id: string; name: string } | null;
+	tags: { id: string; name: string; color: string }[];
+	created_at: string;
+	updated_at: string;
+};
+
+// Versions list is lightweight (no prompt data); fetch a single version's detail
+// when the editor needs its `data`.
+export type AgentVersionSummary = {
+	id: string;
+	agent_id: string;
+	is_deployed: boolean;
+	user_id: string | null;
+	created_at: string;
+};
+
+export type AgentVersionDetail = AgentVersionSummary & { data: Json };
+
 export const agentsLiteQuery = (workspaceId: string) =>
 	queryOptions({
-		queryKey: ["agents-lite"],
+		queryKey: ["agents-lite", workspaceId],
 		queryFn: async () => {
-			const { data, error } = await supabase
-				.from("agents")
-				.select("id, name")
-				.eq("workspace_id", workspaceId);
+			// Pickers/filters want the whole list; the runner caps at 100/page,
+			// which covers typical workspaces.
+			const { data } = await api.get<{ data: Agent[] }>(
+				`/api/v1/workspaces/${workspaceId}/agents`,
+				{ query: { limit: 100 } },
+			);
 
-			if (error) throw error;
-
-			return data;
+			return data.map((a) => ({ id: a.id, name: a.name }));
 		},
+		enabled: !!workspaceId,
 	});
 
 export const tagsQuery = (workspaceId: string) =>
@@ -260,22 +287,6 @@ export async function createTag(
 	return data;
 }
 
-export const agentTagsQuery = (agentId: string) =>
-	queryOptions({
-		queryKey: ["agent-tags", agentId],
-		queryFn: async () => {
-			const { data, error } = await supabase
-				.from("agent_tags")
-				.select("*, tags(*)")
-				.eq("agent_id", agentId);
-
-			if (error) throw error;
-
-			return data;
-		},
-		enabled: !!agentId && agentId !== "new",
-	});
-
 export const agentsQuery = (
 	workspaceId: string,
 	page = 1,
@@ -285,100 +296,120 @@ export const agentsQuery = (
 	queryOptions({
 		queryKey: ["agents", workspaceId, page, search, tagIds],
 		queryFn: async () => {
-			// First, get agent IDs that match the tag filter (if provided)
-			let matchingAgentIds: string[] | null = null;
-
-			if (tagIds && tagIds.length > 0) {
-				const { data: agentTags, error: tagError } = await supabase
-					.from("agent_tags")
-					.select("agent_id")
-					.in("tag_id", tagIds);
-
-				if (tagError) throw tagError;
-
-				// Get unique agent IDs that have ALL selected tags
-				const agentIdCounts = agentTags.reduce(
-					(acc, { agent_id }) => {
-						acc[agent_id] = (acc[agent_id] || 0) + 1;
-						return acc;
+			// The runner does the ALL-tags filtering server-side from a
+			// comma-separated tag_ids list.
+			const { data } = await api.get<{ data: Agent[] }>(
+				`/api/v1/workspaces/${workspaceId}/agents`,
+				{
+					query: {
+						page,
+						limit: 20,
+						search,
+						tag_ids: tagIds && tagIds.length > 0 ? tagIds.join(",") : undefined,
 					},
-					{} as Record<string, number>,
-				);
-
-				// Only include agents that have all selected tags
-				matchingAgentIds = Object.entries(agentIdCounts)
-					.filter(([_, count]) => count >= tagIds.length)
-					.map(([id]) => id);
-
-				// If no agents match the tags, return empty array
-				if (matchingAgentIds.length === 0) {
-					return [];
-				}
-			}
-
-			let query = supabase
-				.from("agents")
-				.select(
-					"*, agent_tags(*, tags(*)), staging_version:agent_versions!staging_version_id(data), production_version:agent_versions!production_version_id(data)",
-				)
-				.eq("workspace_id", workspaceId);
-
-			// Apply agent ID filter if we have matching agents from tags
-			if (matchingAgentIds) {
-				query = query.in("id", matchingAgentIds);
-			}
-
-			// Apply search filter if provided
-			if (search) {
-				query = query.ilike("name", `%${search}%`);
-			}
-
-			query = query
-				.order("created_at", { ascending: false })
-				.range((page - 1) * 20, page * 20);
-
-			const { data, error } = await query;
-
-			if (error) throw error;
+				},
+			);
 
 			return data;
 		},
 		enabled: !!workspaceId,
 	});
 
-export const agentQuery = (agentId: string) =>
+export const agentQuery = (workspaceId: string, agentId: string) =>
 	queryOptions({
 		queryKey: ["agent", agentId],
 		queryFn: async () => {
-			const { data, error } = await supabase
-				.from("agents")
-				.select("*")
-				.eq("id", agentId)
-				.single();
-
-			if (error) throw error;
+			const { data } = await api.get<{ data: Agent }>(
+				`/api/v1/workspaces/${workspaceId}/agents/${agentId}`,
+			);
 
 			return data;
 		},
 		enabled: !!agentId,
 	});
 
-export const agentVersionsQuery = (agentId: string) =>
+export const agentVersionsQuery = (workspaceId: string, agentId: string) =>
 	queryOptions({
 		queryKey: ["agent-versions", agentId],
 		queryFn: async () => {
-			const { data, error } = await supabase
-				.from("agent_versions")
-				.select("*")
-				.eq("agent_id", agentId)
-				.order("created_at", { ascending: false });
-
-			if (error) throw error;
+			const { data } = await api.get<{ data: AgentVersionSummary[] }>(
+				`/api/v1/workspaces/${workspaceId}/agents/${agentId}/versions`,
+				{ query: { limit: 100 } },
+			);
 
 			return data;
 		},
 		enabled: !!agentId,
 	});
+
+// Single version with its full prompt `data` — fetched on demand when the
+// editor selects a version (the versions list omits data for a lighter payload).
+export const agentVersionQuery = (
+	workspaceId: string,
+	agentId: string,
+	versionId: string | undefined,
+) =>
+	queryOptions({
+		queryKey: ["agent-version", versionId],
+		queryFn: async () => {
+			const { data } = await api.get<{ data: AgentVersionDetail }>(
+				`/api/v1/workspaces/${workspaceId}/agents/${agentId}/versions/${versionId}`,
+			);
+
+			return data;
+		},
+		enabled: !!workspaceId && !!agentId && !!versionId,
+	});
+
+export async function createAgent(workspaceId: string, name: string) {
+	const { data } = await api.post<{ data: Agent }>(
+		`/api/v1/workspaces/${workspaceId}/agents`,
+		{ name },
+	);
+
+	return data;
+}
+
+export async function deleteAgent(workspaceId: string, agentId: string) {
+	await api.delete(`/api/v1/workspaces/${workspaceId}/agents/${agentId}`);
+}
+
+// Rename / deploy a version / replace the tag set. Omit a field to leave it
+// untouched; `tag_ids` replaces the full set.
+export async function updateAgent(
+	workspaceId: string,
+	agentId: string,
+	input: {
+		name?: string;
+		staging_version_id?: string | null;
+		production_version_id?: string | null;
+		tag_ids?: string[];
+	},
+) {
+	const { data } = await api.patch<{ data: Agent }>(
+		`/api/v1/workspaces/${workspaceId}/agents/${agentId}`,
+		input,
+	);
+
+	return data;
+}
+
+// Push a new prompt version (optionally deploying it). Returns the full version
+// including its `data`.
+export async function createAgentVersion(
+	workspaceId: string,
+	agentId: string,
+	data: Json,
+	deploy?: "staging" | "production",
+) {
+	const { data: version } = await api.post<{ data: AgentVersionDetail }>(
+		`/api/v1/workspaces/${workspaceId}/agents/${agentId}/versions`,
+		{ data },
+		{ query: { deploy } },
+	);
+
+	return version;
+}
 
 // API keys are an admin-only resource; the row holds the plaintext `key` (only
 // shown once on create, redacted thereafter in the list).

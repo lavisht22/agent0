@@ -8,20 +8,19 @@ import {
 	Popover,
 	useOverlayState,
 } from "@heroui/react";
-import type { Tables } from "@repo/database";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { LucideHistory } from "lucide-react";
-import { membersQuery } from "@/lib/queries";
+import { type AgentVersionSummary, membersQuery } from "@/lib/queries";
 
 interface VersionHistoryProps {
 	workspaceId: string;
-	versions: Tables<"agent_versions">[];
+	versions: AgentVersionSummary[];
 	stagingVersionId?: string | null;
 	productionVersionId?: string | null;
 	currentVersionId?: string;
 	isDirty?: boolean;
-	onSelectionChange: (version: Tables<"agent_versions">) => void;
+	onSelectionChange: (version: AgentVersionSummary) => void;
 }
 
 export const VersionHistory = ({

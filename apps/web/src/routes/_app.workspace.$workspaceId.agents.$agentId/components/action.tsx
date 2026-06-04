@@ -1,6 +1,6 @@
 import { Button, Description, Dropdown, Label, Spinner } from "@heroui/react";
-import type { Tables } from "@repo/database";
 import { LucideChevronDown } from "lucide-react";
+import type { Agent } from "@/lib/queries";
 
 export function Action({
 	isNewAgent,
@@ -10,7 +10,7 @@ export function Action({
 	isMutationPending,
 	handleSubmit,
 	agent,
-	version,
+	versionId,
 	deploy,
 }: {
 	isNewAgent: boolean;
@@ -19,8 +19,8 @@ export function Action({
 	canSubmit: boolean;
 	isDirty: boolean;
 	handleSubmit: (data: unknown) => void;
-	agent?: Tables<"agents">;
-	version?: Tables<"agent_versions">;
+	agent?: Agent;
+	versionId?: string;
 	deploy: (
 		version_id: string,
 		environment: "staging" | "production",
@@ -48,8 +48,8 @@ export function Action({
 	const isLoading = isSubmitting || isMutationPending;
 
 	// Check if current version is deployed to each environment
-	const isDeployedToStaging = agent?.staging_version_id === version?.id;
-	const isDeployedToProduction = agent?.production_version_id === version?.id;
+	const isDeployedToStaging = agent?.staging_version_id === versionId;
+	const isDeployedToProduction = agent?.production_version_id === versionId;
 
 	return (
 		<>
@@ -99,14 +99,14 @@ export function Action({
 									: []),
 							]}
 							onAction={async (key) => {
-								if (!version) return;
+								if (!versionId) return;
 								if (key === "staging") {
-									await deploy(version.id, "staging");
+									await deploy(versionId, "staging");
 								} else if (key === "production") {
-									await deploy(version.id, "production");
+									await deploy(versionId, "production");
 								} else if (key === "both") {
-									await deploy(version.id, "staging");
-									await deploy(version.id, "production");
+									await deploy(versionId, "staging");
+									await deploy(versionId, "production");
 								}
 							}}
 						>

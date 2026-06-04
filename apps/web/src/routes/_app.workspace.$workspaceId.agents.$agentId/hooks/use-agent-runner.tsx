@@ -1,5 +1,4 @@
 import { toast } from "@heroui/react";
-import type { Tables } from "@repo/database";
 import type { TextStreamPart, Tool } from "ai";
 import { events } from "fetch-event-stream";
 import { nanoid } from "nanoid";
@@ -12,12 +11,12 @@ import { supabase } from "@/lib/supabase";
 export const useAgentRunner = ({
 	variableValues,
 	mcpHeaderValues,
-	version,
+	versionId,
 	environment,
 }: {
 	variableValues: Record<string, string>;
 	mcpHeaderValues: Record<string, Record<string, string>>;
-	version?: Tables<"agent_versions">;
+	versionId?: string;
 	environment: "staging" | "production";
 }) => {
 	const [isRunning, setIsRunning] = useState(false);
@@ -63,7 +62,7 @@ export const useAgentRunner = ({
 					body: JSON.stringify({
 						data,
 						variables: variableValues,
-						version_id: version?.id,
+						version_id: versionId,
 						environment,
 						mcp_options: Object.fromEntries(
 							Object.entries(mcpHeaderValues)
@@ -205,7 +204,7 @@ export const useAgentRunner = ({
 				}
 			}
 		},
-		[variableValues, mcpHeaderValues, version, environment],
+		[variableValues, mcpHeaderValues, versionId, environment],
 	);
 
 	const handleStop = useCallback(() => {

@@ -8,6 +8,7 @@ const TagSchema = {
 	properties: {
 		id: { type: "string" as const },
 		name: { type: "string" as const },
+		color: { type: "string" as const },
 	},
 };
 
@@ -57,7 +58,7 @@ function extractModel(
 // Columns for the list/detail responses, embedding only the deployed versions'
 // `data` (so we can derive the model summary) plus the tag join.
 const AGENT_SELECT =
-	"id, name, staging_version_id, production_version_id, created_at, updated_at, agent_tags(tags(id, name)), staging_version:agent_versions!staging_version_id(data), production_version:agent_versions!production_version_id(data)";
+	"id, name, staging_version_id, production_version_id, created_at, updated_at, agent_tags(tags(id, name, color)), staging_version:agent_versions!staging_version_id(data), production_version:agent_versions!production_version_id(data)";
 
 type AgentRow = {
 	id: string;
@@ -66,7 +67,9 @@ type AgentRow = {
 	production_version_id: string | null;
 	created_at: string;
 	updated_at: string;
-	agent_tags?: { tags: { id: string; name: string } | null }[] | null;
+	agent_tags?:
+		| { tags: { id: string; name: string; color: string } | null }[]
+		| null;
 	staging_version?: { data: unknown } | null;
 	production_version?: { data: unknown } | null;
 };
@@ -393,7 +396,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 
 			const { data: tagRows, error: tagFetchError } = await supabase
 				.from("agent_tags")
-				.select("tags(id, name)")
+				.select("tags(id, name, color)")
 				.eq("agent_id", agentId);
 
 			if (tagFetchError) {

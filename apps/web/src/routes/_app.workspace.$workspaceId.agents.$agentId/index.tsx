@@ -13,7 +13,6 @@ import {
 	TextField,
 	useOverlayState,
 } from "@heroui/react";
-import type { Tables } from "@repo/database";
 import { useForm, useStore } from "@tanstack/react-form";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useLocation } from "@tanstack/react-router";
@@ -39,7 +38,7 @@ import { copyToClipboard } from "@/lib/clipboard";
 import { getModelStatus } from "@/lib/providers";
 import {
 	agentQuery,
-	agentTagsQuery,
+	agentVersionQuery,
 	agentVersionsQuery,
 	mcpsQuery,
 	providersQuery,
@@ -68,7 +67,7 @@ function RouteComponent() {
 	const location = useLocation();
 	const isNewAgent = agentId === "new";
 
-	const [version, setVersion] = useState<Tables<"agent_versions">>();
+	const [versionId, setVersionId] = useState<string>();
 	const [name, setName] = useState("New Agent");
 	const [variableValues, setVariableValues] = useDb<Record<string, string>>(
 		`agent-variables-${agentId}`,
@@ -94,7 +93,7 @@ function RouteComponent() {
 
 	// Fetch agent
 	const { data: agent } = useQuery({
-		...agentQuery(agentId),
+		...agentQuery(workspaceId, agentId),
 		enabled: !isNewAgent,
 	});
 
@@ -109,20 +108,22 @@ function RouteComponent() {
 	// Fetch MCPs (for custom headers in the variables drawer)
 	const { data: mcps } = useQuery(mcpsQuery(workspaceId));
 
-	// Fetch existing agent versions if editing
+	// Fetch existing agent versions if editing (lightweight — no prompt data)
 	const { data: versions } = useQuery({
-		...agentVersionsQuery(agentId),
+		...agentVersionsQuery(workspaceId, agentId),
 		enabled: !isNewAgent,
 	});
 
-	// Fetch agent tags
-	const { data: agentTags } = useQuery(agentTagsQuery(agentId));
+	// The selected version's full detail (with prompt data) drives the form.
+	const { data: version } = useQuery(
+		agentVersionQuery(workspaceId, agentId, versionId),
+	);
 
-	// Derive selected tag IDs from agent tags
-	const selectedTagIds = agentTags?.map((at) => at.tag_id) || [];
+	// Tags are embedded on the agent now (no separate agent_tags query).
+	const selectedTagIds = agent?.tags.map((t) => t.id) ?? [];
 
 	useEffect(() => {
-		if (version) {
+		if (versionId) {
 			return;
 		}
 
@@ -130,8 +131,8 @@ function RouteComponent() {
 			return;
 		}
 
-		setVersion(versions[0]);
-	}, [versions, version]);
+		setVersionId(versions[0].id);
+	}, [versions, versionId]);
 
 	const {
 		createMutation,
@@ -139,7 +140,7 @@ function RouteComponent() {
 		updateNameMutation,
 		deployMutation,
 		syncTagsMutation,
-	} = useAgentMutations({ name, agentId, workspaceId, setVersion });
+	} = useAgentMutations({ name, agentId, workspaceId, setVersionId });
 
 	const {
 		isRunning,
@@ -152,7 +153,7 @@ function RouteComponent() {
 	} = useAgentRunner({
 		variableValues,
 		mcpHeaderValues,
-		version,
+		versionId,
 		environment: testEnvironment,
 	});
 
@@ -316,10 +317,10 @@ function RouteComponent() {
 								versions={versions || []}
 								stagingVersionId={agent?.staging_version_id}
 								productionVersionId={agent?.production_version_id}
-								currentVersionId={version?.id}
+								currentVersionId={versionId}
 								isDirty={state.isDirty}
-								onSelectionChange={(v: Tables<"agent_versions">) => {
-									setVersion(v);
+								onSelectionChange={(v) => {
+									setVersionId(v.id);
 								}}
 							/>
 						)}
@@ -358,7 +359,7 @@ function RouteComponent() {
 								isDirty={state.isDirty}
 								handleSubmit={form.handleSubmit}
 								agent={agent}
-								version={version}
+								versionId={versionId}
 								deploy={async (
 									version_id: string,
 									environment: "staging" | "production",
