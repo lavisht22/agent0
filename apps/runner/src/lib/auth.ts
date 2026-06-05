@@ -33,9 +33,6 @@ declare module "fastify" {
 	}
 }
 
-/** Bearer tokens with this prefix are PATs; anything else is a browser session. */
-const PAT_PREFIX = "agent0_pat_";
-
 function sha256Hex(input: string): string {
 	return createHash("sha256").update(input).digest("hex");
 }
@@ -90,8 +87,9 @@ async function resolveUserScopes(
 
 /**
  * Browser session → `kind: "user"`. Validates the Supabase access token and
- * derives scopes from the user's current workspace role. Selected when the
- * Bearer token does NOT start with `agent0_pat_`.
+ * derives scopes from the user's current workspace role. Selected when an
+ * `Authorization: Bearer` token is present (Bearer is now exclusively the
+ * browser-session channel; PATs moved to the `x-pat` header).
  */
 async function authenticateBrowserSession(
 	request: FastifyRequest,
@@ -118,7 +116,8 @@ async function authenticateBrowserSession(
 /**
  * PAT → `kind: "user"`. Looks up the hashed token, checks revocation/expiry,
  * then resolves scopes from the holder's current workspace role. Selected when
- * the Bearer token starts with `agent0_pat_`.
+ * the `x-pat` header is present — a dedicated transport that keeps PATs cleanly
+ * distinct from browser sessions (Bearer) and machine keys (`x-api-key`).
  */
 async function authenticatePat(
 	request: FastifyRequest,
@@ -239,17 +238,16 @@ function applyPrincipal(request: FastifyRequest, principal: Principal): void {
  *
  * The middleware is an ordered list of authenticators (Passport-style
  * strategies); the credential present on the request selects which one runs,
- * and the winner is normalized to a single `Principal`:
+ * and the winner is normalized to a single `Principal`. Each credential has its
+ * own header, so dispatch is a pure header check — no prefix-sniffing:
  *
- *   1. `Authorization: Bearer <token>`
- *        - starts with `agent0_pat_` → PAT          → kind "user"
- *        - otherwise                 → browser session (Supabase JWT) → kind "user"
- *   2. `x-api-key: <key>`            → API key       → kind "apiKey"
+ *   1. `x-pat: <token>`              → PAT            → kind "user"
+ *   2. `Authorization: Bearer <jwt>` → browser session (Supabase JWT) → kind "user"
+ *   3. `x-api-key: <key>`            → API key        → kind "apiKey"
  *
- * If a bearer token is present but invalid/expired/revoked, the request is
- * rejected (we do not fall through to the API-key path, since silently masking
- * token issues would be confusing). Discrimination is a clean prefix/header
- * check — no shape-sniffing.
+ * If a credential is present but invalid/expired/revoked, the request is
+ * rejected — we do not fall through to a later authenticator, since silently
+ * masking token issues would be confusing.
  *
  * Per-route scope checks: see `requireScope` / `checkScope` in ./scopes.js.
  * Mutating endpoints should chain `requireUserId` to keep API keys out.
@@ -265,26 +263,35 @@ export function addAuth(fastify: FastifyInstance) {
 	fastify.addHook(
 		"preHandler",
 		async (request: FastifyRequest, reply: FastifyReply) => {
+			const patToken = request.headers["x-pat"] as string | undefined;
 			const authHeader = request.headers.authorization;
 
 			let result: AuthResult;
 
-			if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+			if (patToken !== undefined) {
+				const token = patToken.trim();
+				if (!token) {
+					return reply.code(401).send({ message: "Empty x-pat token" });
+				}
+
+				result = await authenticatePat(request, reply, token);
+			} else if (
+				typeof authHeader === "string" &&
+				authHeader.startsWith("Bearer ")
+			) {
 				const token = authHeader.slice("Bearer ".length).trim();
 				if (!token) {
 					return reply.code(401).send({ message: "Empty bearer token" });
 				}
 
-				result = token.startsWith(PAT_PREFIX)
-					? await authenticatePat(request, reply, token)
-					: await authenticateBrowserSession(request, reply, token);
+				result = await authenticateBrowserSession(request, reply, token);
 			} else {
 				const apiKey = request.headers["x-api-key"] as string | undefined;
 
 				if (!apiKey) {
 					return reply.code(401).send({
 						message:
-							"Authentication required (Authorization: Bearer or x-api-key)",
+							"Authentication required (x-pat, Authorization: Bearer, or x-api-key)",
 					});
 				}
 
