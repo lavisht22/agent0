@@ -1,17 +1,16 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
 import { api } from "../lib/api-client";
-import { supabase } from "../lib/supabase";
+import { getSessionToken } from "../lib/auth-client";
 
 type WorkspaceListItem = { id: string };
 
 export const Route = createFileRoute("/_app")({
 	component: LayoutComponent,
 	beforeLoad: async ({ location }) => {
-		const {
-			data: { session },
-		} = await supabase.auth.getSession();
-		if (!session) {
+		// The better-auth session token lives only in memory; no token means no
+		// authenticated session (e.g. after a reload) → back to login.
+		if (!getSessionToken()) {
 			throw redirect({ to: "/auth" });
 		}
 

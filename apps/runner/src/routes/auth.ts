@@ -42,20 +42,23 @@ export async function registerAuthRoutes(fastify: FastifyInstance) {
 			const userId = request.userId as string;
 			const tokenId = request.tokenId as string;
 
-			const [userRes, authRes] = await Promise.all([
-				supabase.from("users").select("name").eq("id", userId).maybeSingle(),
-				supabase.auth.admin.getUserById(userId),
-			]);
+			// Email + name both live on public.users now (Phase 2 extended the
+			// table); no more Supabase Auth admin lookup.
+			const { data: user, error } = await supabase
+				.from("users")
+				.select("name, email")
+				.eq("id", userId)
+				.maybeSingle();
 
-			if (userRes.error) {
+			if (error) {
 				return reply.code(500).send({ message: "Failed to resolve identity" });
 			}
 
 			return reply.send({
 				data: {
 					user_id: userId,
-					user_email: authRes.data?.user?.email ?? null,
-					user_name: userRes.data?.name ?? null,
+					user_email: user?.email ?? null,
+					user_name: user?.name ?? null,
 					token_id: tokenId,
 				},
 			});

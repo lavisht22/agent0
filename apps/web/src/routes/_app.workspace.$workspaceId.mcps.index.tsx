@@ -14,8 +14,8 @@ import { useState } from "react";
 import { ConfirmationModal } from "@/components/confirmation-modal";
 import IDCopy from "@/components/id-copy";
 import { PageHeader } from "@/components/page-header";
+import { getSessionToken } from "@/lib/auth-client";
 import { deleteMcp, mcpsQuery, workspaceUserQuery } from "@/lib/queries";
-import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/_app/workspace/$workspaceId/mcps/")({
 	component: RouteComponent,
@@ -55,11 +55,9 @@ function RouteComponent() {
 
 	const refreshMcpMutation = useMutation({
 		mutationFn: async (mcp_id: string) => {
-			const {
-				data: { session },
-			} = await supabase.auth.getSession();
+			const token = getSessionToken();
 
-			if (!session) {
+			if (!token) {
 				throw new Error("You must be logged in to refresh MCP.");
 			}
 
@@ -70,7 +68,7 @@ function RouteComponent() {
 				body: JSON.stringify({ mcp_id }),
 				headers: {
 					"Content-Type": "application/json",
-					Authorization: `Bearer ${session.access_token}`,
+					Authorization: `Bearer ${token}`,
 				},
 			});
 

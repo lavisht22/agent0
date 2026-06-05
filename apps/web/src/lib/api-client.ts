@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { getSessionToken } from "./auth-client";
 
 // In dev the web (:2222) and runner (:2223) are separate origins; in prod the
 // runner serves the built SPA, so same-origin relative paths work.
@@ -46,13 +46,11 @@ async function request<T>(
 	path: string,
 	options: RequestOptions = {},
 ): Promise<T> {
-	// The runner authenticates browser callers via the Supabase JWT (Phase 1).
-	// In Phase 2 this becomes a better-auth bearer token; only this line changes.
-	const {
-		data: { session },
-	} = await supabase.auth.getSession();
+	// The runner authenticates browser callers via the better-auth session
+	// bearer token, held in memory by auth-client (Phase 2).
+	const token = getSessionToken();
 
-	if (!session) {
+	if (!token) {
 		throw new ApiError("You must be logged in.", 401);
 	}
 
@@ -60,7 +58,7 @@ async function request<T>(
 		method,
 		headers: {
 			"Content-Type": "application/json",
-			Authorization: `Bearer ${session.access_token}`,
+			Authorization: `Bearer ${token}`,
 		},
 		body: options.body === undefined ? undefined : JSON.stringify(options.body),
 		signal: options.signal,

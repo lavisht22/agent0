@@ -6,7 +6,7 @@ import { useCallback, useRef, useState } from "react";
 import type z from "zod";
 import type { assistantMessageSchema } from "@/components/assistant-message";
 import type { MessageT } from "@/components/messages";
-import { supabase } from "@/lib/supabase";
+import { getSessionToken } from "@/lib/auth-client";
 
 export const useAgentRunner = ({
 	variableValues,
@@ -39,12 +39,10 @@ export const useAgentRunner = ({
 				setErrors([]);
 				setWarnings([]);
 
-				// Get the user's session to include the JWT token
-				const {
-					data: { session },
-				} = await supabase.auth.getSession();
+				// Include the better-auth session bearer token.
+				const token = getSessionToken();
 
-				if (!session) {
+				if (!token) {
 					toast.danger("You must be logged in to run agents.");
 					return;
 				}
@@ -57,7 +55,7 @@ export const useAgentRunner = ({
 					method: "POST",
 					headers: {
 						"Content-Type": "application/json",
-						Authorization: `Bearer ${session.access_token}`,
+						Authorization: `Bearer ${token}`,
 					},
 					body: JSON.stringify({
 						data,

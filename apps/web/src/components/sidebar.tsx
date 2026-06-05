@@ -27,8 +27,8 @@ import {
 	Settings,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { authClient, setSessionToken } from "@/lib/auth-client";
 import { workspacesQuery, workspaceUserQuery } from "@/lib/queries";
-import { supabase } from "@/lib/supabase";
 import { useTheme } from "@/lib/use-theme";
 
 interface SidebarProps {
@@ -287,9 +287,10 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 								id="logout"
 								textValue="Logout"
 								variant="danger"
-								onAction={() => {
-									supabase.auth.signOut();
-									navigate({ to: "/" });
+								onAction={async () => {
+									await authClient.signOut();
+									setSessionToken(null);
+									navigate({ to: "/auth" });
 								}}
 							>
 								<LucideLogOut className="size-4" />

@@ -17,8 +17,8 @@ import * as openpgp from "openpgp";
 import { useState } from "react";
 import { MonacoJsonField } from "@/components/monaco-json-field";
 import { PageHeader } from "@/components/page-header";
+import { getSessionToken } from "@/lib/auth-client";
 import { createMcp, mcpsQuery, updateMcp } from "@/lib/queries";
-import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute(
 	"/_app/workspace/$workspaceId/mcps/$mcpId",
@@ -62,10 +62,8 @@ async function encryptConfig(value: string) {
 }
 
 async function refreshMcpTools(mcpId: string) {
-	const {
-		data: { session },
-	} = await supabase.auth.getSession();
-	if (!session) return;
+	const token = getSessionToken();
+	if (!token) return;
 
 	const baseURL = import.meta.env.DEV ? "http://localhost:2223" : "";
 
@@ -74,7 +72,7 @@ async function refreshMcpTools(mcpId: string) {
 		body: JSON.stringify({ mcp_id: mcpId }),
 		headers: {
 			"Content-Type": "application/json",
-			Authorization: `Bearer ${session.access_token}`,
+			Authorization: `Bearer ${token}`,
 		},
 	});
 }

@@ -10,15 +10,14 @@ import {
 } from "@heroui/react";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { supabase } from "../lib/supabase";
+import { authClient, getSessionToken } from "../lib/auth-client";
 
 export const Route = createFileRoute("/auth")({
 	component: RouteComponent,
 	beforeLoad: async () => {
-		const {
-			data: { session },
-		} = await supabase.auth.getSession();
-		if (session) {
+		// The session token lives only in memory, so a held token means an
+		// already-authenticated tab — skip the login screen.
+		if (getSessionToken()) {
 			throw redirect({ to: "/" });
 		}
 	},
@@ -37,11 +36,12 @@ function RouteComponent() {
 		setLoading(true);
 
 		try {
-			const { error } = await supabase.auth.signInWithOtp({
+			const { error } = await authClient.emailOtp.sendVerificationOtp({
 				email,
+				type: "sign-in",
 			});
 
-			if (error) throw error;
+			if (error) throw new Error(error.message);
 
 			setStep("otp");
 		} catch (error) {
@@ -60,13 +60,12 @@ function RouteComponent() {
 		setLoading(true);
 
 		try {
-			const { error } = await supabase.auth.verifyOtp({
+			const { error } = await authClient.signIn.emailOtp({
 				email,
-				token: otp,
-				type: "email",
+				otp,
 			});
 
-			if (error) throw error;
+			if (error) throw new Error(error.message);
 
 			navigate({ to: "/" });
 		} catch (error) {

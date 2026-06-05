@@ -35,7 +35,11 @@ fastify.register(fastifyStatic, {
 
 await fastify.register(cors, {
 	origin: "*",
-	methods: ["GET", "POST", "PUT", "DELETE"],
+	methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+	// better-auth's bearer plugin returns the session token in this response
+	// header on sign-in / getSession; expose it so the cross-origin dev web
+	// (:2222 → :2223) can read it. Prod is same-origin, so it's a no-op there.
+	exposedHeaders: ["set-auth-token"],
 });
 
 // 2. Catch-all for SPA (Single Page App) Routing

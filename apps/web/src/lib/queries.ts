@@ -5,7 +5,7 @@ import {
 	type DateRangeValue,
 } from "@/components/date-range-picker";
 import { api } from "./api-client";
-import { supabase } from "./supabase";
+import { authClient } from "./auth-client";
 import type { RunData } from "./types";
 
 // The runner's tags endpoints return this subset of the full row.
@@ -617,29 +617,27 @@ export const workspaceUserQuery = (workspaceId: string) =>
 	queryOptions({
 		queryKey: ["workspace-user", workspaceId],
 		queryFn: async () => {
-			// Identity (id + email) comes from the Supabase session — auth stays on
-			// Supabase until Phase 2. Role + display name come from the members API.
-			const { data: claimsData, error: claimsError } =
-				await supabase.auth.getClaims();
+			// Identity (id + email) comes from the better-auth session; role +
+			// display name come from the members API.
+			const { data: session, error: sessionError } =
+				await authClient.getSession();
 
-			if (claimsError) throw claimsError;
+			if (sessionError) throw new Error(sessionError.message);
 
-			const claims = claimsData?.claims;
-
-			if (!claims?.sub) throw new Error("User not found");
+			if (!session?.user?.id) throw new Error("User not found");
 
 			const { data: members } = await api.get<{ data: WorkspaceMember[] }>(
 				`/api/v1/workspaces/${workspaceId}/members`,
 			);
 
-			const me = members.find((m) => m.user_id === claims.sub);
+			const me = members.find((m) => m.user_id === session.user.id);
 
 			if (!me) throw new Error("User not found");
 
 			return {
-				id: claims.sub,
+				id: session.user.id,
 				name: me.user?.name ?? null,
-				email: claims.email,
+				email: session.user.email,
 				workspace_id: workspaceId,
 				role: me.role,
 			};

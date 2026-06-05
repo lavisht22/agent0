@@ -1,6 +1,8 @@
 import { Output, stepCountIs, streamText, type ToolSet } from "ai";
+import { fromNodeHeaders } from "better-auth/node";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
+import { auth } from "../lib/auth/index.js";
 import { sumUsage } from "../lib/cost.js";
 import { supabase } from "../lib/db.js";
 import { createSSEStream } from "../lib/helpers.js";
@@ -14,24 +16,18 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 		// back to this test run as parent_run_id.
 		const runId = nanoid();
 
-		// Extract and validate JWT token from Authorization header
-		const token = request.headers.authorization?.split("Bearer ")[1];
+		// Validate the better-auth session (bearer token on the Authorization
+		// header). This /internal route does its own auth — it's registered
+		// outside `addAuth` — but uses the same browser-session credential.
+		const session = await auth.api.getSession({
+			headers: fromNodeHeaders(request.headers),
+		});
 
-		if (!token) {
-			return reply.code(401).send({ message: "No token provided" });
-		}
-
-		// Validate the token with Supabase
-		const { data: claims, error: userError } =
-			await supabase.auth.getClaims(token);
-
-		if (userError) {
+		if (!session) {
 			return reply.code(401).send({ message: "Invalid token" });
 		}
 
-		if (!claims) {
-			return reply.code(401).send({ message: "Failed to get claims" });
-		}
+		const userId = session.user.id;
 
 		const {
 			data,
@@ -54,7 +50,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			.from("providers")
 			.select("workspace_id, workspaces(workspace_user(user_id, role))")
 			.eq("id", versionData.model.provider_id)
-			.eq("workspaces.workspace_user.user_id", claims.claims.sub)
+			.eq("workspaces.workspace_user.user_id", userId)
 			.single();
 
 		if (providerError || !provider) {

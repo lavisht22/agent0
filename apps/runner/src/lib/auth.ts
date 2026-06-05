@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
+import { fromNodeHeaders } from "better-auth/node";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { auth } from "./auth/index.js";
 import { supabase } from "./db.js";
 import { scopesForRole } from "./scopes.js";
 
@@ -86,24 +88,26 @@ async function resolveUserScopes(
 }
 
 /**
- * Browser session → `kind: "user"`. Validates the Supabase access token and
- * derives scopes from the user's current workspace role. Selected when an
- * `Authorization: Bearer` token is present (Bearer is now exclusively the
- * browser-session channel; PATs moved to the `x-pat` header).
+ * Browser session → `kind: "user"`. Validates the better-auth session bearer
+ * token and derives scopes from the user's current workspace role. Selected when
+ * an `Authorization: Bearer` token is present (Bearer is now exclusively the
+ * browser-session channel; PATs moved to the `x-pat` header). The bearer plugin
+ * lets `getSession` read the token straight off the `Authorization` header.
  */
 async function authenticateBrowserSession(
 	request: FastifyRequest,
 	reply: FastifyReply,
-	token: string,
 ): Promise<AuthResult> {
-	const { data, error } = await supabase.auth.getClaims(token);
+	const session = await auth.api.getSession({
+		headers: fromNodeHeaders(request.headers),
+	});
 
-	if (error || !data) {
+	if (!session) {
 		reply.code(401).send({ message: "Invalid token" });
 		return { ok: false };
 	}
 
-	const userId = data.claims.sub;
+	const userId = session.user.id;
 
 	const scopes = await resolveUserScopes(request, reply, userId);
 	if (scopes === null) {
@@ -284,7 +288,7 @@ export function addAuth(fastify: FastifyInstance) {
 					return reply.code(401).send({ message: "Empty bearer token" });
 				}
 
-				result = await authenticateBrowserSession(request, reply, token);
+				result = await authenticateBrowserSession(request, reply);
 			} else {
 				const apiKey = request.headers["x-api-key"] as string | undefined;
 
