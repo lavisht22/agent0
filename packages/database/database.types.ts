@@ -444,18 +444,30 @@ export type Database = {
       users: {
         Row: {
           created_at: string
+          email: string
+          email_verified: boolean
           id: string
+          image: string | null
           name: string | null
+          updated_at: string
         }
         Insert: {
           created_at?: string
+          email: string
+          email_verified?: boolean
           id: string
+          image?: string | null
           name?: string | null
+          updated_at?: string
         }
         Update: {
           created_at?: string
+          email?: string
+          email_verified?: boolean
           id?: string
+          image?: string | null
           name?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
