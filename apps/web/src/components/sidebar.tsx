@@ -27,7 +27,7 @@ import {
 	Settings,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { authClient, setSessionToken } from "@/lib/auth-client";
+import { authClient, invalidateSession } from "@/lib/auth-client";
 import { workspacesQuery, workspaceUserQuery } from "@/lib/queries";
 import { useTheme } from "@/lib/use-theme";
 
@@ -289,7 +289,7 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 								variant="danger"
 								onAction={async () => {
 									await authClient.signOut();
-									setSessionToken(null);
+									invalidateSession();
 									navigate({ to: "/auth" });
 								}}
 							>

@@ -33,13 +33,53 @@ fastify.register(fastifyStatic, {
 	prefix: "/", // Serve at root
 });
 
+// Wildcard CORS is for the cross-origin *machine* clients — the embed widget
+// and API-key callers on customer sites. The browser app never relies on it:
+// it's same-origin (prod serves the SPA; dev proxies through Vite), and its
+// session rides a same-origin httpOnly cookie, not a CORS-readable header.
 await fastify.register(cors, {
 	origin: "*",
 	methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-	// better-auth's bearer plugin returns the session token in this response
-	// header on sign-in / getSession; expose it so the cross-origin dev web
-	// (:2222 → :2223) can read it. Prod is same-origin, so it's a no-op there.
-	exposedHeaders: ["set-auth-token"],
+});
+
+// Content-Security-Policy for the SPA document — the primary XSS mitigation now
+// that the session cookie is httpOnly (an injected script can't read the token,
+// and CSP makes injecting one much harder). It permits what our bundle actually
+// needs: Monaco loads its editor + blob workers from the jsdelivr CDN and uses
+// eval for its tokenizer (which also covers openpgp's wasm), and HeroUI / React
+// Aria inject inline styles. Tightening to nonces + a locally-bundled Monaco
+// (dropping 'unsafe-eval' and the CDN) is a possible follow-up.
+const CONTENT_SECURITY_POLICY = [
+	"default-src 'self'",
+	"script-src 'self' 'unsafe-eval' blob: https://cdn.jsdelivr.net",
+	"worker-src 'self' blob:",
+	"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+	"img-src 'self' data: blob:",
+	"font-src 'self' data: https://cdn.jsdelivr.net",
+	"connect-src 'self' https://cdn.jsdelivr.net",
+	"frame-ancestors 'none'",
+	"base-uri 'self'",
+	"form-action 'self'",
+	"object-src 'none'",
+].join("; ");
+
+fastify.addHook("onSend", async (request, reply, payload) => {
+	// Cheap, universally-safe headers on every response.
+	reply.header("X-Content-Type-Options", "nosniff");
+	reply.header("Referrer-Policy", "no-referrer");
+
+	// CSP + anti-framing only on the SPA document — not the JSON API, and not the
+	// Swagger UI at /api/v1/docs (which ships its own inline init script this
+	// policy would block).
+	const contentType = reply.getHeader("content-type");
+	const isHtml =
+		typeof contentType === "string" && contentType.includes("text/html");
+	if (isHtml && !(request.raw.url ?? "").startsWith("/api")) {
+		reply.header("Content-Security-Policy", CONTENT_SECURITY_POLICY);
+		reply.header("X-Frame-Options", "DENY");
+	}
+
+	return payload;
 });
 
 // 2. Catch-all for SPA (Single Page App) Routing

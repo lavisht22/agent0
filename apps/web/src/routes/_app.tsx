@@ -1,16 +1,17 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
 import { api } from "../lib/api-client";
-import { getSessionToken } from "../lib/auth-client";
+import { getCachedSession } from "../lib/auth-client";
 
 type WorkspaceListItem = { id: string };
 
 export const Route = createFileRoute("/_app")({
 	component: LayoutComponent,
 	beforeLoad: async ({ location }) => {
-		// The better-auth session token lives only in memory; no token means no
-		// authenticated session (e.g. after a reload) → back to login.
-		if (!getSessionToken()) {
+		// Ask better-auth whether the httpOnly session cookie is valid (cached for
+		// the app lifetime). No session → back to login.
+		const session = await getCachedSession();
+		if (!session) {
 			throw redirect({ to: "/auth" });
 		}
 

@@ -5,7 +5,7 @@ import {
 	type DateRangeValue,
 } from "@/components/date-range-picker";
 import { api } from "./api-client";
-import { authClient } from "./auth-client";
+import { getCachedSession } from "./auth-client";
 import type { RunData } from "./types";
 
 // The runner's tags endpoints return this subset of the full row.
@@ -619,10 +619,7 @@ export const workspaceUserQuery = (workspaceId: string) =>
 		queryFn: async () => {
 			// Identity (id + email) comes from the better-auth session; role +
 			// display name come from the members API.
-			const { data: session, error: sessionError } =
-				await authClient.getSession();
-
-			if (sessionError) throw new Error(sessionError.message);
+			const session = await getCachedSession();
 
 			if (!session?.user?.id) throw new Error("User not found");
 

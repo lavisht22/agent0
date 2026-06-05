@@ -6,7 +6,6 @@ import { useCallback, useRef, useState } from "react";
 import type z from "zod";
 import type { assistantMessageSchema } from "@/components/assistant-message";
 import type { MessageT } from "@/components/messages";
-import { getSessionToken } from "@/lib/auth-client";
 
 export const useAgentRunner = ({
 	variableValues,
@@ -39,23 +38,12 @@ export const useAgentRunner = ({
 				setErrors([]);
 				setWarnings([]);
 
-				// Include the better-auth session bearer token.
-				const token = getSessionToken();
-
-				if (!token) {
-					toast.danger("You must be logged in to run agents.");
-					return;
-				}
-
-				const url = import.meta.env.DEV
-					? "http://localhost:2223/internal/test"
-					: "/internal/test";
-
-				const response = await fetch(url, {
+				// Auth rides the httpOnly session cookie (same-origin).
+				const response = await fetch("/internal/test", {
 					method: "POST",
+					credentials: "include",
 					headers: {
 						"Content-Type": "application/json",
-						Authorization: `Bearer ${token}`,
 					},
 					body: JSON.stringify({
 						data,

@@ -11,9 +11,9 @@ import { scopesForRole } from "./scopes.js";
  * handlers depend only on `principal.scopes` (and, for mutations, `kind`),
  * never on *how* the caller authenticated.
  *
- *   - `kind: "user"`   — a human identity. Browser session (Supabase JWT) or
- *     PAT (`agent0_pat_…`). Scopes are resolved per-request from the user's
- *     current `workspace_user.role` against the path's workspace.
+ *   - `kind: "user"`   — a human identity. Browser session (better-auth httpOnly
+ *     cookie) or PAT (`agent0_pat_…`). Scopes are resolved per-request from the
+ *     user's current `workspace_user.role` against the path's workspace.
  *   - `kind: "apiKey"` — a machine identity. Workspace-pinned, fixed scopes,
  *     optional origin allowlist. No user.
  */
@@ -88,11 +88,11 @@ async function resolveUserScopes(
 }
 
 /**
- * Browser session → `kind: "user"`. Validates the better-auth session bearer
- * token and derives scopes from the user's current workspace role. Selected when
- * an `Authorization: Bearer` token is present (Bearer is now exclusively the
- * browser-session channel; PATs moved to the `x-pat` header). The bearer plugin
- * lets `getSession` read the token straight off the `Authorization` header.
+ * Browser session → `kind: "user"`. Validates the better-auth session from the
+ * httpOnly cookie and derives scopes from the user's current workspace role.
+ * This is the fallback authenticator — it runs whenever the request carries
+ * neither `x-pat` nor `x-api-key`, i.e. it's the browser app. `getSession`
+ * reads the session cookie out of the forwarded request headers.
  */
 async function authenticateBrowserSession(
 	request: FastifyRequest,
@@ -103,7 +103,7 @@ async function authenticateBrowserSession(
 	});
 
 	if (!session) {
-		reply.code(401).send({ message: "Invalid token" });
+		reply.code(401).send({ message: "Authentication required" });
 		return { ok: false };
 	}
 
@@ -242,12 +242,12 @@ function applyPrincipal(request: FastifyRequest, principal: Principal): void {
  *
  * The middleware is an ordered list of authenticators (Passport-style
  * strategies); the credential present on the request selects which one runs,
- * and the winner is normalized to a single `Principal`. Each credential has its
- * own header, so dispatch is a pure header check — no prefix-sniffing:
+ * and the winner is normalized to a single `Principal`. Dispatch is a pure
+ * header check, with the browser cookie session as the fallback:
  *
- *   1. `x-pat: <token>`              → PAT            → kind "user"
- *   2. `Authorization: Bearer <jwt>` → browser session (Supabase JWT) → kind "user"
- *   3. `x-api-key: <key>`            → API key        → kind "apiKey"
+ *   1. `x-pat: <token>`   → PAT                          → kind "user"
+ *   2. `x-api-key: <key>` → API key                      → kind "apiKey"
+ *   3. otherwise          → browser session (httpOnly cookie, better-auth) → kind "user"
  *
  * If a credential is present but invalid/expired/revoked, the request is
  * rejected — we do not fall through to a later authenticator, since silently
@@ -268,7 +268,7 @@ export function addAuth(fastify: FastifyInstance) {
 		"preHandler",
 		async (request: FastifyRequest, reply: FastifyReply) => {
 			const patToken = request.headers["x-pat"] as string | undefined;
-			const authHeader = request.headers.authorization;
+			const apiKey = request.headers["x-api-key"] as string | undefined;
 
 			let result: AuthResult;
 
@@ -279,27 +279,12 @@ export function addAuth(fastify: FastifyInstance) {
 				}
 
 				result = await authenticatePat(request, reply, token);
-			} else if (
-				typeof authHeader === "string" &&
-				authHeader.startsWith("Bearer ")
-			) {
-				const token = authHeader.slice("Bearer ".length).trim();
-				if (!token) {
-					return reply.code(401).send({ message: "Empty bearer token" });
-				}
-
-				result = await authenticateBrowserSession(request, reply);
-			} else {
-				const apiKey = request.headers["x-api-key"] as string | undefined;
-
-				if (!apiKey) {
-					return reply.code(401).send({
-						message:
-							"Authentication required (x-pat, Authorization: Bearer, or x-api-key)",
-					});
-				}
-
+			} else if (apiKey) {
 				result = await authenticateApiKey(request, reply, apiKey);
+			} else {
+				// No PAT and no API key → the caller is the browser app, identified
+				// by its httpOnly better-auth session cookie (read inside getSession).
+				result = await authenticateBrowserSession(request, reply);
 			}
 
 			// Authenticator already sent the failure reply.

@@ -1,55 +1,40 @@
 import { emailOTPClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
-// In dev the web (:2222) and runner (:2223) are separate origins; in prod the
-// runner serves the built SPA, so the auth surface is same-origin. The runner
-// mounts better-auth at /api/auth (the client's default basePath).
-const BASE_URL = import.meta.env.DEV
-	? "http://localhost:2223"
-	: window.location.origin;
-
 /**
- * In-memory bearer-token store. Deliberately NOT localStorage/sessionStorage:
- * a token kept only in a JS closure can't be lifted out of persistent storage
- * by an XSS payload, and it dies with the tab. The trade-off is that a full
- * page reload loses the token (there's no cookie either — the runner's CORS is
- * wildcard + bearer-only by design), so the user lands back on /auth. Durable
- * cross-reload sessions (refresh-token rotation) are Phase 2 step 9.
+ * better-auth client. The session is an httpOnly cookie (Phase 2 step 9) — the
+ * token never touches JS, so there is nothing here to store or read. The browser
+ * is same-origin with the runner (prod serves the SPA; dev proxies through Vite),
+ * so the cookie flows on every request with no CORS involvement.
  */
-let sessionToken: string | null = null;
-
-export function getSessionToken(): string | null {
-	return sessionToken;
-}
-
-export function setSessionToken(token: string | null): void {
-	sessionToken = token;
-}
-
 export const authClient = createAuthClient({
-	baseURL: BASE_URL,
+	baseURL: window.location.origin,
 	plugins: [emailOTPClient()],
 	fetchOptions: {
-		// Bearer-only, no cookies — so don't send credentials. This also keeps us
-		// off the wildcard-origin-vs-credentials CORS conflict: the runner replies
-		// `Access-Control-Allow-Origin: *`, which the browser rejects on a
-		// credentialed (`include`) request. better-auth defaults to `include`
-		// (it's cookie-oriented); override it here.
-		credentials: "omit",
-		// The bearer plugin returns the session token in `set-auth-token` on any
-		// authenticated response (OTP verify, getSession, …). Capture it into the
-		// in-memory store so api-client can attach it as `Authorization: Bearer`.
-		// (The runner exposes this header via CORS for the cross-origin dev case.)
-		onSuccess(ctx) {
-			const token = ctx.response.headers.get("set-auth-token");
-			if (token) {
-				setSessionToken(token);
-			}
-		},
-		// Send the in-memory token on better-auth's own requests too.
-		auth: {
-			type: "Bearer",
-			token: () => getSessionToken() ?? "",
-		},
+		// Send the session cookie. Same-origin, so this is effectively the default,
+		// but we set it explicitly.
+		credentials: "include",
 	},
 });
+
+type SessionData = Awaited<ReturnType<typeof authClient.getSession>>["data"];
+
+// Because the session cookie is httpOnly, JS can't synchronously know whether
+// the user is logged in — it has to ask the server. We cache the answer for the
+// app's lifetime so route guards don't refetch on every navigation. `undefined`
+// means "not yet loaded"; `null` means "loaded, not authenticated".
+let cachedSession: SessionData | undefined;
+
+/** Resolve the session, hitting the server once and caching the result. */
+export async function getCachedSession(force = false): Promise<SessionData> {
+	if (cachedSession === undefined || force) {
+		const { data } = await authClient.getSession();
+		cachedSession = data ?? null;
+	}
+	return cachedSession;
+}
+
+/** Drop the cache so the next `getCachedSession` refetches (after login/logout). */
+export function invalidateSession(): void {
+	cachedSession = undefined;
+}

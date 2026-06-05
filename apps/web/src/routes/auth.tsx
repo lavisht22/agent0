@@ -10,14 +10,18 @@ import {
 } from "@heroui/react";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { authClient, getSessionToken } from "../lib/auth-client";
+import {
+	authClient,
+	getCachedSession,
+	invalidateSession,
+} from "../lib/auth-client";
 
 export const Route = createFileRoute("/auth")({
 	component: RouteComponent,
 	beforeLoad: async () => {
-		// The session token lives only in memory, so a held token means an
-		// already-authenticated tab — skip the login screen.
-		if (getSessionToken()) {
+		// Already authenticated (valid session cookie) → skip the login screen.
+		const session = await getCachedSession();
+		if (session) {
 			throw redirect({ to: "/" });
 		}
 	},
@@ -67,6 +71,9 @@ function RouteComponent() {
 
 			if (error) throw new Error(error.message);
 
+			// Sign-in set the session cookie; drop the cached "logged out" answer so
+			// the destination route's guard re-reads it.
+			invalidateSession();
 			navigate({ to: "/" });
 		} catch (error) {
 			toast.danger(

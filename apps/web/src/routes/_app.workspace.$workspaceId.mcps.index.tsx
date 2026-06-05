@@ -14,7 +14,6 @@ import { useState } from "react";
 import { ConfirmationModal } from "@/components/confirmation-modal";
 import IDCopy from "@/components/id-copy";
 import { PageHeader } from "@/components/page-header";
-import { getSessionToken } from "@/lib/auth-client";
 import { deleteMcp, mcpsQuery, workspaceUserQuery } from "@/lib/queries";
 
 export const Route = createFileRoute("/_app/workspace/$workspaceId/mcps/")({
@@ -55,20 +54,12 @@ function RouteComponent() {
 
 	const refreshMcpMutation = useMutation({
 		mutationFn: async (mcp_id: string) => {
-			const token = getSessionToken();
-
-			if (!token) {
-				throw new Error("You must be logged in to refresh MCP.");
-			}
-
-			const baseURL = import.meta.env.DEV ? "http://localhost:2223" : "";
-
-			const response = await fetch(`${baseURL}/internal/refresh-mcp`, {
+			const response = await fetch("/internal/refresh-mcp", {
 				method: "POST",
+				credentials: "include",
 				body: JSON.stringify({ mcp_id }),
 				headers: {
 					"Content-Type": "application/json",
-					Authorization: `Bearer ${token}`,
 				},
 			});
 

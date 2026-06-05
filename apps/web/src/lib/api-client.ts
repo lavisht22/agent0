@@ -1,8 +1,6 @@
-import { getSessionToken } from "./auth-client";
-
-// In dev the web (:2222) and runner (:2223) are separate origins; in prod the
-// runner serves the built SPA, so same-origin relative paths work.
-const BASE_URL = import.meta.env.DEV ? "http://localhost:2223" : "";
+// The browser is same-origin with the runner in both dev (Vite proxy) and prod
+// (runner serves the SPA), so relative paths work everywhere.
+const BASE_URL = "";
 
 /** Thrown for any non-2xx runner response. `status` is the HTTP status code. */
 export class ApiError extends Error {
@@ -46,19 +44,14 @@ async function request<T>(
 	path: string,
 	options: RequestOptions = {},
 ): Promise<T> {
-	// The runner authenticates browser callers via the better-auth session
-	// bearer token, held in memory by auth-client (Phase 2).
-	const token = getSessionToken();
-
-	if (!token) {
-		throw new ApiError("You must be logged in.", 401);
-	}
-
+	// The runner authenticates browser callers via the httpOnly session cookie,
+	// which the browser attaches automatically (same-origin). A request made
+	// while logged out simply comes back 401 → ApiError below.
 	const response = await fetch(buildUrl(path, options.query), {
 		method,
+		credentials: "include",
 		headers: {
 			"Content-Type": "application/json",
-			Authorization: `Bearer ${token}`,
 		},
 		body: options.body === undefined ? undefined : JSON.stringify(options.body),
 		signal: options.signal,

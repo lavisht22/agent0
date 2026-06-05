@@ -7,8 +7,9 @@ import { auth } from "../lib/auth/index.js";
  * `addAuth` middleware on purpose — this IS the authentication surface (OTP
  * send/verify, session, sign-out), so it cannot require an existing credential.
  *
- * Bearer-token transport (no cookies), so the existing permissive CORS is fine
- * — there are no credentialed cross-origin requests to guard. Phase 2.
+ * Sessions ride an httpOnly cookie. The browser app is same-origin (the runner
+ * serves the SPA in prod; a Vite proxy makes dev same-origin), so the cookie
+ * flows without any credentialed-CORS dance. Phase 2.
  */
 export async function registerBetterAuthRoutes(fastify: FastifyInstance) {
 	fastify.route({
@@ -29,7 +30,16 @@ export async function registerBetterAuthRoutes(fastify: FastifyInstance) {
 			const response = await auth.handler(req);
 
 			reply.status(response.status);
-			response.headers.forEach((value, key) => reply.header(key, value));
+			// Forward every header except Set-Cookie, which needs special handling:
+			// Headers.forEach collapses multiple Set-Cookie values into one comma-
+			// joined string and corrupts them. getSetCookie() returns them split.
+			for (const [key, value] of response.headers.entries()) {
+				if (key.toLowerCase() === "set-cookie") continue;
+				reply.header(key, value);
+			}
+			for (const cookie of response.headers.getSetCookie()) {
+				reply.header("set-cookie", cookie);
+			}
 			reply.send(response.body ? await response.text() : null);
 		},
 	});

@@ -17,7 +17,6 @@ import * as openpgp from "openpgp";
 import { useState } from "react";
 import { MonacoJsonField } from "@/components/monaco-json-field";
 import { PageHeader } from "@/components/page-header";
-import { getSessionToken } from "@/lib/auth-client";
 import { createMcp, mcpsQuery, updateMcp } from "@/lib/queries";
 
 export const Route = createFileRoute(
@@ -62,17 +61,12 @@ async function encryptConfig(value: string) {
 }
 
 async function refreshMcpTools(mcpId: string) {
-	const token = getSessionToken();
-	if (!token) return;
-
-	const baseURL = import.meta.env.DEV ? "http://localhost:2223" : "";
-
-	await fetch(`${baseURL}/internal/refresh-mcp`, {
+	await fetch("/internal/refresh-mcp", {
 		method: "POST",
+		credentials: "include",
 		body: JSON.stringify({ mcp_id: mcpId }),
 		headers: {
 			"Content-Type": "application/json",
-			Authorization: `Bearer ${token}`,
 		},
 	});
 }
