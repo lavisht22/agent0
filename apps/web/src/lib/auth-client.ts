@@ -30,6 +30,12 @@ export const authClient = createAuthClient({
 	baseURL: BASE_URL,
 	plugins: [emailOTPClient()],
 	fetchOptions: {
+		// Bearer-only, no cookies — so don't send credentials. This also keeps us
+		// off the wildcard-origin-vs-credentials CORS conflict: the runner replies
+		// `Access-Control-Allow-Origin: *`, which the browser rejects on a
+		// credentialed (`include`) request. better-auth defaults to `include`
+		// (it's cookie-oriented); override it here.
+		credentials: "omit",
 		// The bearer plugin returns the session token in `set-auth-token` on any
 		// authenticated response (OTP verify, getSession, …). Capture it into the
 		// in-memory store so api-client can attach it as `Authorization: Bearer`.
