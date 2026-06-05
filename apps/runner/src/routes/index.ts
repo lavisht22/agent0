@@ -3,6 +3,7 @@ import { addAuth } from "../lib/auth.js";
 import { registerAgentRoutes } from "./agents.js";
 import { registerApiKeysRoutes } from "./api-keys.js";
 import { registerAuthRoutes } from "./auth.js";
+import { registerBetterAuthRoutes } from "./better-auth.js";
 import { registerDashboardRoutes } from "./dashboard.js";
 import { registerEmbedRoutes } from "./embed.js";
 import { registerMcpsRoutes } from "./mcps.js";
@@ -22,6 +23,11 @@ export async function registerRoutes(fastify: FastifyInstance) {
 
 	// Unauthenticated discovery — must be registered outside `addAuth`.
 	await registerVersionRoute(fastify);
+
+	// better-auth handler (/api/auth/*) — the browser-session auth surface
+	// (OTP send/verify, session, sign-out). Outside `addAuth` by design: it
+	// issues credentials, so it can't require one. PATs/API keys are unaffected.
+	await registerBetterAuthRoutes(fastify);
 
 	// Public API routes — authenticated by `addAuth` (PAT first, then x-api-key).
 	// PATs set request.userId; API keys leave it undefined. Routes that mutate

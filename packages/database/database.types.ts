@@ -39,6 +39,62 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounts: {
+        Row: {
+          access_token: string | null
+          access_token_expires_at: string | null
+          account_id: string
+          created_at: string
+          id: string
+          id_token: string | null
+          password: string | null
+          provider_id: string
+          refresh_token: string | null
+          refresh_token_expires_at: string | null
+          scope: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          access_token_expires_at?: string | null
+          account_id: string
+          created_at?: string
+          id?: string
+          id_token?: string | null
+          password?: string | null
+          provider_id: string
+          refresh_token?: string | null
+          refresh_token_expires_at?: string | null
+          scope?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          access_token_expires_at?: string | null
+          account_id?: string
+          created_at?: string
+          id?: string
+          id_token?: string | null
+          password?: string | null
+          provider_id?: string
+          refresh_token?: string | null
+          refresh_token_expires_at?: string | null
+          scope?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_tags: {
         Row: {
           agent_id: string
@@ -406,6 +462,47 @@ export type Database = {
           },
         ]
       }
+      sessions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          ip_address: string | null
+          token: string
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          ip_address?: string | null
+          token: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          token?: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tags: {
         Row: {
           color: string
@@ -468,6 +565,33 @@ export type Database = {
           image?: string | null
           name?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      verifications: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          identifier: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          identifier: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          identifier?: string
+          updated_at?: string
+          value?: string
         }
         Relationships: []
       }
