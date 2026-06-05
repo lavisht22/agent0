@@ -1,54 +1,41 @@
 import { toast } from "@heroui/react";
-import type { Json, Tables } from "@repo/database";
+import type { Json } from "@repo/database";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { nanoid } from "nanoid";
 import type { Dispatch, SetStateAction } from "react";
-import { supabase } from "@/lib/supabase";
+import {
+	type Agent,
+	createAgent,
+	createAgentVersion,
+	type Tag,
+	updateAgent,
+} from "@/lib/queries";
 import type { AgentFormValues } from "../types";
 
 export const useAgentMutations = ({
 	name,
 	agentId,
 	workspaceId,
-	setVersion,
+	setVersionId,
 }: {
 	name: string;
 	agentId: string;
 	workspaceId: string;
-	setVersion: Dispatch<SetStateAction<Tables<"agent_versions"> | undefined>>;
+	setVersionId: Dispatch<SetStateAction<string | undefined>>;
 }) => {
 	const queryClient = useQueryClient();
 	const navigate = useNavigate();
 
-	// Create mutation (creates both agent and first version)
+	// Create mutation (creates both the agent and its first, undeployed version)
 	const createMutation = useMutation({
 		mutationFn: async (values: AgentFormValues) => {
-			const newAgentId = nanoid();
-			const newVersionId = nanoid();
-
-			// Create agent
-			const { error: agentError } = await supabase.from("agents").insert({
-				id: newAgentId,
-				name,
-				workspace_id: workspaceId,
-			});
-
-			if (agentError) throw agentError;
-
-			// Create first version
-			const { error: versionError } = await supabase
-				.from("agent_versions")
-				.insert({
-					id: newVersionId,
-					agent_id: newAgentId,
-					data: values as unknown as Json,
-					is_deployed: false,
-				});
-
-			if (versionError) throw versionError;
-
-			return newAgentId;
+			const agent = await createAgent(workspaceId, name);
+			await createAgentVersion(
+				workspaceId,
+				agent.id,
+				values as unknown as Json,
+			);
+			return agent.id;
 		},
 		onSuccess: (newAgentId) => {
 			queryClient.invalidateQueries({ queryKey: ["agents", workspaceId] });
@@ -65,31 +52,17 @@ export const useAgentMutations = ({
 		},
 	});
 
-	// Update mutation (creates new version)
+	// Update mutation (creates a new, undeployed version)
 	const updateMutation = useMutation({
-		mutationFn: async (values: AgentFormValues) => {
-			const newVersionId = nanoid();
-
-			// Create new version
-			const { data: version, error: versionError } = await supabase
-				.from("agent_versions")
-				.insert({
-					id: newVersionId,
-					agent_id: agentId,
-					data: values as unknown as Json,
-					is_deployed: false,
-				})
-				.select()
-				.single();
-
-			if (versionError) throw versionError;
-
-			return version;
-		},
-		onSuccess: (data) => {
+		mutationFn: (values: AgentFormValues) =>
+			createAgentVersion(workspaceId, agentId, values as unknown as Json),
+		onSuccess: (version) => {
 			queryClient.invalidateQueries({ queryKey: ["agents", workspaceId] });
 			queryClient.invalidateQueries({ queryKey: ["agent-versions", agentId] });
-			setVersion(data);
+			// Seed the detail cache so the editor has the new version's data without
+			// a refetch, then select it.
+			queryClient.setQueryData(["agent-version", version.id], version);
+			setVersionId(version.id);
 			toast.success("New version created successfully.");
 		},
 		onError: (error) => {
@@ -102,14 +75,7 @@ export const useAgentMutations = ({
 	});
 
 	const updateNameMutation = useMutation({
-		mutationFn: async (name: string) => {
-			const { error } = await supabase
-				.from("agents")
-				.update({ name })
-				.eq("id", agentId);
-
-			if (error) throw error;
-		},
+		mutationFn: (name: string) => updateAgent(workspaceId, agentId, { name }),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["agents", workspaceId] });
 			queryClient.invalidateQueries({ queryKey: ["agent", agentId] });
@@ -123,29 +89,20 @@ export const useAgentMutations = ({
 
 	// Deploy mutation - deploys a version to an environment (staging or production)
 	const deployMutation = useMutation({
-		mutationFn: async ({
+		mutationFn: ({
 			version_id,
 			environment,
 		}: {
 			version_id: string;
 			environment: "staging" | "production";
-		}) => {
-			// Update the agent's staging or production version ID
-			const updateField =
+		}) =>
+			updateAgent(
+				workspaceId,
+				agentId,
 				environment === "staging"
 					? { staging_version_id: version_id }
-					: { production_version_id: version_id };
-
-			const { error } = await supabase
-				.from("agents")
-				.update(updateField)
-				.eq("id", agentId)
-				.throwOnError();
-
-			if (error) throw error;
-
-			return { version_id, environment };
-		},
+					: { production_version_id: version_id },
+			),
 		onSuccess: (_, variables) => {
 			queryClient.invalidateQueries({ queryKey: ["agent", agentId] });
 			queryClient.invalidateQueries({ queryKey: ["agent-versions", agentId] });
@@ -160,73 +117,42 @@ export const useAgentMutations = ({
 		},
 	});
 
-	// Sync tags mutation - replaces all agent tags with new ones (with optimistic updates)
+	// Sync tags mutation - replaces the agent's full tag set (with optimistic update)
 	const syncTagsMutation = useMutation({
-		mutationFn: async (tagIds: string[]) => {
-			// Delete existing agent tags
-			const { error: deleteError } = await supabase
-				.from("agent_tags")
-				.delete()
-				.eq("agent_id", agentId);
-
-			if (deleteError) throw deleteError;
-
-			// Insert new agent tags
-			if (tagIds.length > 0) {
-				const { error: insertError } = await supabase
-					.from("agent_tags")
-					.insert(
-						tagIds.map((tagId) => ({ agent_id: agentId, tag_id: tagId })),
-					);
-
-				if (insertError) throw insertError;
-			}
-		},
+		mutationFn: (tagIds: string[]) =>
+			updateAgent(workspaceId, agentId, { tag_ids: tagIds }),
 		onMutate: async (tagIds) => {
-			// Cancel any outgoing refetches to avoid overwriting optimistic update
-			await queryClient.cancelQueries({ queryKey: ["agent-tags", agentId] });
+			// Cancel outgoing refetches so they don't clobber the optimistic update.
+			await queryClient.cancelQueries({ queryKey: ["agent", agentId] });
 
-			// Snapshot the previous value
-			const previousAgentTags = queryClient.getQueryData([
-				"agent-tags",
-				agentId,
-			]);
+			const previousAgent = queryClient.getQueryData<Agent>(["agent", agentId]);
 
-			// Get the tags data to create proper optimistic entries
-			const tagsData = queryClient.getQueryData(["tags", workspaceId]) as
-				| { id: string; name: string; color: string; workspace_id: string }[]
-				| undefined;
+			// Build the optimistic tag set from the workspace tags cache.
+			const tagsData = queryClient.getQueryData<Tag[]>(["tags", workspaceId]);
+			const optimisticTags = tagIds
+				.map((id) => tagsData?.find((t) => t.id === id))
+				.filter((t): t is Tag => Boolean(t))
+				.map((t) => ({ id: t.id, name: t.name, color: t.color }));
 
-			// Optimistically update the cache with new tag structure
-			const optimisticAgentTags = tagIds.map((tagId) => {
-				const tag = tagsData?.find((t) => t.id === tagId);
-				return {
-					agent_id: agentId,
-					tag_id: tagId,
-					tags: tag || null,
-				};
-			});
+			if (previousAgent) {
+				queryClient.setQueryData<Agent>(["agent", agentId], {
+					...previousAgent,
+					tags: optimisticTags,
+				});
+			}
 
-			queryClient.setQueryData(["agent-tags", agentId], optimisticAgentTags);
-
-			// Return context with the previous value for rollback
-			return { previousAgentTags };
+			return { previousAgent };
 		},
 		onError: (error, _, context) => {
-			// Rollback to previous value on error
-			if (context?.previousAgentTags) {
-				queryClient.setQueryData(
-					["agent-tags", agentId],
-					context.previousAgentTags,
-				);
+			if (context?.previousAgent) {
+				queryClient.setQueryData(["agent", agentId], context.previousAgent);
 			}
 			toast.danger(
 				error instanceof Error ? error.message : "Failed to update tags.",
 			);
 		},
 		onSettled: () => {
-			// Always refetch after error or success to ensure consistency
-			queryClient.invalidateQueries({ queryKey: ["agent-tags", agentId] });
+			queryClient.invalidateQueries({ queryKey: ["agent", agentId] });
 			queryClient.invalidateQueries({ queryKey: ["agents", workspaceId] });
 		},
 	});

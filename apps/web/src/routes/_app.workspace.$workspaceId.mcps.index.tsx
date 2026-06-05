@@ -14,7 +14,7 @@ import { useState } from "react";
 import { ConfirmationModal } from "@/components/confirmation-modal";
 import IDCopy from "@/components/id-copy";
 import { PageHeader } from "@/components/page-header";
-import { mcpsQuery, workspaceUserQuery } from "@/lib/queries";
+import { deleteMcp, mcpsQuery, workspaceUserQuery } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/_app/workspace/$workspaceId/mcps/")({
@@ -39,11 +39,7 @@ function RouteComponent() {
 
 	// Delete mutation
 	const deleteMutation = useMutation({
-		mutationFn: async (mcpId: string) => {
-			const { error } = await supabase.from("mcps").delete().eq("id", mcpId);
-
-			if (error) throw error;
-		},
+		mutationFn: (mcpId: string) => deleteMcp(workspaceId, mcpId),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });
 			toast.success("MCP server deleted successfully.");

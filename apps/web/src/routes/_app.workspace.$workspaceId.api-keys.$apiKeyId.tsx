@@ -14,11 +14,9 @@ import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Check, Copy, Plus, X } from "lucide-react";
-import { customAlphabet, nanoid } from "nanoid";
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
-import { apiKeysQuery } from "@/lib/queries";
-import { supabase } from "@/lib/supabase";
+import { apiKeysQuery, createApiKey, updateApiKey } from "@/lib/queries";
 
 export const Route = createFileRoute(
 	"/_app/workspace/$workspaceId/api-keys/$apiKeyId",
@@ -36,9 +34,6 @@ const BUILT_IN_SCOPE_SUGGESTIONS = [
 	"providers:read:*",
 	"mcps:read:*",
 ];
-
-
-
 
 interface FormValues {
 	name: string;
@@ -66,30 +61,13 @@ function RouteComponent() {
 
 	const createMutation = useMutation({
 		mutationFn: async (values: FormValues) => {
-			const {
-				data: { user },
-			} = await supabase.auth.getUser();
-			if (!user) throw new Error("User not authenticated");
+			const apiKey = await createApiKey(workspaceId, {
+				name: values.name,
+				scopes: values.scopes,
+				allowed_origins: values.allowedOrigins,
+			});
 
-			const key = customAlphabet("abcdefghijklmnopqrstuvwxyz1234567890")();
-
-			const { error } = await supabase
-				.from("api_keys")
-				.insert({
-					id: nanoid(),
-					key,
-					name: values.name,
-					workspace_id: workspaceId,
-					user_id: user.id,
-					scopes: values.scopes,
-					allowed_origins:
-						values.allowedOrigins.length > 0 ? values.allowedOrigins : null,
-				})
-				.select()
-				.single();
-
-			if (error) throw error;
-			return key;
+			return apiKey.key;
 		},
 		onSuccess: (data) => {
 			queryClient.invalidateQueries({ queryKey: ["api-keys", workspaceId] });
@@ -104,17 +82,11 @@ function RouteComponent() {
 
 	const updateMutation = useMutation({
 		mutationFn: async (values: FormValues) => {
-			const { error } = await supabase
-				.from("api_keys")
-				.update({
-					name: values.name,
-					scopes: values.scopes,
-					allowed_origins:
-						values.allowedOrigins.length > 0 ? values.allowedOrigins : null,
-				})
-				.eq("id", apiKeyId);
-
-			if (error) throw error;
+			await updateApiKey(workspaceId, apiKeyId, {
+				name: values.name,
+				scopes: values.scopes,
+				allowed_origins: values.allowedOrigins,
+			});
 		},
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["api-keys", workspaceId] });
@@ -330,8 +302,7 @@ function RouteComponent() {
 												. Use <code className="font-mono text-xs">*</code> as a
 												wildcard for any segment.{" "}
 												<code className="font-mono text-xs">*:*:*</code> grants
-												full access. An empty list means the key can do
-												nothing.
+												full access. An empty list means the key can do nothing.
 											</>
 										}
 										placeholder="entity:operation:target"

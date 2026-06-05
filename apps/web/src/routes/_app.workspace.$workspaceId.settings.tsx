@@ -17,8 +17,14 @@ import { Trash2, UserPlus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { ConfirmationModal } from "@/components/confirmation-modal";
 import { PageHeader } from "@/components/page-header";
-import { workspacesQuery } from "@/lib/queries";
-import { supabase } from "@/lib/supabase";
+import {
+	deleteWorkspace,
+	membersQuery,
+	removeWorkspaceMember,
+	updateWorkspace,
+	type WorkspaceMember,
+	workspacesQuery,
+} from "@/lib/queries";
 
 export const Route = createFileRoute("/_app/workspace/$workspaceId/settings")({
 	component: SettingsPage,
@@ -30,6 +36,7 @@ function SettingsPage() {
 	const queryClient = useQueryClient();
 
 	const { data: workspaces } = useQuery(workspacesQuery);
+	const { data: members } = useQuery(membersQuery(workspaceId));
 
 	const workspace = useMemo(
 		() => workspaces?.find((w) => w.id === workspaceId),
@@ -45,19 +52,13 @@ function SettingsPage() {
 	const deleteWorkspaceState = useOverlayState();
 	const removeMemberState = useOverlayState();
 
-	const [memberToRemove, setMemberToRemove] = useState<
-		NonNullable<typeof workspace>["workspace_user"][number] | null
-	>(null);
+	const [memberToRemove, setMemberToRemove] = useState<WorkspaceMember | null>(
+		null,
+	);
 
 	// Workspace Name Mutation
 	const updateWorkspaceNameMutation = useMutation({
-		mutationFn: async (name: string) => {
-			const { error } = await supabase
-				.from("workspaces")
-				.update({ name })
-				.eq("id", workspaceId);
-			if (error) throw error;
-		},
+		mutationFn: (name: string) => updateWorkspace(workspaceId, name),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["workspaces"] });
 			toast.success("Workspace name updated successfully.");
@@ -69,13 +70,7 @@ function SettingsPage() {
 
 	// Delete Workspace Mutation
 	const deleteWorkspaceMutation = useMutation({
-		mutationFn: async () => {
-			const { error } = await supabase
-				.from("workspaces")
-				.delete()
-				.eq("id", workspaceId);
-			if (error) throw error;
-		},
+		mutationFn: () => deleteWorkspace(workspaceId),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["workspaces"] });
 
@@ -90,16 +85,11 @@ function SettingsPage() {
 
 	// Remove Member Mutation
 	const removeMemberMutation = useMutation({
-		mutationFn: async (userId: string) => {
-			const { error } = await supabase
-				.from("workspace_user")
-				.delete()
-				.eq("workspace_id", workspaceId)
-				.eq("user_id", userId);
-			if (error) throw error;
-		},
+		mutationFn: (userId: string) => removeWorkspaceMember(workspaceId, userId),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+			queryClient.invalidateQueries({
+				queryKey: ["workspace-members", workspaceId],
+			});
 			toast.success("Member removed successfully.");
 			setMemberToRemove(null);
 			removeMemberState.close();
@@ -165,7 +155,7 @@ function SettingsPage() {
 										<Table.Column>Actions</Table.Column>
 									</Table.Header>
 									<Table.Body
-										items={workspace?.workspace_user || []}
+										items={members || []}
 										renderEmptyState={() => (
 											<p className="text-center text-muted p-6">
 												No members yet.
@@ -173,7 +163,7 @@ function SettingsPage() {
 										)}
 									>
 										{(wu) => {
-											const memberName = wu.users?.name || "Unknown";
+											const memberName = wu.user?.name || "Unknown";
 											return (
 												<Table.Row key={wu.user_id} id={wu.user_id}>
 													<Table.Cell>
@@ -258,7 +248,7 @@ function SettingsPage() {
 						isOpen={removeMemberState.isOpen}
 						onOpenChange={removeMemberState.setOpen}
 						title="Remove Member"
-						description={`Are you sure you want to remove ${memberToRemove?.users?.name || "this member"} from the workspace?`}
+						description={`Are you sure you want to remove ${memberToRemove?.user?.name || "this member"} from the workspace?`}
 						onConfirm={() => {
 							if (memberToRemove) {
 								removeMemberMutation.mutate(memberToRemove.user_id);

@@ -1,115 +1,291 @@
+import type { Json, Tables } from "@repo/database";
 import { queryOptions } from "@tanstack/react-query";
 import {
 	computeDateRangeFromPreset,
 	type DateRangeValue,
 } from "@/components/date-range-picker";
+import { api } from "./api-client";
 import { supabase } from "./supabase";
 import type { RunData } from "./types";
+
+// The runner's tags endpoints return this subset of the full row.
+export type Tag = Pick<
+	Tables<"tags">,
+	"id" | "name" | "color" | "workspace_id"
+>;
+
+// The runner returns a flat per-membership view (the caller's role in each
+// workspace), not the nested member roster the old direct query embedded.
+// Member rosters now come from `membersQuery`.
+export type Workspace = {
+	id: string;
+	name: string;
+	role: "admin" | "writer" | "reader";
+	created_at: string;
+};
+
+export type WorkspaceMember = {
+	user_id: string;
+	role: "admin" | "writer" | "reader";
+	created_at: string;
+	updated_at: string;
+	user: { id: string; name: string | null } | null;
+};
 
 export const workspacesQuery = queryOptions({
 	queryKey: ["workspaces"],
 	queryFn: async () => {
-		const { data, error } = await supabase
-			.from("workspaces")
-			.select("*, workspace_user(*, users(*))");
-
-		if (error) throw error;
+		const { data } = await api.get<{ data: Workspace[] }>("/api/v1/workspaces");
 
 		return data;
 	},
 });
 
+export const membersQuery = (workspaceId: string) =>
+	queryOptions({
+		queryKey: ["workspace-members", workspaceId],
+		queryFn: async () => {
+			const { data } = await api.get<{ data: WorkspaceMember[] }>(
+				`/api/v1/workspaces/${workspaceId}/members`,
+			);
+
+			return data;
+		},
+		enabled: !!workspaceId,
+	});
+
+export async function createWorkspace(name: string) {
+	const { data } = await api.post<{ data: Workspace }>("/api/v1/workspaces", {
+		name,
+	});
+
+	return data;
+}
+
+export async function updateWorkspace(workspaceId: string, name: string) {
+	const { data } = await api.patch<{ data: Workspace }>(
+		`/api/v1/workspaces/${workspaceId}`,
+		{ name },
+	);
+
+	return data;
+}
+
+export async function deleteWorkspace(workspaceId: string) {
+	await api.delete(`/api/v1/workspaces/${workspaceId}`);
+}
+
+// Remove a member (admin) or leave the workspace (self).
+export async function removeWorkspaceMember(
+	workspaceId: string,
+	userId: string,
+) {
+	await api.delete(`/api/v1/workspaces/${workspaceId}/members/${userId}`);
+}
+
+// The runner derives `has_staging_config` from the encrypted blob and never
+// returns the blobs themselves on the list/CRUD endpoints.
+export type Provider = {
+	id: string;
+	name: string;
+	type: string;
+	has_staging_config: boolean;
+	created_at: string;
+	updated_at: string;
+};
+
 export const providersQuery = (workspaceId: string) =>
 	queryOptions({
 		queryKey: ["providers", workspaceId],
 		queryFn: async () => {
-			const { data, error } = await supabase
-				.from("providers")
-				.select(
-					"id, name, type, created_at, updated_at, encrypted_data_staging",
-				)
-				.eq("workspace_id", workspaceId)
-				.order("created_at", { ascending: false });
+			const { data } = await api.get<{ data: Provider[] }>(
+				`/api/v1/workspaces/${workspaceId}/providers`,
+			);
 
-			if (error) throw error;
-
-			return data.map(({ encrypted_data_staging, ...rest }) => ({
-				...rest,
-				has_staging_config: !!encrypted_data_staging,
-			}));
+			return data;
 		},
 		enabled: !!workspaceId,
 	});
+
+// Config blobs are PGP-encrypted in the browser; the API only ever sees the
+// armored ciphertext. `encrypted_data_staging: null` clears the staging override.
+export async function createProvider(
+	workspaceId: string,
+	input: {
+		name: string;
+		type: string;
+		encrypted_data_production: string;
+		encrypted_data_staging: string | null;
+	},
+) {
+	const { data } = await api.post<{ data: Provider }>(
+		`/api/v1/workspaces/${workspaceId}/providers`,
+		input,
+	);
+
+	return data;
+}
+
+// Partial update: omit a field to leave it untouched. Pass
+// `encrypted_data_staging: null` to clear the staging override. The runner
+// stamps `updated_at`, so the caller never sends it.
+export async function updateProvider(
+	workspaceId: string,
+	providerId: string,
+	input: {
+		name?: string;
+		type?: string;
+		encrypted_data_production?: string;
+		encrypted_data_staging?: string | null;
+	},
+) {
+	const { data } = await api.patch<{ data: Provider }>(
+		`/api/v1/workspaces/${workspaceId}/providers/${providerId}`,
+		input,
+	);
+
+	return data;
+}
+
+export async function deleteProvider(workspaceId: string, providerId: string) {
+	await api.delete(`/api/v1/workspaces/${workspaceId}/providers/${providerId}`);
+}
+
+// `tools` is populated by the refresh endpoint, never on create/update;
+// `has_staging_config` is derived from the (never-returned) encrypted blob.
+export type Mcp = {
+	id: string;
+	name: string;
+	tools: Json | null;
+	custom_headers: string;
+	has_staging_config: boolean;
+	created_at: string;
+	updated_at: string;
+};
 
 export const mcpsQuery = (workspaceId: string) =>
 	queryOptions({
 		queryKey: ["mcps", workspaceId],
 		queryFn: async () => {
-			const { data, error } = await supabase
-				.from("mcps")
-				.select(
-					"id, name, tools, custom_headers, created_at, updated_at, encrypted_data_staging",
-				)
-				.eq("workspace_id", workspaceId)
-				.order("created_at", { ascending: false });
+			const { data } = await api.get<{ data: Mcp[] }>(
+				`/api/v1/workspaces/${workspaceId}/mcps`,
+			);
 
-			if (error) throw error;
-
-			return data.map(({ encrypted_data_staging, ...rest }) => ({
-				...rest,
-				has_staging_config: !!encrypted_data_staging,
-			}));
+			return data;
 		},
 		enabled: !!workspaceId,
 	});
 
+// Config blobs are PGP-encrypted in the browser; the API only sees ciphertext.
+// `custom_headers` is a comma-separated header-name list (the runner trims it).
+export async function createMcp(
+	workspaceId: string,
+	input: {
+		name: string;
+		encrypted_data_production: string;
+		encrypted_data_staging: string | null;
+		custom_headers: string;
+	},
+) {
+	const { data } = await api.post<{ data: Mcp }>(
+		`/api/v1/workspaces/${workspaceId}/mcps`,
+		input,
+	);
+
+	return data;
+}
+
+// Partial update; omit a field to leave it untouched, pass
+// `encrypted_data_staging: null` to clear the staging override. The runner
+// stamps `updated_at`.
+export async function updateMcp(
+	workspaceId: string,
+	mcpId: string,
+	input: {
+		name?: string;
+		encrypted_data_production?: string;
+		encrypted_data_staging?: string | null;
+		custom_headers?: string;
+	},
+) {
+	const { data } = await api.patch<{ data: Mcp }>(
+		`/api/v1/workspaces/${workspaceId}/mcps/${mcpId}`,
+		input,
+	);
+
+	return data;
+}
+
+export async function deleteMcp(workspaceId: string, mcpId: string) {
+	await api.delete(`/api/v1/workspaces/${workspaceId}/mcps/${mcpId}`);
+}
+
+// The runner derives the model summaries server-side from the deployed versions'
+// data, so the list no longer ships the full prompt blob per agent.
+export type Agent = {
+	id: string;
+	name: string;
+	staging_version_id: string | null;
+	production_version_id: string | null;
+	staging_model: { provider_id: string; name: string } | null;
+	production_model: { provider_id: string; name: string } | null;
+	tags: { id: string; name: string; color: string }[];
+	created_at: string;
+	updated_at: string;
+};
+
+// Versions list is lightweight (no prompt data); fetch a single version's detail
+// when the editor needs its `data`.
+export type AgentVersionSummary = {
+	id: string;
+	agent_id: string;
+	is_deployed: boolean;
+	user_id: string | null;
+	created_at: string;
+};
+
+export type AgentVersionDetail = AgentVersionSummary & { data: Json };
+
 export const agentsLiteQuery = (workspaceId: string) =>
 	queryOptions({
-		queryKey: ["agents-lite"],
+		queryKey: ["agents-lite", workspaceId],
 		queryFn: async () => {
-			const { data, error } = await supabase
-				.from("agents")
-				.select("id, name")
-				.eq("workspace_id", workspaceId);
+			// Pickers/filters want the whole list; the runner caps at 100/page,
+			// which covers typical workspaces.
+			const { data } = await api.get<{ data: Agent[] }>(
+				`/api/v1/workspaces/${workspaceId}/agents`,
+				{ query: { limit: 100 } },
+			);
 
-			if (error) throw error;
-
-			return data;
+			return data.map((a) => ({ id: a.id, name: a.name }));
 		},
+		enabled: !!workspaceId,
 	});
 
 export const tagsQuery = (workspaceId: string) =>
 	queryOptions({
 		queryKey: ["tags", workspaceId],
 		queryFn: async () => {
-			const { data, error } = await supabase
-				.from("tags")
-				.select("*")
-				.eq("workspace_id", workspaceId)
-				.order("name", { ascending: true });
-
-			if (error) throw error;
+			const { data } = await api.get<{ data: Tag[] }>(
+				`/api/v1/workspaces/${workspaceId}/tags`,
+			);
 
 			return data;
 		},
 		enabled: !!workspaceId,
 	});
 
-export const agentTagsQuery = (agentId: string) =>
-	queryOptions({
-		queryKey: ["agent-tags", agentId],
-		queryFn: async () => {
-			const { data, error } = await supabase
-				.from("agent_tags")
-				.select("*, tags(*)")
-				.eq("agent_id", agentId);
+export async function createTag(
+	workspaceId: string,
+	input: { name: string; color: string },
+) {
+	const { data } = await api.post<{ data: Tag }>(
+		`/api/v1/workspaces/${workspaceId}/tags`,
+		input,
+	);
 
-			if (error) throw error;
-
-			return data;
-		},
-		enabled: !!agentId && agentId !== "new",
-	});
+	return data;
+}
 
 export const agentsQuery = (
 	workspaceId: string,
@@ -120,136 +296,240 @@ export const agentsQuery = (
 	queryOptions({
 		queryKey: ["agents", workspaceId, page, search, tagIds],
 		queryFn: async () => {
-			// First, get agent IDs that match the tag filter (if provided)
-			let matchingAgentIds: string[] | null = null;
-
-			if (tagIds && tagIds.length > 0) {
-				const { data: agentTags, error: tagError } = await supabase
-					.from("agent_tags")
-					.select("agent_id")
-					.in("tag_id", tagIds);
-
-				if (tagError) throw tagError;
-
-				// Get unique agent IDs that have ALL selected tags
-				const agentIdCounts = agentTags.reduce(
-					(acc, { agent_id }) => {
-						acc[agent_id] = (acc[agent_id] || 0) + 1;
-						return acc;
+			// The runner does the ALL-tags filtering server-side from a
+			// comma-separated tag_ids list.
+			const { data } = await api.get<{ data: Agent[] }>(
+				`/api/v1/workspaces/${workspaceId}/agents`,
+				{
+					query: {
+						page,
+						limit: 20,
+						search,
+						tag_ids: tagIds && tagIds.length > 0 ? tagIds.join(",") : undefined,
 					},
-					{} as Record<string, number>,
-				);
-
-				// Only include agents that have all selected tags
-				matchingAgentIds = Object.entries(agentIdCounts)
-					.filter(([_, count]) => count >= tagIds.length)
-					.map(([id]) => id);
-
-				// If no agents match the tags, return empty array
-				if (matchingAgentIds.length === 0) {
-					return [];
-				}
-			}
-
-			let query = supabase
-				.from("agents")
-				.select(
-					"*, agent_tags(*, tags(*)), staging_version:agent_versions!staging_version_id(data), production_version:agent_versions!production_version_id(data)",
-				)
-				.eq("workspace_id", workspaceId);
-
-			// Apply agent ID filter if we have matching agents from tags
-			if (matchingAgentIds) {
-				query = query.in("id", matchingAgentIds);
-			}
-
-			// Apply search filter if provided
-			if (search) {
-				query = query.ilike("name", `%${search}%`);
-			}
-
-			query = query
-				.order("created_at", { ascending: false })
-				.range((page - 1) * 20, page * 20);
-
-			const { data, error } = await query;
-
-			if (error) throw error;
+				},
+			);
 
 			return data;
 		},
 		enabled: !!workspaceId,
 	});
 
-export const agentQuery = (agentId: string) =>
+export const agentQuery = (workspaceId: string, agentId: string) =>
 	queryOptions({
 		queryKey: ["agent", agentId],
 		queryFn: async () => {
-			const { data, error } = await supabase
-				.from("agents")
-				.select("*")
-				.eq("id", agentId)
-				.single();
-
-			if (error) throw error;
+			const { data } = await api.get<{ data: Agent }>(
+				`/api/v1/workspaces/${workspaceId}/agents/${agentId}`,
+			);
 
 			return data;
 		},
 		enabled: !!agentId,
 	});
 
-export const agentVersionsQuery = (agentId: string) =>
+export const agentVersionsQuery = (workspaceId: string, agentId: string) =>
 	queryOptions({
 		queryKey: ["agent-versions", agentId],
 		queryFn: async () => {
-			const { data, error } = await supabase
-				.from("agent_versions")
-				.select("*")
-				.eq("agent_id", agentId)
-				.order("created_at", { ascending: false });
-
-			if (error) throw error;
+			const { data } = await api.get<{ data: AgentVersionSummary[] }>(
+				`/api/v1/workspaces/${workspaceId}/agents/${agentId}/versions`,
+				{ query: { limit: 100 } },
+			);
 
 			return data;
 		},
 		enabled: !!agentId,
 	});
+
+// Single version with its full prompt `data` — fetched on demand when the
+// editor selects a version (the versions list omits data for a lighter payload).
+export const agentVersionQuery = (
+	workspaceId: string,
+	agentId: string,
+	versionId: string | undefined,
+) =>
+	queryOptions({
+		queryKey: ["agent-version", versionId],
+		queryFn: async () => {
+			const { data } = await api.get<{ data: AgentVersionDetail }>(
+				`/api/v1/workspaces/${workspaceId}/agents/${agentId}/versions/${versionId}`,
+			);
+
+			return data;
+		},
+		enabled: !!workspaceId && !!agentId && !!versionId,
+	});
+
+export async function createAgent(workspaceId: string, name: string) {
+	const { data } = await api.post<{ data: Agent }>(
+		`/api/v1/workspaces/${workspaceId}/agents`,
+		{ name },
+	);
+
+	return data;
+}
+
+export async function deleteAgent(workspaceId: string, agentId: string) {
+	await api.delete(`/api/v1/workspaces/${workspaceId}/agents/${agentId}`);
+}
+
+// Rename / deploy a version / replace the tag set. Omit a field to leave it
+// untouched; `tag_ids` replaces the full set.
+export async function updateAgent(
+	workspaceId: string,
+	agentId: string,
+	input: {
+		name?: string;
+		staging_version_id?: string | null;
+		production_version_id?: string | null;
+		tag_ids?: string[];
+	},
+) {
+	const { data } = await api.patch<{ data: Agent }>(
+		`/api/v1/workspaces/${workspaceId}/agents/${agentId}`,
+		input,
+	);
+
+	return data;
+}
+
+// Push a new prompt version (optionally deploying it). Returns the full version
+// including its `data`.
+export async function createAgentVersion(
+	workspaceId: string,
+	agentId: string,
+	data: Json,
+	deploy?: "staging" | "production",
+) {
+	const { data: version } = await api.post<{ data: AgentVersionDetail }>(
+		`/api/v1/workspaces/${workspaceId}/agents/${agentId}/versions`,
+		{ data },
+		{ query: { deploy } },
+	);
+
+	return version;
+}
+
+// API keys are an admin-only resource; the row holds the plaintext `key` (only
+// shown once on create, redacted thereafter in the list).
+export type ApiKey = {
+	id: string;
+	key: string;
+	name: string;
+	scopes: string[];
+	allowed_origins: string[] | null;
+	user_id: string;
+	workspace_id: string;
+	created_at: string;
+};
 
 export const apiKeysQuery = (workspaceId: string) =>
 	queryOptions({
 		queryKey: ["api-keys", workspaceId],
 		queryFn: async () => {
-			const { data, error } = await supabase
-				.from("api_keys")
-				.select("*")
-				.eq("workspace_id", workspaceId)
-				.order("created_at", { ascending: false });
-
-			if (error) throw error;
+			const { data } = await api.get<{ data: ApiKey[] }>(
+				`/api/v1/workspaces/${workspaceId}/api-keys`,
+			);
 
 			return data;
 		},
 		enabled: !!workspaceId,
 	});
 
-// PATs are user-bound (not workspace-bound) and RLS restricts this to the
-// caller's own tokens, so no workspace filter is needed.
+// The runner mints the key server-side and sets the owner from the caller; an
+// empty `allowed_origins` is normalized to null ("any origin"). The returned row
+// carries the plaintext `key` for the one-time reveal.
+export async function createApiKey(
+	workspaceId: string,
+	input: { name: string; scopes: string[]; allowed_origins: string[] },
+) {
+	const { data } = await api.post<{ data: ApiKey }>(
+		`/api/v1/workspaces/${workspaceId}/api-keys`,
+		input,
+	);
+
+	return data;
+}
+
+// key/owner/workspace are immutable; only name/scopes/origins are editable.
+export async function updateApiKey(
+	workspaceId: string,
+	apiKeyId: string,
+	input: { name?: string; scopes?: string[]; allowed_origins?: string[] },
+) {
+	const { data } = await api.patch<{ data: ApiKey }>(
+		`/api/v1/workspaces/${workspaceId}/api-keys/${apiKeyId}`,
+		input,
+	);
+
+	return data;
+}
+
+export async function deleteApiKey(workspaceId: string, apiKeyId: string) {
+	await api.delete(`/api/v1/workspaces/${workspaceId}/api-keys/${apiKeyId}`);
+}
+
+// PATs are user-bound, not workspace-bound — the runner scopes every op to the
+// caller's own tokens, so these paths carry no workspaceId.
+export type PersonalAccessToken = {
+	id: string;
+	name: string;
+	token_prefix: string;
+	created_at: string;
+	last_used_at: string | null;
+	expires_at: string | null;
+	revoked_at: string | null;
+};
+
 export const personalAccessTokensQuery = queryOptions({
 	queryKey: ["personal-access-tokens"],
 	queryFn: async () => {
-		const { data, error } = await supabase
-			.from("personal_access_tokens")
-			.select(
-				"id, name, token_prefix, created_at, last_used_at, expires_at, revoked_at",
-			)
-			.is("revoked_at", null)
-			.order("created_at", { ascending: false });
-
-		if (error) throw error;
+		const { data } = await api.get<{ data: PersonalAccessToken[] }>(
+			"/api/v1/personal-access-tokens",
+		);
 
 		return data;
 	},
 });
+
+// The runner mints the token (hash + prefix persisted server-side) and returns
+// the raw secret exactly once, alongside the new row's metadata.
+export async function createPersonalAccessToken(name: string) {
+	const { data } = await api.post<{
+		data: PersonalAccessToken & { token: string };
+	}>("/api/v1/personal-access-tokens", { name });
+
+	return data;
+}
+
+// Soft delete (sets revoked_at) scoped to the caller's own tokens.
+export async function revokePersonalAccessToken(tokenId: string) {
+	await api.delete(`/api/v1/personal-access-tokens/${tokenId}`);
+}
+
+// The runner flattens the version/agent embed to a single `agent` ref and (on
+// the detail endpoint) inlines the run-log blob as `run_data`.
+export type RunListItem = {
+	id: string;
+	version_id: string | null;
+	parent_run_id: string | null;
+	is_error: boolean;
+	is_test: boolean;
+	is_stream: boolean | null;
+	cost: number | null;
+	tokens: number | null;
+	response_time: number;
+	first_token_time: number;
+	pre_processing_time: number;
+	created_at: string;
+	agent: { id: string; name: string | null } | null;
+};
+
+export type RunDetail = RunListItem & {
+	workspace_id: string;
+	run_data: RunData | null;
+};
 
 export const runsQuery = (
 	workspaceId: string,
@@ -272,20 +552,8 @@ export const runsQuery = (
 			status,
 		],
 		queryFn: async () => {
-			// Inner join only when filtering by a specific agent (untagged runs
-			// don't belong to any agent). Otherwise left join so runs from unsaved
-			// agents (null version_id) still appear in the list.
-			let query = supabase
-				.from("runs")
-				.select(
-					agentId
-						? "*, agent_versions!inner(id, agent_id, agents:agent_id(name))"
-						: "*, agent_versions(id, agent_id, agents:agent_id(name))",
-				)
-				.eq("workspace_id", workspaceId);
-
-			// Compute date range at query time
-			// For presets, this ensures we always query with fresh dates
+			// Compute date range at query time. For presets, this ensures we always
+			// query with fresh dates.
 			let dateRange: { from: string; to: string } | null = null;
 			if (dateFilter.datePreset) {
 				dateRange = computeDateRangeFromPreset(dateFilter.datePreset);
@@ -293,47 +561,32 @@ export const runsQuery = (
 				dateRange = { from: dateFilter.startDate, to: dateFilter.endDate };
 			}
 
-			// Apply date filtering if computed
-			if (dateRange) {
-				query = query.gte("created_at", dateRange.from);
-				query = query.lte("created_at", dateRange.to);
-			}
-
-			// Apply agent filtering if provided
-			if (agentId) {
-				query = query.eq("agent_versions.agent_id", agentId);
-			}
-
-			// Apply status filtering if provided
-			if (status === "success") {
-				query = query.eq("is_error", false);
-			} else if (status === "failed") {
-				query = query.eq("is_error", true);
-			}
-
-			query = query
-				.order("created_at", { ascending: false })
-				.range((page - 1) * 20, page * 20);
-
-			const { data, error } = await query;
-
-			if (error) throw error;
+			const { data } = await api.get<{ data: RunListItem[] }>(
+				`/api/v1/workspaces/${workspaceId}/runs`,
+				{
+					query: {
+						page,
+						limit: 20,
+						agent_id: agentId,
+						status,
+						start_date: dateRange?.from,
+						end_date: dateRange?.to,
+					},
+				},
+			);
 
 			return data;
 		},
 		enabled: !!workspaceId,
 	});
 
-export const runQuery = (runId: string) =>
+export const runQuery = (workspaceId: string, runId: string) =>
 	queryOptions({
 		queryKey: ["run", runId],
 		queryFn: async () => {
-			const { data } = await supabase
-				.from("runs")
-				.select("*, agent_versions(id, agents:agent_id(id, name))")
-				.eq("id", runId)
-				.single()
-				.throwOnError();
+			const { data } = await api.get<{ data: RunDetail }>(
+				`/api/v1/workspaces/${workspaceId}/runs/${runId}`,
+			);
 
 			return data;
 		},
@@ -341,48 +594,31 @@ export const runQuery = (runId: string) =>
 	});
 
 // Runs invoked by this run via an agent-as-tool (parent_run_id == runId).
-export const childRunsQuery = (parentRunId: string | null | undefined) =>
+export const childRunsQuery = (
+	workspaceId: string,
+	parentRunId: string | null | undefined,
+) =>
 	queryOptions({
 		queryKey: ["child-runs", parentRunId],
 		queryFn: async () => {
-			const { data, error } = await supabase
-				.from("runs")
-				.select(
-					"id, is_error, is_test, created_at, agent_versions(id, agents:agent_id(name))",
-				)
-				.eq("parent_run_id", parentRunId as string)
-				.order("created_at", { ascending: true });
+			const { data } = await api.get<{ data: RunListItem[] }>(
+				`/api/v1/workspaces/${workspaceId}/runs`,
+				{ query: { parent_run_id: parentRunId } },
+			);
 
-			if (error) throw error;
-
-			return data;
+			// The runner returns newest-first; sub-runs read better in call order
+			// (oldest-first), matching the old ascending sort.
+			return [...data].reverse();
 		},
-		enabled: !!parentRunId,
-	});
-
-export const runDataQuery = (runId: string) =>
-	queryOptions({
-		queryKey: ["run-data", runId],
-		queryFn: async () => {
-			const { data: runData, error: runDataError } = await supabase.storage
-				.from("runs-data")
-				.download(`${runId}`);
-
-			if (runDataError) throw runDataError;
-
-			// Convert blob into string and parse as JSON
-			const runDataString = await runData.text();
-			const data = JSON.parse(runDataString) as RunData;
-
-			return data;
-		},
-		enabled: !!runId,
+		enabled: !!workspaceId && !!parentRunId,
 	});
 
 export const workspaceUserQuery = (workspaceId: string) =>
 	queryOptions({
 		queryKey: ["workspace-user", workspaceId],
 		queryFn: async () => {
+			// Identity (id + email) comes from the Supabase session — auth stays on
+			// Supabase until Phase 2. Role + display name come from the members API.
 			const { data: claimsData, error: claimsError } =
 				await supabase.auth.getClaims();
 
@@ -392,29 +628,20 @@ export const workspaceUserQuery = (workspaceId: string) =>
 
 			if (!claims?.sub) throw new Error("User not found");
 
-			const { data: user, error: userError } = await supabase
-				.from("users")
-				.select("*")
-				.eq("id", claims.sub)
-				.single();
+			const { data: members } = await api.get<{ data: WorkspaceMember[] }>(
+				`/api/v1/workspaces/${workspaceId}/members`,
+			);
 
-			if (userError) throw userError;
+			const me = members.find((m) => m.user_id === claims.sub);
 
-			const { data: workspaceUser, error: workspaceUserError } = await supabase
-				.from("workspace_user")
-				.select("*")
-				.eq("workspace_id", workspaceId)
-				.eq("user_id", claims.sub)
-				.single();
-
-			if (workspaceUserError) throw workspaceUserError;
+			if (!me) throw new Error("User not found");
 
 			return {
-				id: user.id,
-				name: user.name,
+				id: claims.sub,
+				name: me.user?.name ?? null,
 				email: claims.email,
-				workspace_id: workspaceUser.workspace_id,
-				role: workspaceUser.role,
+				workspace_id: workspaceId,
+				role: me.role,
 			};
 		},
 		enabled: !!workspaceId,
@@ -441,25 +668,21 @@ export const dashboardStatsQuery = (
 				dateRange = { from: dateFilter.startDate, to: dateFilter.endDate };
 			}
 
-			// Use RPC function to calculate stats at database level (avoids 1000 row limit)
-			const { data, error } = await supabase.rpc("get_dashboard_stats", {
-				p_workspace_id: workspaceId,
-				p_start_date: dateRange?.from,
-				p_end_date: dateRange?.to,
+			// The runner proxies the get_dashboard_stats Postgres function so the
+			// aggregation still happens DB-side (no 1000-row cap).
+			const { data: stats } = await api.get<{
+				data: {
+					total_runs: number;
+					successful_runs: number;
+					failed_runs: number;
+					success_rate: number;
+					total_cost: number;
+					total_tokens: number;
+					avg_response_time: number;
+				};
+			}>(`/api/v1/workspaces/${workspaceId}/dashboard/stats`, {
+				query: { start_date: dateRange?.from, end_date: dateRange?.to },
 			});
-
-			if (error) throw error;
-
-			// Parse the response - RPC returns json object
-			const stats = data as {
-				total_runs: number;
-				successful_runs: number;
-				failed_runs: number;
-				success_rate: number;
-				total_cost: number;
-				total_tokens: number;
-				avg_response_time: number;
-			};
 
 			return {
 				totalRuns: stats.total_runs,
@@ -478,15 +701,10 @@ export const recentRunsQuery = (workspaceId: string) =>
 	queryOptions({
 		queryKey: ["recent-runs", workspaceId],
 		queryFn: async () => {
-			// Left join so runs from unsaved agents (null version_id) still appear.
-			const { data, error } = await supabase
-				.from("runs")
-				.select("*, agent_versions(id, agent_id, agents:agent_id(name))")
-				.eq("workspace_id", workspaceId)
-				.order("created_at", { ascending: false })
-				.limit(5);
-
-			if (error) throw error;
+			const { data } = await api.get<{ data: RunListItem[] }>(
+				`/api/v1/workspaces/${workspaceId}/runs`,
+				{ query: { page: 1, limit: 5 } },
+			);
 
 			return data;
 		},
@@ -514,26 +732,25 @@ export const topAgentsQuery = (
 				dateRange = { from: dateFilter.startDate, to: dateFilter.endDate };
 			}
 
-			// Use RPC function to aggregate at database level (avoids 1000 row limit)
-			const { data, error } = await supabase.rpc("get_top_agents", {
-				p_workspace_id: workspaceId,
-				p_start_date: dateRange?.from,
-				p_end_date: dateRange?.to,
-				p_limit: 5,
+			// The runner proxies the get_top_agents Postgres function (DB-side
+			// aggregation, no 1000-row cap).
+			const { data } = await api.get<{
+				data: Array<{
+					id: string;
+					name: string;
+					runs: number;
+					errors: number;
+					cost: number;
+				}>;
+			}>(`/api/v1/workspaces/${workspaceId}/dashboard/top-agents`, {
+				query: {
+					start_date: dateRange?.from,
+					end_date: dateRange?.to,
+					limit: 5,
+				},
 			});
 
-			if (error) throw error;
-
-			// Parse the response - RPC returns json array
-			const agents = data as Array<{
-				id: string;
-				name: string;
-				runs: number;
-				errors: number;
-				cost: number;
-			}>;
-
-			return agents;
+			return data;
 		},
 		enabled: !!workspaceId,
 	});

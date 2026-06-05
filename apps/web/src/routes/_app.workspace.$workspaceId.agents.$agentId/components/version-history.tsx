@@ -8,21 +8,19 @@ import {
 	Popover,
 	useOverlayState,
 } from "@heroui/react";
-import type { Tables } from "@repo/database";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { LucideHistory } from "lucide-react";
-import { useMemo } from "react";
-import { workspacesQuery } from "@/lib/queries";
+import { type AgentVersionSummary, membersQuery } from "@/lib/queries";
 
 interface VersionHistoryProps {
 	workspaceId: string;
-	versions: Tables<"agent_versions">[];
+	versions: AgentVersionSummary[];
 	stagingVersionId?: string | null;
 	productionVersionId?: string | null;
 	currentVersionId?: string;
 	isDirty?: boolean;
-	onSelectionChange: (version: Tables<"agent_versions">) => void;
+	onSelectionChange: (version: AgentVersionSummary) => void;
 }
 
 export const VersionHistory = ({
@@ -35,11 +33,7 @@ export const VersionHistory = ({
 	onSelectionChange,
 }: VersionHistoryProps) => {
 	const state = useOverlayState();
-	const { data: workspaces } = useQuery(workspacesQuery);
-
-	const workspace = useMemo(() => {
-		return workspaces?.find((workspace) => workspace.id === workspaceId);
-	}, [workspaces, workspaceId]);
+	const { data: members } = useQuery(membersQuery(workspaceId));
 
 	const versionLabel = isDirty
 		? "Unsaved"
@@ -59,9 +53,9 @@ export const VersionHistory = ({
 				<Popover.Dialog className="max-h-96 overflow-auto">
 					<ListBox aria-label="Version History" className="p-0">
 						{versions.map((version) => {
-							const user = workspace?.workspace_user.find(
-								(user) => user.user_id === version.user_id,
-							)?.users;
+							const user = members?.find(
+								(member) => member.user_id === version.user_id,
+							)?.user;
 
 							const isStaging = stagingVersionId === version.id;
 							const isProduction = productionVersionId === version.id;

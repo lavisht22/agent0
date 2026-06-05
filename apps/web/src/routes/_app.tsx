@@ -1,6 +1,9 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
+import { api } from "../lib/api-client";
 import { supabase } from "../lib/supabase";
+
+type WorkspaceListItem = { id: string };
 
 export const Route = createFileRoute("/_app")({
 	component: LayoutComponent,
@@ -25,17 +28,13 @@ export const Route = createFileRoute("/_app")({
 				});
 			}
 
-			// Fetch workspaces
-			const { data: workspace, error } = await supabase
-				.from("workspaces")
-				.select("id")
-				.limit(1)
-				.order("created_at", { ascending: true })
-				.single();
+			// Fetch workspaces (runner returns them oldest-first, matching the old
+			// `order(created_at asc).limit(1)`).
+			const { data: workspaces } = await api.get<{
+				data: WorkspaceListItem[];
+			}>("/api/v1/workspaces");
 
-			if (error) throw error;
-
-			if (!workspace) {
+			if (workspaces.length === 0) {
 				// No workspaces exist, redirect to create workspace
 				throw redirect({ to: "/create-workspace" });
 			}
@@ -43,7 +42,7 @@ export const Route = createFileRoute("/_app")({
 			throw redirect({
 				to: "/workspace/$workspaceId",
 				params: {
-					workspaceId: workspace.id,
+					workspaceId: workspaces[0].id,
 				},
 			});
 		}

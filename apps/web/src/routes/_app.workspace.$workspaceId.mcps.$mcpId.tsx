@@ -13,12 +13,11 @@ import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Pencil, ShieldAlert } from "lucide-react";
-import { nanoid } from "nanoid";
 import * as openpgp from "openpgp";
 import { useState } from "react";
 import { MonacoJsonField } from "@/components/monaco-json-field";
 import { PageHeader } from "@/components/page-header";
-import { mcpsQuery } from "@/lib/queries";
+import { createMcp, mcpsQuery, updateMcp } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute(
@@ -122,20 +121,14 @@ function RouteComponent() {
 				? await encryptConfig(values.data_staging)
 				: null;
 
-			const id = nanoid();
-
-			const { error } = await supabase.from("mcps").insert({
-				id,
+			const mcp = await createMcp(workspaceId, {
 				name: values.name,
 				encrypted_data_production,
 				encrypted_data_staging,
-				workspace_id: workspaceId,
-				custom_headers: values.custom_headers.trim() || undefined,
+				custom_headers: values.custom_headers,
 			});
 
-			if (error) throw error;
-
-			return { id };
+			return { id: mcp.id };
 		},
 		onSuccess: async ({ id }) => {
 			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });
@@ -166,10 +159,14 @@ function RouteComponent() {
 			updateProduction: boolean;
 			updateStaging: boolean;
 		}) => {
-			const updatePayload: Record<string, unknown> = {
+			const updatePayload: {
+				name: string;
+				custom_headers: string;
+				encrypted_data_production?: string;
+				encrypted_data_staging?: string | null;
+			} = {
 				name: values.name,
-				custom_headers: values.custom_headers.trim() || undefined,
-				updated_at: new Date().toISOString(),
+				custom_headers: values.custom_headers,
 			};
 
 			if (values.updateProduction) {
@@ -188,12 +185,7 @@ function RouteComponent() {
 				updatePayload.encrypted_data_staging = null;
 			}
 
-			const { error } = await supabase
-				.from("mcps")
-				.update(updatePayload)
-				.eq("id", mcpId);
-
-			if (error) throw error;
+			await updateMcp(workspaceId, mcpId, updatePayload);
 		},
 		onSuccess: async () => {
 			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });

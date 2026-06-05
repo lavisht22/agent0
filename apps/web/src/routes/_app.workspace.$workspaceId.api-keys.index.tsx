@@ -11,13 +11,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { LucideEllipsisVertical, Pencil, Plus, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ConfirmationModal } from "@/components/confirmation-modal";
 import IDCopy from "@/components/id-copy";
 import { PageHeader } from "@/components/page-header";
 
-import { apiKeysQuery, workspacesQuery } from "@/lib/queries";
-import { supabase } from "@/lib/supabase";
+import { apiKeysQuery, deleteApiKey, membersQuery } from "@/lib/queries";
 
 export const Route = createFileRoute("/_app/workspace/$workspaceId/api-keys/")({
 	component: RouteComponent,
@@ -37,22 +36,11 @@ function RouteComponent() {
 
 	// Fetch API Keys
 	const { data: apiKeys, isLoading } = useQuery(apiKeysQuery(workspaceId));
-	const { data: workspaces } = useQuery(workspacesQuery);
-
-	const workspace = useMemo(() => {
-		return workspaces?.find((workspace) => workspace.id === workspaceId);
-	}, [workspaces, workspaceId]);
+	const { data: members } = useQuery(membersQuery(workspaceId));
 
 	// Delete mutation
 	const deleteMutation = useMutation({
-		mutationFn: async (keyId: string) => {
-			const { error } = await supabase
-				.from("api_keys")
-				.delete()
-				.eq("id", keyId);
-
-			if (error) throw error;
-		},
+		mutationFn: (keyId: string) => deleteApiKey(workspaceId, keyId),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["api-keys", workspaceId] });
 			toast.success("API key deleted successfully.");
@@ -114,9 +102,9 @@ function RouteComponent() {
 								}
 							>
 								{(item) => {
-									const user = workspace?.workspace_user.find(
-										(user) => user.user_id === item.user_id,
-									)?.users;
+									const user = members?.find(
+										(member) => member.user_id === item.user_id,
+									)?.user;
 									const userName = user?.name || "Unknown";
 
 									return (

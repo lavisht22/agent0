@@ -8,6 +8,18 @@ const TagSchema = {
 	properties: {
 		id: { type: "string" as const },
 		name: { type: "string" as const },
+		color: { type: "string" as const },
+	},
+};
+
+// A lightweight model reference derived from a deployed version's prompt data,
+// so the agents list can show the model per row without shipping the full blob.
+const ModelSummarySchema = {
+	type: "object" as const,
+	nullable: true,
+	properties: {
+		provider_id: { type: "string" as const },
+		name: { type: "string" as const },
 	},
 };
 
@@ -18,11 +30,63 @@ const AgentSchema = {
 		name: { type: "string" as const },
 		staging_version_id: { type: "string" as const, nullable: true },
 		production_version_id: { type: "string" as const, nullable: true },
+		staging_model: ModelSummarySchema,
+		production_model: ModelSummarySchema,
 		tags: { type: "array" as const, items: TagSchema },
 		created_at: { type: "string" as const, format: "date-time" },
 		updated_at: { type: "string" as const, format: "date-time" },
 	},
 };
+
+// Pull `{ provider_id, name }` out of a version's opaque prompt data. Mirrors the
+// web's `extractModel`, so the list's model column renders identically.
+function extractModel(
+	data: unknown,
+): { provider_id: string; name: string } | null {
+	if (!data || typeof data !== "object") return null;
+	const model = (data as { model?: unknown }).model;
+	if (!model || typeof model !== "object") return null;
+	const { provider_id, name } = model as {
+		provider_id?: unknown;
+		name?: unknown;
+	};
+	if (typeof provider_id !== "string" || typeof name !== "string") return null;
+	if (!provider_id || !name) return null;
+	return { provider_id, name };
+}
+
+// Columns for the list/detail responses, embedding only the deployed versions'
+// `data` (so we can derive the model summary) plus the tag join.
+const AGENT_SELECT =
+	"id, name, staging_version_id, production_version_id, created_at, updated_at, agent_tags(tags(id, name, color)), staging_version:agent_versions!staging_version_id(data), production_version:agent_versions!production_version_id(data)";
+
+type AgentRow = {
+	id: string;
+	name: string;
+	staging_version_id: string | null;
+	production_version_id: string | null;
+	created_at: string;
+	updated_at: string;
+	agent_tags?:
+		| { tags: { id: string; name: string; color: string } | null }[]
+		| null;
+	staging_version?: { data: unknown } | null;
+	production_version?: { data: unknown } | null;
+};
+
+function toAgent(agent: AgentRow) {
+	return {
+		id: agent.id,
+		name: agent.name,
+		staging_version_id: agent.staging_version_id,
+		production_version_id: agent.production_version_id,
+		staging_model: extractModel(agent.staging_version?.data),
+		production_model: extractModel(agent.production_version?.data),
+		tags: agent.agent_tags?.map((at) => at.tags).filter(Boolean) ?? [],
+		created_at: agent.created_at,
+		updated_at: agent.updated_at,
+	};
+}
 
 const VersionSummarySchema = {
 	type: "object" as const,
@@ -89,7 +153,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 
 			const { data: agent, error } = await supabase
 				.from("agents")
-				.select("id, name, staging_version_id, production_version_id, created_at, updated_at, agent_tags(tags(id, name))")
+				.select(AGENT_SELECT)
 				.eq("id", agentId)
 				.eq("workspace_id", workspaceId)
 				.single();
@@ -98,19 +162,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 				return reply.code(404).send({ message: "Agent not found" });
 			}
 
-			return reply.send({
-				data: {
-					id: agent.id,
-					name: agent.name,
-					staging_version_id: agent.staging_version_id,
-					production_version_id: agent.production_version_id,
-					tags: agent.agent_tags
-						?.map((at) => at.tags)
-						.filter(Boolean),
-					created_at: agent.created_at,
-					updated_at: agent.updated_at,
-				},
-			});
+			return reply.send({ data: toAgent(agent as unknown as AgentRow) });
 		},
 	});
 
@@ -122,10 +174,25 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			querystring: {
 				type: "object" as const,
 				properties: {
-					search: { type: "string" as const, description: "Search agents by name" },
-					tag_ids: { type: "string" as const, description: "Comma-separated tag IDs to filter by (agents must have ALL specified tags)" },
-					page: { type: "string" as const, default: "1", description: "Page number" },
-					limit: { type: "string" as const, default: "20", description: "Items per page (max 100)" },
+					search: {
+						type: "string" as const,
+						description: "Search agents by name",
+					},
+					tag_ids: {
+						type: "string" as const,
+						description:
+							"Comma-separated tag IDs to filter by (agents must have ALL specified tags)",
+					},
+					page: {
+						type: "string" as const,
+						default: "1",
+						description: "Page number",
+					},
+					limit: {
+						type: "string" as const,
+						default: "20",
+						description: "Items per page (max 100)",
+					},
 				},
 			},
 			response: {
@@ -156,7 +223,10 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			};
 
 			const pageNum = Math.max(1, Number.parseInt(page, 10) || 1);
-			const limitNum = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 20));
+			const limitNum = Math.min(
+				100,
+				Math.max(1, Number.parseInt(limit, 10) || 20),
+			);
 			const offset = (pageNum - 1) * limitNum;
 
 			// If tag_ids provided, filter agents that have ALL specified tags
@@ -172,7 +242,9 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 						.in("tag_id", tagIdList);
 
 					if (tagError) {
-						return reply.code(500).send({ message: "Failed to filter by tags" });
+						return reply
+							.code(500)
+							.send({ message: "Failed to filter by tags" });
 					}
 
 					// Only include agents that have ALL selected tags
@@ -196,7 +268,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 
 			let query = supabase
 				.from("agents")
-				.select("id, name, staging_version_id, production_version_id, created_at, updated_at, agent_tags(tags(id, name))")
+				.select(AGENT_SELECT)
 				.eq("workspace_id", workspaceId);
 
 			if (matchingAgentIds) {
@@ -217,18 +289,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 				return reply.code(500).send({ message: "Failed to fetch agents" });
 			}
 
-			// Flatten tags for cleaner response
-			const result = agents.map((agent) => ({
-				id: agent.id,
-				name: agent.name,
-				staging_version_id: agent.staging_version_id,
-				production_version_id: agent.production_version_id,
-				tags: agent.agent_tags
-					?.map((at) => at.tags)
-					.filter(Boolean),
-				created_at: agent.created_at,
-				updated_at: agent.updated_at,
-			}));
+			const result = (agents as unknown as AgentRow[]).map(toAgent);
 
 			return reply.send({ data: result, page: pageNum, limit: limitNum });
 		},
@@ -242,11 +303,16 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			body: {
 				type: "object" as const,
 				properties: {
-					name: { type: "string" as const, minLength: 1, description: "Agent name" },
+					name: {
+						type: "string" as const,
+						minLength: 1,
+						description: "Agent name",
+					},
 					tag_ids: {
 						type: "array" as const,
 						items: { type: "string" as const },
-						description: "Optional tag IDs to attach. All must belong to the caller's workspace.",
+						description:
+							"Optional tag IDs to attach. All must belong to the caller's workspace.",
 					},
 				},
 				required: ["name"],
@@ -305,7 +371,9 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 					name: trimmedName,
 					workspace_id: workspaceId,
 				})
-				.select("id, name, staging_version_id, production_version_id, created_at, updated_at")
+				.select(
+					"id, name, staging_version_id, production_version_id, created_at, updated_at",
+				)
 				.single();
 
 			if (insertError || !created) {
@@ -315,7 +383,9 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			if (uniqueTagIds.length > 0) {
 				const { error: tagInsertError } = await supabase
 					.from("agent_tags")
-					.insert(uniqueTagIds.map((tagId) => ({ agent_id: agentId, tag_id: tagId })));
+					.insert(
+						uniqueTagIds.map((tagId) => ({ agent_id: agentId, tag_id: tagId })),
+					);
 
 				if (tagInsertError) {
 					// Roll back the agent so the caller doesn't end up with a half-created record.
@@ -326,7 +396,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 
 			const { data: tagRows, error: tagFetchError } = await supabase
 				.from("agent_tags")
-				.select("tags(id, name)")
+				.select("tags(id, name, color)")
 				.eq("agent_id", agentId);
 
 			if (tagFetchError) {
@@ -366,8 +436,16 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			querystring: {
 				type: "object" as const,
 				properties: {
-					page: { type: "string" as const, default: "1", description: "Page number" },
-					limit: { type: "string" as const, default: "20", description: "Items per page (max 100)" },
+					page: {
+						type: "string" as const,
+						default: "1",
+						description: "Page number",
+					},
+					limit: {
+						type: "string" as const,
+						default: "20",
+						description: "Items per page (max 100)",
+					},
 				},
 			},
 			response: {
@@ -389,16 +467,16 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 				agentId: string;
 			};
 
-			const {
-				page = "1",
-				limit = "20",
-			} = request.query as {
+			const { page = "1", limit = "20" } = request.query as {
 				page?: string;
 				limit?: string;
 			};
 
 			const pageNum = Math.max(1, Number.parseInt(page, 10) || 1);
-			const limitNum = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 20));
+			const limitNum = Math.min(
+				100,
+				Math.max(1, Number.parseInt(limit, 10) || 20),
+			);
 			const offset = (pageNum - 1) * limitNum;
 
 			// Verify agent belongs to workspace
@@ -510,13 +588,26 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			body: {
 				type: "object" as const,
 				properties: {
-					name: { type: "string" as const, minLength: 1, description: "New agent name" },
-					staging_version_id: { type: "string" as const, nullable: true, description: "ID of version to deploy to staging" },
-					production_version_id: { type: "string" as const, nullable: true, description: "ID of version to deploy to production" },
+					name: {
+						type: "string" as const,
+						minLength: 1,
+						description: "New agent name",
+					},
+					staging_version_id: {
+						type: "string" as const,
+						nullable: true,
+						description: "ID of version to deploy to staging",
+					},
+					production_version_id: {
+						type: "string" as const,
+						nullable: true,
+						description: "ID of version to deploy to production",
+					},
 					tag_ids: {
 						type: "array" as const,
 						items: { type: "string" as const },
-						description: "Replacement set of tag IDs. All must belong to the caller's workspace.",
+						description:
+							"Replacement set of tag IDs. All must belong to the caller's workspace.",
 					},
 				},
 				additionalProperties: false,
@@ -568,9 +659,10 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			}
 
 			// Validate versions if provided
-			const versionIdsToCheck = [staging_version_id, production_version_id].filter(
-				(id): id is string => id !== undefined && id !== null,
-			);
+			const versionIdsToCheck = [
+				staging_version_id,
+				production_version_id,
+			].filter((id): id is string => id !== undefined && id !== null);
 
 			if (versionIdsToCheck.length > 0) {
 				const { data: versions, error: versionsError } = await supabase
@@ -580,7 +672,9 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 					.in("id", versionIdsToCheck);
 
 				if (versionsError) {
-					return reply.code(500).send({ message: "Failed to validate versions" });
+					return reply
+						.code(500)
+						.send({ message: "Failed to validate versions" });
 				}
 
 				const foundVersionIds = new Set(versions.map((v) => v.id));
@@ -651,7 +745,9 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 					.eq("agent_id", agentId);
 
 				if (deleteError) {
-					return reply.code(500).send({ message: "Failed to clear existing tags" });
+					return reply
+						.code(500)
+						.send({ message: "Failed to clear existing tags" });
 				}
 
 				// Insert new tags
@@ -659,11 +755,16 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 					const { error: insertError } = await supabase
 						.from("agent_tags")
 						.insert(
-							uniqueTagIds.map((tagId) => ({ agent_id: agentId, tag_id: tagId })),
+							uniqueTagIds.map((tagId) => ({
+								agent_id: agentId,
+								tag_id: tagId,
+							})),
 						);
 
 					if (insertError) {
-						return reply.code(500).send({ message: "Failed to attach new tags" });
+						return reply
+							.code(500)
+							.send({ message: "Failed to attach new tags" });
 					}
 				}
 			}
@@ -671,28 +772,69 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			// Fetch final agent state
 			const { data: updatedAgent, error: fetchError } = await supabase
 				.from("agents")
-				.select(
-					"id, name, staging_version_id, production_version_id, created_at, updated_at, agent_tags(tags(id, name))",
-				)
+				.select(AGENT_SELECT)
 				.eq("id", agentId)
 				.single();
 
 			if (fetchError || !updatedAgent) {
-				return reply.code(500).send({ message: "Failed to fetch updated agent" });
+				return reply
+					.code(500)
+					.send({ message: "Failed to fetch updated agent" });
 			}
 
-			return reply.code(200).send({
-				data: {
-					id: updatedAgent.id,
-					name: updatedAgent.name,
-					staging_version_id: updatedAgent.staging_version_id,
-					production_version_id: updatedAgent.production_version_id,
-					tags:
-						updatedAgent.agent_tags?.map((at) => at.tags).filter(Boolean) ?? [],
-					created_at: updatedAgent.created_at,
-					updated_at: updatedAgent.updated_at,
+			return reply
+				.code(200)
+				.send({ data: toAgent(updatedAgent as unknown as AgentRow) });
+		},
+	});
+
+	fastify.delete("/agents/:agentId", {
+		preHandler: [
+			async (request, reply) => {
+				const { agentId } = request.params as { agentId: string };
+				checkScope(request, reply, `agents:write:${agentId}`);
+			},
+			requireUserId,
+		],
+		schema: {
+			tags: ["Agents"],
+			summary: "Delete an agent (cascades to its versions and tag links)",
+			params: {
+				type: "object" as const,
+				properties: {
+					agentId: { type: "string" as const, description: "Agent ID" },
 				},
-			});
+				required: ["agentId"],
+			},
+			response: {
+				200: {
+					type: "object" as const,
+					properties: { success: { type: "boolean" as const } },
+				},
+				404: ErrorSchema,
+				500: ErrorSchema,
+			},
+		},
+		handler: async (request, reply) => {
+			const { workspaceId, agentId } = request.params as {
+				workspaceId: string;
+				agentId: string;
+			};
+
+			const { error, count } = await supabase
+				.from("agents")
+				.delete({ count: "exact" })
+				.eq("id", agentId)
+				.eq("workspace_id", workspaceId);
+
+			if (error) {
+				return reply.code(500).send({ message: "Failed to delete agent" });
+			}
+			if (count === 0) {
+				return reply.code(404).send({ message: "Agent not found" });
+			}
+
+			return reply.send({ success: true });
 		},
 	});
 
@@ -717,13 +859,21 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			querystring: {
 				type: "object" as const,
 				properties: {
-					deploy: { type: "string" as const, enum: ["staging", "production"], description: "Deploy this version to staging or production" },
+					deploy: {
+						type: "string" as const,
+						enum: ["staging", "production"],
+						description: "Deploy this version to staging or production",
+					},
 				},
 			},
 			body: {
 				type: "object" as const,
 				properties: {
-					data: { type: "object" as const, additionalProperties: true, description: "Opaque JSON prompt data" },
+					data: {
+						type: "object" as const,
+						additionalProperties: true,
+						description: "Opaque JSON prompt data",
+					},
 				},
 				required: ["data"],
 			},
@@ -781,14 +931,19 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 
 			// If deploy is requested, update the agent
 			if (deploy) {
-				const updateField = deploy === "staging" ? { staging_version_id: versionId } : { production_version_id: versionId };
+				const updateField =
+					deploy === "staging"
+						? { staging_version_id: versionId }
+						: { production_version_id: versionId };
 				const { error: deployError } = await supabase
 					.from("agents")
 					.update(updateField)
 					.eq("id", agentId);
 
 				if (deployError) {
-					return reply.code(500).send({ message: "Version created but failed to deploy" });
+					return reply
+						.code(500)
+						.send({ message: "Version created but failed to deploy" });
 				}
 			}
 

@@ -14,10 +14,9 @@ import { useForm } from "@tanstack/react-form";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Check, Copy } from "lucide-react";
-import { customAlphabet, nanoid } from "nanoid";
 import { useState } from "react";
 import { PageHeader } from "@/components/page-header";
-import { supabase } from "@/lib/supabase";
+import { createPersonalAccessToken } from "@/lib/queries";
 
 export const Route = createFileRoute(
 	"/_app/account/personal-access-tokens/$tokenId",
@@ -27,28 +26,6 @@ export const Route = createFileRoute(
 
 interface FormValues {
 	name: string;
-}
-
-// URL-safe alphabet — no `+`, `/`, or `=` so the token is shell- and
-// query-string-safe without quoting.
-const tokenRandom = customAlphabet(
-	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
-	32,
-);
-
-const TOKEN_PREFIX = "agent0_pat_";
-// Length of the prefix the dashboard stores for display: the static prefix
-// plus four random chars, enough to differentiate tokens visually.
-const PREFIX_DISPLAY_LEN = TOKEN_PREFIX.length + 4;
-
-async function sha256Hex(input: string): Promise<string> {
-	const buffer = await crypto.subtle.digest(
-		"SHA-256",
-		new TextEncoder().encode(input),
-	);
-	return Array.from(new Uint8Array(buffer))
-		.map((b) => b.toString(16).padStart(2, "0"))
-		.join("");
 }
 
 function RouteComponent() {
@@ -62,27 +39,7 @@ function RouteComponent() {
 
 	const createMutation = useMutation({
 		mutationFn: async (values: FormValues) => {
-			const {
-				data: { user },
-			} = await supabase.auth.getUser();
-			if (!user) throw new Error("User not authenticated");
-
-			const token = `${TOKEN_PREFIX}${tokenRandom()}`;
-			const tokenHash = await sha256Hex(token);
-
-			const { error } = await supabase
-				.from("personal_access_tokens")
-				.insert({
-					id: nanoid(),
-					user_id: user.id,
-					token_hash: tokenHash,
-					token_prefix: token.slice(0, PREFIX_DISPLAY_LEN),
-					name: values.name,
-				})
-				.select()
-				.single();
-
-			if (error) throw error;
+			const { token } = await createPersonalAccessToken(values.name);
 			return token;
 		},
 		onSuccess: (token) => {

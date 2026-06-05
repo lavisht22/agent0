@@ -12,10 +12,8 @@ import {
 } from "@heroui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LucidePlus, LucideTag } from "lucide-react";
-import { nanoid } from "nanoid";
 import { useEffect, useState } from "react";
-import { tagsQuery } from "@/lib/queries";
-import { supabase } from "@/lib/supabase";
+import { createTag, tagsQuery } from "@/lib/queries";
 import { TagChip } from "./tag-chip";
 
 // Predefined color palette for tags
@@ -73,23 +71,11 @@ export function TagsSelect({
 
 	// Create new tag mutation
 	const createTagMutation = useMutation({
-		mutationFn: async ({ name, color }: { name: string; color: string }) => {
-			const tagId = nanoid();
-
-			const { error } = await supabase.from("tags").insert({
-				id: tagId,
-				name,
-				color,
-				workspace_id: workspaceId,
-			});
-
-			if (error) throw error;
-
-			return tagId;
-		},
-		onSuccess: (tagId) => {
+		mutationFn: ({ name, color }: { name: string; color: string }) =>
+			createTag(workspaceId, { name, color }),
+		onSuccess: (tag) => {
 			queryClient.invalidateQueries({ queryKey: ["tags", workspaceId] });
-			onTagsChange([...selectedTags, tagId]);
+			onTagsChange([...selectedTags, tag.id]);
 			setNewTagName("");
 			state.close();
 		},

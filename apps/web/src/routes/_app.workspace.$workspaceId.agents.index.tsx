@@ -25,26 +25,12 @@ import IDCopy from "@/components/id-copy";
 import { PageHeader } from "@/components/page-header";
 import { TagChip } from "@/components/tag-chip";
 import { TagsSelect } from "@/components/tags-select";
-import { agentsQuery, providersQuery } from "@/lib/queries";
 import { getModelStatus, PROVIDER_TYPES } from "@/lib/providers";
-import { supabase } from "@/lib/supabase";
+import { agentsQuery, deleteAgent, providersQuery } from "@/lib/queries";
 
 type ProviderForCell = { id: string; type: string };
 
-function extractModel(
-	data: unknown,
-): { provider_id: string; name: string } | null {
-	if (!data || typeof data !== "object") return null;
-	const model = (data as { model?: unknown }).model;
-	if (!model || typeof model !== "object") return null;
-	const { provider_id, name } = model as {
-		provider_id?: unknown;
-		name?: unknown;
-	};
-	if (typeof provider_id !== "string" || typeof name !== "string") return null;
-	if (!provider_id || !name) return null;
-	return { provider_id, name };
-}
+type ModelSummary = { provider_id: string; name: string } | null;
 
 function ModelLine({
 	model,
@@ -61,9 +47,7 @@ function ModelLine({
 
 	return (
 		<div className="flex items-center gap-1.5 min-w-0">
-			{label && (
-				<span className="text-xs text-muted shrink-0">{label}:</span>
-			)}
+			{label && <span className="text-xs text-muted shrink-0">{label}:</span>}
 			{Icon && <Icon className="size-4 shrink-0" />}
 			<Tooltip delay={300}>
 				<Tooltip.Trigger>
@@ -90,13 +74,13 @@ function AgentModelCell({
 	providers,
 }: {
 	agent: {
-		staging_version?: { data: unknown } | null;
-		production_version?: { data: unknown } | null;
+		staging_model: ModelSummary;
+		production_model: ModelSummary;
 	};
 	providers: ProviderForCell[];
 }) {
-	const prod = extractModel(agent.production_version?.data);
-	const stg = extractModel(agent.staging_version?.data);
+	const prod = agent.production_model;
+	const stg = agent.staging_model;
 
 	if (!prod && !stg) {
 		return <span className="text-muted text-sm">Not deployed</span>;
@@ -109,7 +93,12 @@ function AgentModelCell({
 		prod.name === stg.name;
 
 	if (same || (prod && !stg)) {
-		return <ModelLine model={prod as NonNullable<typeof prod>} providers={providers} />;
+		return (
+			<ModelLine
+				model={prod as NonNullable<typeof prod>}
+				providers={providers}
+			/>
+		);
 	}
 	if (stg && !prod) {
 		return <ModelLine model={stg} providers={providers} label="Staging" />;
@@ -198,14 +187,7 @@ function RouteComponent() {
 
 	// Delete mutation
 	const deleteMutation = useMutation({
-		mutationFn: async (agentId: string) => {
-			const { error } = await supabase
-				.from("agents")
-				.delete()
-				.eq("id", agentId);
-
-			if (error) throw error;
-		},
+		mutationFn: (agentId: string) => deleteAgent(workspaceId, agentId),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["agents", workspaceId] });
 			toast.success("Agent deleted successfully.");
@@ -349,15 +331,13 @@ function RouteComponent() {
 										<Table.Cell>{item.name}</Table.Cell>
 										<Table.Cell>
 											<div className="flex gap-1 flex-wrap">
-												{item.agent_tags?.map((at) =>
-													at.tags ? (
-														<TagChip
-															key={at.tags.id}
-															name={at.tags.name}
-															color={at.tags.color}
-														/>
-													) : null,
-												)}
+												{item.tags.map((tag) => (
+													<TagChip
+														key={tag.id}
+														name={tag.name}
+														color={tag.color}
+													/>
+												))}
 											</div>
 										</Table.Cell>
 										<Table.Cell>

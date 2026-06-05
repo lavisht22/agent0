@@ -23,7 +23,7 @@ import {
 import { Messages, type MessageT } from "@/components/messages";
 import { MonacoJsonEditor } from "@/components/monaco-json-editor";
 import { PageHeader } from "@/components/page-header";
-import { childRunsQuery, runDataQuery, runQuery } from "@/lib/queries";
+import { childRunsQuery, runQuery } from "@/lib/queries";
 import type { AgentFormValues } from "./_app.workspace.$workspaceId.agents.$agentId/types";
 
 export const Route = createFileRoute(
@@ -70,7 +70,7 @@ type LineageRun = {
 	id: string;
 	is_error: boolean;
 	created_at: string;
-	agent_versions: { agents: { name: string | null } | null } | null;
+	agent: { name: string | null } | null;
 };
 
 function RunLink({
@@ -100,7 +100,7 @@ function RunLink({
 				rel="noreferrer"
 				className="text-foreground hover:underline"
 			>
-				{run.agent_versions?.agents?.name || "Unknown Agent"}
+				{run.agent?.name || "Unknown Agent"}
 			</Link>
 			<span className="text-muted text-xs">
 				{format(run.created_at, "PPp")}
@@ -114,16 +114,18 @@ function RouteComponent() {
 	const modalState = useOverlayState();
 	const navigate = useNavigate();
 
-	const { data: run, isLoading: isRunLoading } = useQuery(runQuery(runId));
-	const { data: runData, isLoading: isRunDataLoading } = useQuery({
-		...runDataQuery(runId),
-		retry: 0,
-	});
+	const { data: run, isLoading: isRunLoading } = useQuery(
+		runQuery(workspaceId, runId),
+	);
+	// The run-log blob is now returned inline by the run detail endpoint.
+	const runData = run?.run_data ?? null;
 
 	// Parent/child run lineage (agent-as-tool). Both enable only once their id
 	// is known, so they're safe to call unconditionally before the early returns.
-	const { data: parentRun } = useQuery(runQuery(run?.parent_run_id ?? ""));
-	const { data: childRuns } = useQuery(childRunsQuery(runId));
+	const { data: parentRun } = useQuery(
+		runQuery(workspaceId, run?.parent_run_id ?? ""),
+	);
+	const { data: childRuns } = useQuery(childRunsQuery(workspaceId, runId));
 
 	const handleReplay = () => {
 		if (!runData?.request) return;
@@ -154,7 +156,7 @@ function RouteComponent() {
 		);
 	}
 
-	const agentName = run.agent_versions?.agents?.name || "Unknown Agent";
+	const agentName = run.agent?.name || "Unknown Agent";
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
@@ -211,7 +213,7 @@ function RouteComponent() {
 							to="/workspace/$workspaceId/agents/$agentId"
 							params={{
 								workspaceId,
-								agentId: run.agent_versions?.agents?.id || "",
+								agentId: run.agent?.id || "",
 							}}
 							className="text-muted hover:text-foreground transition-colors"
 						>
@@ -298,11 +300,7 @@ function RouteComponent() {
 						/>
 					</div>
 
-					{isRunDataLoading ? (
-						<div className="flex items-center justify-center p-12">
-							<Spinner />
-						</div>
-					) : !runData ? (
+					{!runData ? (
 						<Alert status="warning">
 							<Alert.Indicator />
 							<Alert.Content>
