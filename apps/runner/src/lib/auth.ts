@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto";
+import { apiKeys, personalAccessTokens, workspaceUser } from "@repo/database";
+import { and, eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { toWebHeaders } from "./auth/headers.js";
 import { auth } from "./auth/index.js";
-import { supabase } from "./db.js";
+import { db } from "./pg.js";
 import { scopesForRole } from "./scopes.js";
 
 /**
@@ -72,19 +74,30 @@ async function resolveUserScopes(
 	// Resolve the user's current role in this workspace. A user-kind credential
 	// is only as powerful as the holder's role — demote a user and their browser
 	// sessions and PATs lose access on the next request.
-	const { data: membership, error } = await supabase
-		.from("workspace_user")
-		.select("role")
-		.eq("user_id", userId)
-		.eq("workspace_id", pathWorkspaceId)
-		.maybeSingle();
+	try {
+		const [membership] = await db
+			.select({ role: workspaceUser.role })
+			.from(workspaceUser)
+			.where(
+				and(
+					eq(workspaceUser.userId, userId),
+					eq(workspaceUser.workspaceId, pathWorkspaceId),
+				),
+			)
+			.limit(1);
 
-	if (error || !membership) {
+		if (!membership) {
+			reply
+				.code(403)
+				.send({ message: "User is not a member of this workspace" });
+			return null;
+		}
+
+		return scopesForRole(membership.role);
+	} catch {
 		reply.code(403).send({ message: "User is not a member of this workspace" });
 		return null;
 	}
-
-	return scopesForRole(membership.role);
 }
 
 /**
@@ -129,13 +142,32 @@ async function authenticatePat(
 	token: string,
 ): Promise<AuthResult> {
 	const tokenHash = sha256Hex(token);
-	const { data: pat, error } = await supabase
-		.from("personal_access_tokens")
-		.select("id, user_id, expires_at, revoked_at")
-		.eq("token_hash", tokenHash)
-		.maybeSingle();
 
-	if (error || !pat) {
+	let pat:
+		| {
+				id: string;
+				user_id: string;
+				expires_at: string | null;
+				revoked_at: string | null;
+		  }
+		| undefined;
+	try {
+		[pat] = await db
+			.select({
+				id: personalAccessTokens.id,
+				user_id: personalAccessTokens.userId,
+				expires_at: personalAccessTokens.expiresAt,
+				revoked_at: personalAccessTokens.revokedAt,
+			})
+			.from(personalAccessTokens)
+			.where(eq(personalAccessTokens.tokenHash, tokenHash))
+			.limit(1);
+	} catch {
+		reply.code(401).send({ message: "Invalid token" });
+		return { ok: false };
+	}
+
+	if (!pat) {
 		reply.code(401).send({ message: "Invalid token" });
 		return { ok: false };
 	}
@@ -156,10 +188,15 @@ async function authenticatePat(
 		return { ok: false };
 	}
 
-	void supabase
-		.from("personal_access_tokens")
-		.update({ last_used_at: new Date().toISOString() })
-		.eq("id", pat.id);
+	// Fire-and-forget last-used bump. Drizzle queries are lazy, so call
+	// `.execute()` to actually run it, and swallow errors to keep it
+	// non-blocking (a failed bump must never fail the request).
+	void db
+		.update(personalAccessTokens)
+		.set({ lastUsedAt: new Date().toISOString() })
+		.where(eq(personalAccessTokens.id, pat.id))
+		.execute()
+		.catch(() => {});
 
 	return {
 		ok: true,
@@ -177,13 +214,29 @@ async function authenticateApiKey(
 	reply: FastifyReply,
 	apiKey: string,
 ): Promise<AuthResult> {
-	const { data: apiKeyData, error } = await supabase
-		.from("api_keys")
-		.select("workspace_id, scopes, allowed_origins")
-		.eq("key", apiKey)
-		.single();
+	let apiKeyData:
+		| {
+				workspace_id: string;
+				scopes: string[];
+				allowed_origins: string[] | null;
+		  }
+		| undefined;
+	try {
+		[apiKeyData] = await db
+			.select({
+				workspace_id: apiKeys.workspaceId,
+				scopes: apiKeys.scopes,
+				allowed_origins: apiKeys.allowedOrigins,
+			})
+			.from(apiKeys)
+			.where(eq(apiKeys.key, apiKey))
+			.limit(1);
+	} catch {
+		reply.code(403).send({ message: "Invalid API key" });
+		return { ok: false };
+	}
 
-	if (error || !apiKeyData) {
+	if (!apiKeyData) {
 		reply.code(403).send({ message: "Invalid API key" });
 		return { ok: false };
 	}

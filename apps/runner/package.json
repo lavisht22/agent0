@@ -3,9 +3,9 @@
 	"version": "2.0.0",
 	"type": "module",
 	"scripts": {
-		"predev": "pnpm --filter @repo/models build",
+		"predev": "pnpm --filter @repo/models --filter @repo/database build",
 		"dev": "tsx watch src/index.ts",
-		"prebuild": "pnpm --filter @repo/models build",
+		"prebuild": "pnpm --filter @repo/models --filter @repo/database build",
 		"build": "tsc && cp src/lib/openpgp.js src/lib/openpgp.d.ts dist/lib/",
 		"start": "node dist/index.js"
 	},

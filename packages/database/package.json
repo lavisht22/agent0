@@ -1,14 +1,28 @@
 {
 	"name": "@repo/database",
 	"version": "1.0.0",
-	"main": "index.ts",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js"
+		}
+	},
+	"files": ["dist"],
 	"scripts": {
+		"build": "tsc",
 		"types": "supabase gen types typescript --linked > database.types.ts",
 		"pull": "supabase db pull",
 		"push": "supabase db push"
 	},
 	"devDependencies": {
+		"drizzle-kit": "^0.31.10",
 		"supabase": "^2.76.8",
 		"typescript": "^5.0.0"
+	},
+	"dependencies": {
+		"drizzle-orm": "^0.45.2"
 	}
 }

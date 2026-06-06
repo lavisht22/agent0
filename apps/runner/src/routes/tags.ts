@@ -1,7 +1,20 @@
+import { tags } from "@repo/database";
+import { and, asc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
-import { supabase } from "../lib/db.js";
+import { db } from "../lib/pg.js";
 import { requireScope, requireUserId } from "../lib/scopes.js";
+
+/**
+ * Columns returned to the web, named snake_case to preserve the API contract
+ * the Supabase SDK produced (the web's `Tag` type reads `workspace_id`).
+ */
+const tagColumns = {
+	id: tags.id,
+	name: tags.name,
+	color: tags.color,
+	workspace_id: tags.workspaceId,
+};
 
 const TagSchema = {
 	type: "object" as const,
@@ -39,17 +52,17 @@ export async function registerTagsRoutes(fastify: FastifyInstance) {
 		handler: async (request, reply) => {
 			const { workspaceId } = request.params as { workspaceId: string };
 
-			const { data, error } = await supabase
-				.from("tags")
-				.select("id, name, color, workspace_id")
-				.eq("workspace_id", workspaceId)
-				.order("name", { ascending: true });
+			try {
+				const data = await db
+					.select(tagColumns)
+					.from(tags)
+					.where(eq(tags.workspaceId, workspaceId))
+					.orderBy(asc(tags.name));
 
-			if (error) {
+				return reply.send({ data });
+			} catch {
 				return reply.code(500).send({ message: "Failed to fetch tags" });
 			}
-
-			return reply.send({ data });
 		},
 	});
 
@@ -92,22 +105,25 @@ export async function registerTagsRoutes(fastify: FastifyInstance) {
 				return reply.code(400).send({ message: "color must not be empty" });
 			}
 
-			const { data, error } = await supabase
-				.from("tags")
-				.insert({
-					id: nanoid(),
-					workspace_id: workspaceId,
-					name: trimmedName,
-					color: trimmedColor,
-				})
-				.select("id, name, color, workspace_id")
-				.single();
+			try {
+				const [data] = await db
+					.insert(tags)
+					.values({
+						id: nanoid(),
+						workspaceId,
+						name: trimmedName,
+						color: trimmedColor,
+					})
+					.returning(tagColumns);
 
-			if (error || !data) {
+				if (!data) {
+					return reply.code(500).send({ message: "Failed to create tag" });
+				}
+
+				return reply.code(201).send({ data });
+			} catch {
 				return reply.code(500).send({ message: "Failed to create tag" });
 			}
-
-			return reply.code(201).send({ data });
 		},
 	});
 
@@ -140,21 +156,20 @@ export async function registerTagsRoutes(fastify: FastifyInstance) {
 				tagId: string;
 			};
 
-			const { error, count } = await supabase
-				.from("tags")
-				.delete({ count: "exact" })
-				.eq("id", tagId)
-				.eq("workspace_id", workspaceId);
+			try {
+				const deleted = await db
+					.delete(tags)
+					.where(and(eq(tags.id, tagId), eq(tags.workspaceId, workspaceId)))
+					.returning({ id: tags.id });
 
-			if (error) {
+				if (deleted.length === 0) {
+					return reply.code(404).send({ message: "Tag not found" });
+				}
+
+				return reply.send({ success: true });
+			} catch {
 				return reply.code(500).send({ message: "Failed to delete tag" });
 			}
-
-			if (count === 0) {
-				return reply.code(404).send({ message: "Tag not found" });
-			}
-
-			return reply.send({ success: true });
 		},
 	});
 }

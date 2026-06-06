@@ -1,9 +1,9 @@
+import { authSchema } from "@repo/database";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { emailOTP } from "better-auth/plugins";
 import { db } from "../pg.js";
 import { sendSignInOtp } from "./email.js";
-import { authSchema } from "./schema.js";
 
 /**
  * better-auth instance — Phase 2 of the Supabase -> self-contained migration.
@@ -23,10 +23,11 @@ import { authSchema } from "./schema.js";
  * overrides are needed. New users get UUID ids (`generateId: "uuid"`) to match
  * the existing rows' scheme, keeping every `user_id` FK homogeneous.
  *
- * The adapter `schema` (./schema.ts) was produced by `@better-auth/cli generate`
- * — tables users/sessions/accounts/verifications. The new three are created in
- * Supabase migration 20260605130000. (Phase 3 relocates this schema into a
- * properly-built `@repo/database`; see that file's note.)
+ * The adapter `schema` is the shared `authSchema` from `@repo/database` (the
+ * users/sessions/accounts/verifications subset of the full Drizzle schema,
+ * relocated there in Phase 3 from the runner-local CLI-generated copy). The
+ * sessions/accounts/verifications tables are created in Supabase migration
+ * 20260605130000.
  */
 export const auth = betterAuth({
 	baseURL: process.env.APP_URL,
