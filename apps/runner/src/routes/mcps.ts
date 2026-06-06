@@ -1,7 +1,8 @@
-import type { Json } from "@repo/database";
+import { mcps } from "@repo/database";
+import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
-import { supabase } from "../lib/db.js";
+import { db } from "../lib/pg.js";
 import { requireScope, requireUserId } from "../lib/scopes.js";
 import {
 	type Environment,
@@ -13,15 +14,33 @@ import {
 // endpoints only ever persist the opaque blobs. Decryption happens solely on the
 // run path, so create/update never see plaintext. `tools` is populated separately
 // by the refresh endpoint below, never on create/update.
-const SELECT_COLUMNS =
-	"id, name, tools, custom_headers, created_at, updated_at, encrypted_data_staging";
+// `encrypted_data_production` is never selected (write-only).
+const mcpColumns = {
+	id: mcps.id,
+	name: mcps.name,
+	tools: mcps.tools,
+	custom_headers: mcps.custom_headers,
+	created_at: mcps.created_at,
+	updated_at: mcps.updated_at,
+	encrypted_data_staging: mcps.encrypted_data_staging,
+};
 
 function toMcp(row: {
+	id: string;
+	name: string;
+	tools: unknown;
+	custom_headers: string;
+	created_at: string;
+	updated_at: string;
 	encrypted_data_staging: unknown;
-	[key: string]: unknown;
 }) {
-	const { encrypted_data_staging, ...rest } = row;
-	return { ...rest, has_staging_config: !!encrypted_data_staging };
+	const { encrypted_data_staging, created_at, updated_at, ...rest } = row;
+	return {
+		...rest,
+		created_at: new Date(created_at).toISOString(),
+		updated_at: new Date(updated_at).toISOString(),
+		has_staging_config: !!encrypted_data_staging,
+	};
 }
 
 const McpSchema = {
@@ -68,17 +87,17 @@ export async function registerMcpsRoutes(fastify: FastifyInstance) {
 		handler: async (request, reply) => {
 			const { workspaceId } = request.params as { workspaceId: string };
 
-			const { data, error } = await supabase
-				.from("mcps")
-				.select(SELECT_COLUMNS)
-				.eq("workspace_id", workspaceId)
-				.order("created_at", { ascending: false });
+			try {
+				const data = await db
+					.select(mcpColumns)
+					.from(mcps)
+					.where(eq(mcps.workspace_id, workspaceId))
+					.orderBy(desc(mcps.created_at));
 
-			if (error) {
+				return reply.send({ data: data.map(toMcp) });
+			} catch {
 				return reply.code(500).send({ message: "Failed to fetch MCPs" });
 			}
-
-			return reply.send({ data: data.map(toMcp) });
 		},
 	});
 
@@ -130,24 +149,29 @@ export async function registerMcpsRoutes(fastify: FastifyInstance) {
 				return reply.code(400).send({ message: "name must not be empty" });
 			}
 
-			const { data, error } = await supabase
-				.from("mcps")
-				.insert({
-					id: nanoid(),
-					workspace_id: workspaceId,
-					name: trimmedName,
-					encrypted_data_production,
-					encrypted_data_staging: encrypted_data_staging ?? null,
-					custom_headers: custom_headers?.trim() ?? "",
-				})
-				.select(SELECT_COLUMNS)
-				.single();
+			try {
+				const [data] = await db
+					.insert(mcps)
+					.values({
+						id: nanoid(),
+						workspace_id: workspaceId,
+						name: trimmedName,
+						encrypted_data_production,
+						encrypted_data_staging: encrypted_data_staging ?? null,
+						custom_headers: custom_headers?.trim() ?? "",
+					})
+					.returning(mcpColumns);
 
-			if (error || !data) {
+				if (!data) {
+					return reply
+						.code(500)
+						.send({ message: "Failed to create MCP server" });
+				}
+
+				return reply.code(201).send({ data: toMcp(data) });
+			} catch {
 				return reply.code(500).send({ message: "Failed to create MCP server" });
 			}
-
-			return reply.code(201).send({ data: toMcp(data) });
 		},
 	});
 
@@ -198,7 +222,7 @@ export async function registerMcpsRoutes(fastify: FastifyInstance) {
 				custom_headers?: string;
 			};
 
-			const updates: Record<string, unknown> = {};
+			const updates: Partial<typeof mcps.$inferInsert> = {};
 			if (body.name !== undefined) {
 				const trimmedName = body.name.trim();
 				if (trimmedName.length === 0) {
@@ -221,22 +245,21 @@ export async function registerMcpsRoutes(fastify: FastifyInstance) {
 			}
 			updates.updated_at = new Date().toISOString();
 
-			const { data, error } = await supabase
-				.from("mcps")
-				.update(updates)
-				.eq("id", mcpId)
-				.eq("workspace_id", workspaceId)
-				.select(SELECT_COLUMNS)
-				.maybeSingle();
+			try {
+				const [data] = await db
+					.update(mcps)
+					.set(updates)
+					.where(and(eq(mcps.id, mcpId), eq(mcps.workspace_id, workspaceId)))
+					.returning(mcpColumns);
 
-			if (error) {
+				if (!data) {
+					return reply.code(404).send({ message: "MCP server not found" });
+				}
+
+				return reply.send({ data: toMcp(data) });
+			} catch {
 				return reply.code(500).send({ message: "Failed to update MCP server" });
 			}
-			if (!data) {
-				return reply.code(404).send({ message: "MCP server not found" });
-			}
-
-			return reply.send({ data: toMcp(data) });
 		},
 	});
 
@@ -265,20 +288,20 @@ export async function registerMcpsRoutes(fastify: FastifyInstance) {
 				mcpId: string;
 			};
 
-			const { error, count } = await supabase
-				.from("mcps")
-				.delete({ count: "exact" })
-				.eq("id", mcpId)
-				.eq("workspace_id", workspaceId);
+			try {
+				const deleted = await db
+					.delete(mcps)
+					.where(and(eq(mcps.id, mcpId), eq(mcps.workspace_id, workspaceId)))
+					.returning({ id: mcps.id });
 
-			if (error) {
+				if (deleted.length === 0) {
+					return reply.code(404).send({ message: "MCP server not found" });
+				}
+
+				return reply.send({ success: true });
+			} catch {
 				return reply.code(500).send({ message: "Failed to delete MCP server" });
 			}
-			if (count === 0) {
-				return reply.code(404).send({ message: "MCP server not found" });
-			}
-
-			return reply.send({ success: true });
 		},
 	});
 
@@ -321,14 +344,17 @@ export async function registerMcpsRoutes(fastify: FastifyInstance) {
 				mcpId: string;
 			};
 
-			const { data: mcp, error: mcpError } = await supabase
-				.from("mcps")
-				.select("*")
-				.eq("id", mcpId)
-				.eq("workspace_id", workspaceId)
-				.single();
+			const [mcp] = await db
+				.select({
+					encrypted_data_production: mcps.encrypted_data_production,
+					encrypted_data_staging: mcps.encrypted_data_staging,
+					tools: mcps.tools,
+				})
+				.from(mcps)
+				.where(and(eq(mcps.id, mcpId), eq(mcps.workspace_id, workspaceId)))
+				.limit(1);
 
-			if (mcpError || !mcp) {
+			if (!mcp) {
 				return reply.code(404).send({ message: "MCP server not found" });
 			}
 
@@ -382,15 +408,15 @@ export async function registerMcpsRoutes(fastify: FastifyInstance) {
 				});
 			}
 
-			const { error: updateError } = await supabase
-				.from("mcps")
-				.update({
-					tools: newTools as unknown as Json,
-					updated_at: new Date().toISOString(),
-				})
-				.eq("id", mcpId);
-
-			if (updateError) {
+			try {
+				await db
+					.update(mcps)
+					.set({
+						tools: newTools,
+						updated_at: new Date().toISOString(),
+					})
+					.where(eq(mcps.id, mcpId));
+			} catch {
 				return reply.code(500).send({
 					message: "Failed to persist refreshed tools",
 				});

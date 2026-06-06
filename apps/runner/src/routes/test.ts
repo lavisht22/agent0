@@ -1,11 +1,13 @@
+import { agentVersions, providers, workspaceUser } from "@repo/database";
 import { Output, stepCountIs, streamText, type ToolSet } from "ai";
+import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
 import { toWebHeaders } from "../lib/auth/headers.js";
 import { auth } from "../lib/auth/index.js";
 import { sumUsage } from "../lib/cost.js";
-import { supabase } from "../lib/db.js";
 import { createSSEStream } from "../lib/helpers.js";
+import { db } from "../lib/pg.js";
 import { assembleRun, recordRun } from "../lib/run-agent.js";
 import type { VersionData } from "../lib/types.js";
 
@@ -46,18 +48,29 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 		const versionData = data as VersionData;
 
 		// Get the provider to check workspace access (also fetch workspace_id for logging)
-		const { data: provider, error: providerError } = await supabase
-			.from("providers")
-			.select("workspace_id, workspaces(workspace_user(user_id, role))")
-			.eq("id", versionData.model.provider_id)
-			.eq("workspaces.workspace_user.user_id", userId)
-			.single();
+		const [provider] = await db
+			.select({ workspace_id: providers.workspace_id })
+			.from(providers)
+			.where(eq(providers.id, versionData.model.provider_id))
+			.limit(1);
 
-		if (providerError || !provider) {
+		if (!provider) {
 			return reply.code(404).send({ message: "Provider not found" });
 		}
 
-		if (provider.workspaces.workspace_user.length === 0) {
+		// The provider exists; confirm the caller is a member of its workspace.
+		const [membership] = await db
+			.select({ user_id: workspaceUser.user_id })
+			.from(workspaceUser)
+			.where(
+				and(
+					eq(workspaceUser.workspace_id, provider.workspace_id),
+					eq(workspaceUser.user_id, userId),
+				),
+			)
+			.limit(1);
+
+		if (!membership) {
 			return reply.code(403).send({ message: "Access denied" });
 		}
 
@@ -66,13 +79,13 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 		// as a test run), just without a version link, and seed the cycle guard
 		// from the owning agent when we can resolve it. Logging a non-existent
 		// version_id would violate the runs_version_id foreign key.
-		const { data: versionRow } = version_id
-			? await supabase
-					.from("agent_versions")
-					.select("agent_id")
-					.eq("id", version_id)
-					.maybeSingle()
-			: { data: null };
+		const [versionRow] = version_id
+			? await db
+					.select({ agent_id: agentVersions.agent_id })
+					.from(agentVersions)
+					.where(eq(agentVersions.id, version_id))
+					.limit(1)
+			: [];
 		const resolvedVersionId = versionRow ? (version_id ?? null) : null;
 		const editedAgentId = versionRow?.agent_id ?? undefined;
 

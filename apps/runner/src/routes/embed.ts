@@ -1,7 +1,9 @@
+import { providers } from "@repo/database";
 import { embed, embedMany } from "ai";
+import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { supabase } from "../lib/db.js";
 import { decryptMessage } from "../lib/openpgp.js";
+import { db } from "../lib/pg.js";
 import { getAIProvider } from "../lib/providers.js";
 import { requireScope } from "../lib/scopes.js";
 
@@ -36,14 +38,22 @@ async function getProvider(
 	providerId: string,
 	environment: "staging" | "production",
 ) {
-	const { data: provider, error: providerError } = await supabase
-		.from("providers")
-		.select("*")
-		.eq("id", providerId)
-		.eq("workspace_id", workspaceId)
-		.single();
+	const [provider] = await db
+		.select({
+			type: providers.type,
+			encrypted_data_production: providers.encrypted_data_production,
+			encrypted_data_staging: providers.encrypted_data_staging,
+		})
+		.from(providers)
+		.where(
+			and(
+				eq(providers.id, providerId),
+				eq(providers.workspace_id, workspaceId),
+			),
+		)
+		.limit(1);
 
-	if (providerError || !provider) {
+	if (!provider) {
 		return { error: { code: 404, message: "Provider not found" } };
 	}
 
@@ -74,82 +84,102 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 						type: "object" as const,
 						required: ["provider_id", "name"],
 						properties: {
-							provider_id: { type: "string" as const, description: "Provider ID for the embedding model" },
+							provider_id: {
+								type: "string" as const,
+								description: "Provider ID for the embedding model",
+							},
 							name: { type: "string" as const, description: "Model name" },
 						},
 					},
 					value: { type: "string" as const, description: "Text to embed" },
-					environment: { type: "string" as const, enum: ["staging", "production"], default: "production", description: "Which provider config to use" },
+					environment: {
+						type: "string" as const,
+						enum: ["staging", "production"],
+						default: "production",
+						description: "Which provider config to use",
+					},
 				},
 			},
 			response: {
 				200: {
 					type: "object" as const,
 					properties: {
-						embedding: { type: "array" as const, items: { type: "number" as const } },
+						embedding: {
+							type: "array" as const,
+							items: { type: "number" as const },
+						},
 					},
 				},
-				400: { type: "object" as const, properties: { message: { type: "string" as const } } },
-				404: { type: "object" as const, properties: { message: { type: "string" as const } } },
-				500: { type: "object" as const, properties: { message: { type: "string" as const } } },
+				400: {
+					type: "object" as const,
+					properties: { message: { type: "string" as const } },
+				},
+				404: {
+					type: "object" as const,
+					properties: { message: { type: "string" as const } },
+				},
+				500: {
+					type: "object" as const,
+					properties: { message: { type: "string" as const } },
+				},
 			},
 		},
 		handler: async (request, reply) => {
-		const { workspaceId } = request.params as { workspaceId: string };
-		const body = request.body as SingleEmbedRequest & {
-			environment?: "staging" | "production";
-		};
+			const { workspaceId } = request.params as { workspaceId: string };
+			const body = request.body as SingleEmbedRequest & {
+				environment?: "staging" | "production";
+			};
 
-		// Validate request body
-		if (!body.model?.provider_id || !body.model?.name) {
-			return reply
-				.code(400)
-				.send({ message: "model.provider_id and model.name are required" });
-		}
-
-		if (!body.value) {
-			return reply.code(400).send({ message: "value is required" });
-		}
-
-		const result = await getProvider(
-			workspaceId,
-			body.model.provider_id,
-			body.environment ?? "production",
-		);
-		if (result.error) {
-			return reply
-				.code(result.error.code as 404)
-				.send({ message: result.error.message });
-		}
-
-		const { provider, aiProvider } = result;
-
-		try {
-			const embeddingModel = aiProvider?.textEmbeddingModel(body.model.name);
-
-			if (!embeddingModel) {
-				return reply.code(400).send({
-					message: `Unsupported provider type for embeddings: ${provider.type}`,
-				});
+			// Validate request body
+			if (!body.model?.provider_id || !body.model?.name) {
+				return reply
+					.code(400)
+					.send({ message: "model.provider_id and model.name are required" });
 			}
 
-			// Spread all other options from body, replacing model with the resolved embedding model
-			const { model: _, ...restOptions } = body;
-			const embedResult = await embed({
-				...restOptions,
-				model: embeddingModel,
-			});
+			if (!body.value) {
+				return reply.code(400).send({ message: "value is required" });
+			}
 
-			return reply.send({
-				embedding: embedResult.embedding,
-			});
-		} catch (error) {
-			console.error("Embed error:", error);
-			return reply.code(500).send({
-				message:
-					error instanceof Error ? error.message : "Unknown error occurred",
-			});
-		}
+			const result = await getProvider(
+				workspaceId,
+				body.model.provider_id,
+				body.environment ?? "production",
+			);
+			if (result.error) {
+				return reply
+					.code(result.error.code as 404)
+					.send({ message: result.error.message });
+			}
+
+			const { provider, aiProvider } = result;
+
+			try {
+				const embeddingModel = aiProvider?.textEmbeddingModel(body.model.name);
+
+				if (!embeddingModel) {
+					return reply.code(400).send({
+						message: `Unsupported provider type for embeddings: ${provider.type}`,
+					});
+				}
+
+				// Spread all other options from body, replacing model with the resolved embedding model
+				const { model: _, ...restOptions } = body;
+				const embedResult = await embed({
+					...restOptions,
+					model: embeddingModel,
+				});
+
+				return reply.send({
+					embedding: embedResult.embedding,
+				});
+			} catch (error) {
+				console.error("Embed error:", error);
+				return reply.code(500).send({
+					message:
+						error instanceof Error ? error.message : "Unknown error occurred",
+				});
+			}
 		},
 	});
 
@@ -167,88 +197,115 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 						type: "object" as const,
 						required: ["provider_id", "name"],
 						properties: {
-							provider_id: { type: "string" as const, description: "Provider ID for the embedding model" },
+							provider_id: {
+								type: "string" as const,
+								description: "Provider ID for the embedding model",
+							},
 							name: { type: "string" as const, description: "Model name" },
 						},
 					},
-					values: { type: "array" as const, items: { type: "string" as const }, description: "Array of texts to embed" },
-					environment: { type: "string" as const, enum: ["staging", "production"], default: "production", description: "Which provider config to use" },
+					values: {
+						type: "array" as const,
+						items: { type: "string" as const },
+						description: "Array of texts to embed",
+					},
+					environment: {
+						type: "string" as const,
+						enum: ["staging", "production"],
+						default: "production",
+						description: "Which provider config to use",
+					},
 				},
 			},
 			response: {
 				200: {
 					type: "object" as const,
 					properties: {
-						embeddings: { type: "array" as const, items: { type: "array" as const, items: { type: "number" as const } } },
+						embeddings: {
+							type: "array" as const,
+							items: {
+								type: "array" as const,
+								items: { type: "number" as const },
+							},
+						},
 					},
 				},
-				400: { type: "object" as const, properties: { message: { type: "string" as const } } },
-				404: { type: "object" as const, properties: { message: { type: "string" as const } } },
-				500: { type: "object" as const, properties: { message: { type: "string" as const } } },
+				400: {
+					type: "object" as const,
+					properties: { message: { type: "string" as const } },
+				},
+				404: {
+					type: "object" as const,
+					properties: { message: { type: "string" as const } },
+				},
+				500: {
+					type: "object" as const,
+					properties: { message: { type: "string" as const } },
+				},
 			},
 		},
 		handler: async (request, reply) => {
-		const { workspaceId } = request.params as { workspaceId: string };
-		const body = request.body as ManyEmbedRequest & {
-			environment?: "staging" | "production";
-		};
+			const { workspaceId } = request.params as { workspaceId: string };
+			const body = request.body as ManyEmbedRequest & {
+				environment?: "staging" | "production";
+			};
 
-		// Validate request body
-		if (!body.model?.provider_id || !body.model?.name) {
-			return reply
-				.code(400)
-				.send({ message: "model.provider_id and model.name are required" });
-		}
+			// Validate request body
+			if (!body.model?.provider_id || !body.model?.name) {
+				return reply
+					.code(400)
+					.send({ message: "model.provider_id and model.name are required" });
+			}
 
-		if (
-			!body.values ||
-			!Array.isArray(body.values) ||
-			body.values.length === 0
-		) {
-			return reply
-				.code(400)
-				.send({ message: "values is required and must be a non-empty array" });
-		}
-
-		const result = await getProvider(
-			workspaceId,
-			body.model.provider_id,
-			body.environment ?? "production",
-		);
-		if (result.error) {
-			return reply
-				.code(result.error.code as 404)
-				.send({ message: result.error.message });
-		}
-
-		const { provider, aiProvider } = result;
-
-		try {
-			const embeddingModel = aiProvider?.textEmbeddingModel(body.model.name);
-
-			if (!embeddingModel) {
+			if (
+				!body.values ||
+				!Array.isArray(body.values) ||
+				body.values.length === 0
+			) {
 				return reply.code(400).send({
-					message: `Unsupported provider type for embeddings: ${provider.type}`,
+					message: "values is required and must be a non-empty array",
 				});
 			}
 
-			// Spread all other options from body, replacing model with the resolved embedding model
-			const { model: _, ...restOptions } = body;
-			const embedResult = await embedMany({
-				...restOptions,
-				model: embeddingModel,
-			});
+			const result = await getProvider(
+				workspaceId,
+				body.model.provider_id,
+				body.environment ?? "production",
+			);
+			if (result.error) {
+				return reply
+					.code(result.error.code as 404)
+					.send({ message: result.error.message });
+			}
 
-			return reply.send({
-				embeddings: embedResult.embeddings,
-			});
-		} catch (error) {
-			console.error("EmbedMany error:", error);
-			return reply.code(500).send({
-				message:
-					error instanceof Error ? error.message : "Unknown error occurred",
-			});
-		}
+			const { provider, aiProvider } = result;
+
+			try {
+				const embeddingModel = aiProvider?.textEmbeddingModel(body.model.name);
+
+				if (!embeddingModel) {
+					return reply.code(400).send({
+						message: `Unsupported provider type for embeddings: ${provider.type}`,
+					});
+				}
+
+				// Spread all other options from body, replacing model with the resolved embedding model
+				const { model: _, ...restOptions } = body;
+				const embedResult = await embedMany({
+					...restOptions,
+					model: embeddingModel,
+				});
+
+				return reply.send({
+					embeddings: embedResult.embeddings,
+				});
+			} catch (error) {
+				console.error("EmbedMany error:", error);
+				return reply.code(500).send({
+					message:
+						error instanceof Error ? error.message : "Unknown error occurred",
+				});
+			}
 		},
 	});
 }

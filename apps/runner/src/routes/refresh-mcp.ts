@@ -1,10 +1,11 @@
 import { experimental_createMCPClient as createMCPClient } from "@ai-sdk/mcp";
-import type { Json } from "@repo/database";
+import { mcps, workspaceUser } from "@repo/database";
+import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { toWebHeaders } from "../lib/auth/headers.js";
 import { auth } from "../lib/auth/index.js";
-import { supabase } from "../lib/db.js";
 import { decryptMessage } from "../lib/openpgp.js";
+import { db } from "../lib/pg.js";
 import type { MCPConfig } from "../lib/types.js";
 
 export type Environment = "production" | "staging";
@@ -53,18 +54,34 @@ export async function registerRefreshMCPRoute(fastify: FastifyInstance) {
 		}
 
 		// Get the MCP server and check workspace access
-		const { data: mcp, error: mcpError } = await supabase
-			.from("mcps")
-			.select("*, workspaces(workspace_user(user_id, role))")
-			.eq("id", mcp_id)
-			.eq("workspaces.workspace_user.user_id", userId)
-			.single();
+		const [mcp] = await db
+			.select({
+				workspace_id: mcps.workspace_id,
+				encrypted_data_production: mcps.encrypted_data_production,
+				encrypted_data_staging: mcps.encrypted_data_staging,
+				tools: mcps.tools,
+			})
+			.from(mcps)
+			.where(eq(mcps.id, mcp_id))
+			.limit(1);
 
-		if (mcpError || !mcp) {
+		if (!mcp) {
 			return reply.code(404).send({ message: "MCP server not found" });
 		}
 
-		if (mcp.workspaces.workspace_user.length === 0) {
+		// The MCP exists; confirm the caller belongs to its workspace.
+		const [membership] = await db
+			.select({ user_id: workspaceUser.user_id })
+			.from(workspaceUser)
+			.where(
+				and(
+					eq(workspaceUser.workspace_id, mcp.workspace_id),
+					eq(workspaceUser.user_id, userId),
+				),
+			)
+			.limit(1);
+
+		if (!membership) {
 			return reply.code(403).send({ message: "Access denied" });
 		}
 
@@ -121,18 +138,19 @@ export async function registerRefreshMCPRoute(fastify: FastifyInstance) {
 			});
 		}
 
-		const { error: updateError } = await supabase
-			.from("mcps")
-			.update({
-				tools: newTools as unknown as Json,
-				updated_at: new Date().toISOString(),
-			})
-			.eq("id", mcp_id);
-
-		if (updateError) {
+		try {
+			await db
+				.update(mcps)
+				.set({
+					tools: newTools,
+					updated_at: new Date().toISOString(),
+				})
+				.where(eq(mcps.id, mcp_id));
+		} catch (updateError) {
 			return reply.code(500).send({
 				message: "Failed to persist refreshed tools",
-				error: updateError.message,
+				error:
+					updateError instanceof Error ? updateError.message : "Unknown error",
 			});
 		}
 

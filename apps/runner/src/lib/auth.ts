@@ -80,8 +80,8 @@ async function resolveUserScopes(
 			.from(workspaceUser)
 			.where(
 				and(
-					eq(workspaceUser.userId, userId),
-					eq(workspaceUser.workspaceId, pathWorkspaceId),
+					eq(workspaceUser.user_id, userId),
+					eq(workspaceUser.workspace_id, pathWorkspaceId),
 				),
 			)
 			.limit(1);
@@ -155,12 +155,12 @@ async function authenticatePat(
 		[pat] = await db
 			.select({
 				id: personalAccessTokens.id,
-				user_id: personalAccessTokens.userId,
-				expires_at: personalAccessTokens.expiresAt,
-				revoked_at: personalAccessTokens.revokedAt,
+				user_id: personalAccessTokens.user_id,
+				expires_at: personalAccessTokens.expires_at,
+				revoked_at: personalAccessTokens.revoked_at,
 			})
 			.from(personalAccessTokens)
-			.where(eq(personalAccessTokens.tokenHash, tokenHash))
+			.where(eq(personalAccessTokens.token_hash, tokenHash))
 			.limit(1);
 	} catch {
 		reply.code(401).send({ message: "Invalid token" });
@@ -193,7 +193,7 @@ async function authenticatePat(
 	// non-blocking (a failed bump must never fail the request).
 	void db
 		.update(personalAccessTokens)
-		.set({ lastUsedAt: new Date().toISOString() })
+		.set({ last_used_at: new Date().toISOString() })
 		.where(eq(personalAccessTokens.id, pat.id))
 		.execute()
 		.catch(() => {});
@@ -224,9 +224,9 @@ async function authenticateApiKey(
 	try {
 		[apiKeyData] = await db
 			.select({
-				workspace_id: apiKeys.workspaceId,
+				workspace_id: apiKeys.workspace_id,
 				scopes: apiKeys.scopes,
-				allowed_origins: apiKeys.allowedOrigins,
+				allowed_origins: apiKeys.allowed_origins,
 			})
 			.from(apiKeys)
 			.where(eq(apiKeys.key, apiKey))

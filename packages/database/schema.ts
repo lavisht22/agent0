@@ -17,26 +17,14 @@ import {
 } from "drizzle-orm/pg-core";
 
 /**
- * Drizzle schema for the whole agent0 database — Phase 3 of the Supabase ->
- * self-contained migration. Curated from `drizzle-kit pull` against the live
- * Supabase Postgres (see drizzle.config.ts).
+ * Drizzle schema for the agent0 database.
  *
- * Two deliberate deviations from the raw introspection output:
- *
- *  1. **RLS `pgPolicy` blocks are stripped.** RLS stays enabled + dormant in the
- *     DB as a defense-in-depth backstop (the runner connects as the service role
- *     and bypasses it); the runtime Drizzle client never needs the policy
- *     definitions. When we adopt Drizzle Kit migrations (later in Phase 3) the
- *     baseline is re-introspected, so they're reconstructed there if needed.
- *
- *  2. **better-auth tables use Date-mode timestamps; app tables use string-mode.**
- *     The app tables (agents, runs, …) return ISO strings to match what the
- *     Supabase SDK returned (and what `database.types.ts` types them as), so
- *     route handlers are unchanged. The four better-auth-owned tables
- *     (`users`, `sessions`, `accounts`, `verifications`) keep Date-mode
- *     timestamps because better-auth's drizzle adapter works with JS `Date`s.
- *     `users` is shared, but the app only reads its text columns (name/email),
- *     so Date-mode timestamps there are invisible to app code.
+ * App-table columns are named in snake_case so query results, the DB columns,
+ * and the HTTP JSON contract all share one casing with no translation layer.
+ * The four better-auth-owned tables (`users`, `sessions`, `accounts`,
+ * `verifications`) keep camelCase fields + Date-mode timestamps because
+ * better-auth's drizzle adapter expects them; app tables use string-mode
+ * timestamps.
  */
 
 export const workspaceUserRole = pgEnum("workspace_user_role", [
@@ -46,7 +34,7 @@ export const workspaceUserRole = pgEnum("workspace_user_role", [
 ]);
 
 // ---------------------------------------------------------------------------
-// better-auth-owned tables (Date-mode timestamps)
+// better-auth-owned tables (camelCase fields, Date-mode timestamps)
 // ---------------------------------------------------------------------------
 
 export const users = pgTable(
@@ -154,7 +142,7 @@ export const verifications = pgTable(
 export const authSchema = { users, sessions, accounts, verifications };
 
 // ---------------------------------------------------------------------------
-// App tables (string-mode timestamps — parity with the Supabase SDK)
+// App tables (snake_case fields, string-mode timestamps)
 // ---------------------------------------------------------------------------
 
 export const workspaces = pgTable(
@@ -162,19 +150,19 @@ export const workspaces = pgTable(
 	{
 		id: text().primaryKey().notNull(),
 		name: text().notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+		created_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
-		userId: uuid("user_id")
+		user_id: uuid()
 			.default(sql`auth.uid()`)
 			.notNull(),
-		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+		updated_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
 	},
 	(table) => [
 		foreignKey({
-			columns: [table.userId],
+			columns: [table.user_id],
 			foreignColumns: [users.id],
 			name: "workspaces_user_id_fkey",
 		}),
@@ -184,12 +172,12 @@ export const workspaces = pgTable(
 export const workspaceUser = pgTable(
 	"workspace_user",
 	{
-		userId: uuid("user_id").notNull(),
-		workspaceId: text("workspace_id").notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+		user_id: uuid().notNull(),
+		workspace_id: text().notNull(),
+		created_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
-		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+		updated_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
 		role: workspaceUserRole().default("reader").notNull(),
@@ -197,28 +185,28 @@ export const workspaceUser = pgTable(
 	(table) => [
 		index("workspace_user_user_id_idx").using(
 			"btree",
-			table.userId.asc().nullsLast().op("uuid_ops"),
+			table.user_id.asc().nullsLast().op("uuid_ops"),
 		),
 		index("workspace_user_workspace_id_idx").using(
 			"btree",
-			table.workspaceId.asc().nullsLast().op("text_ops"),
+			table.workspace_id.asc().nullsLast().op("text_ops"),
 		),
 		foreignKey({
-			columns: [table.userId],
+			columns: [table.user_id],
 			foreignColumns: [users.id],
 			name: "workspace_user_user_id_fkey",
 		})
 			.onUpdate("cascade")
 			.onDelete("cascade"),
 		foreignKey({
-			columns: [table.workspaceId],
+			columns: [table.workspace_id],
 			foreignColumns: [workspaces.id],
 			name: "workspace_user_workspace_id_fkey",
 		})
 			.onUpdate("cascade")
 			.onDelete("cascade"),
 		primaryKey({
-			columns: [table.userId, table.workspaceId],
+			columns: [table.user_id, table.workspace_id],
 			name: "workspace_user_pkey",
 		}),
 	],
@@ -230,21 +218,21 @@ export const tags = pgTable(
 		id: text().primaryKey().notNull(),
 		name: text().notNull(),
 		color: text().default("#6366f1").notNull(),
-		workspaceId: text("workspace_id").notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+		workspace_id: text().notNull(),
+		created_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
-		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+		updated_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
 	},
 	(table) => [
 		index("tags_workspace_id_idx").using(
 			"btree",
-			table.workspaceId.asc().nullsLast().op("text_ops"),
+			table.workspace_id.asc().nullsLast().op("text_ops"),
 		),
 		foreignKey({
-			columns: [table.workspaceId],
+			columns: [table.workspace_id],
 			foreignColumns: [workspaces.id],
 			name: "tahs_workspace_id_fkey",
 		})
@@ -257,21 +245,19 @@ export const agents = pgTable(
 	"agents",
 	{
 		id: text().primaryKey().notNull(),
-		workspaceId: text("workspace_id").notNull(),
+		workspace_id: text().notNull(),
 		name: text().notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+		created_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
-		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+		updated_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
 		// Inline `.references()` with an `AnyPgColumn` annotation breaks the
 		// agents <-> agent_versions type cycle that `declaration: true` can't
 		// otherwise resolve (the table-level `foreignKey()` form can't here).
-		stagingVersionId: text("staging_version_id").references(
-			(): AnyPgColumn => agentVersions.id,
-		),
-		productionVersionId: text("production_version_id").references(
+		staging_version_id: text().references((): AnyPgColumn => agentVersions.id),
+		production_version_id: text().references(
 			(): AnyPgColumn => agentVersions.id,
 		),
 	},
@@ -279,18 +265,18 @@ export const agents = pgTable(
 		index("agents_production_version_idx")
 			.using(
 				"btree",
-				table.productionVersionId.asc().nullsLast().op("text_ops"),
+				table.production_version_id.asc().nullsLast().op("text_ops"),
 			)
 			.where(sql`(production_version_id IS NOT NULL)`),
 		index("agents_staging_version_idx")
-			.using("btree", table.stagingVersionId.asc().nullsLast().op("text_ops"))
+			.using("btree", table.staging_version_id.asc().nullsLast().op("text_ops"))
 			.where(sql`(staging_version_id IS NOT NULL)`),
 		index("agents_workspace_id_idx").using(
 			"btree",
-			table.workspaceId.asc().nullsLast().op("text_ops"),
+			table.workspace_id.asc().nullsLast().op("text_ops"),
 		),
 		foreignKey({
-			columns: [table.workspaceId],
+			columns: [table.workspace_id],
 			foreignColumns: [workspaces.id],
 			name: "agents_workspace_id_fkey",
 		})
@@ -303,33 +289,33 @@ export const agentVersions = pgTable(
 	"agent_versions",
 	{
 		id: text().primaryKey().notNull(),
-		agentId: text("agent_id").notNull(),
+		agent_id: text().notNull(),
 		data: jsonb().notNull(),
-		isDeployed: boolean("is_deployed").default(false).notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+		is_deployed: boolean().default(false).notNull(),
+		created_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
-		userId: uuid("user_id")
+		user_id: uuid()
 			.default(sql`auth.uid()`)
 			.notNull(),
 	},
 	(table) => [
 		index("agent_versions_agent_id_idx").using(
 			"btree",
-			table.agentId.asc().nullsLast().op("text_ops"),
+			table.agent_id.asc().nullsLast().op("text_ops"),
 		),
 		index("agent_versions_agent_id_is_deployed_idx")
-			.using("btree", table.agentId.asc().nullsLast().op("text_ops"))
+			.using("btree", table.agent_id.asc().nullsLast().op("text_ops"))
 			.where(sql`(is_deployed IS TRUE)`),
 		foreignKey({
-			columns: [table.agentId],
+			columns: [table.agent_id],
 			foreignColumns: [agents.id],
 			name: "agent_versions_agent_id_fkey",
 		})
 			.onUpdate("cascade")
 			.onDelete("cascade"),
 		foreignKey({
-			columns: [table.userId],
+			columns: [table.user_id],
 			foreignColumns: [users.id],
 			name: "agent_versions_user_id_fkey",
 		}),
@@ -339,37 +325,37 @@ export const agentVersions = pgTable(
 export const agentTags = pgTable(
 	"agent_tags",
 	{
-		agentId: text("agent_id").notNull(),
-		tagId: text("tag_id").notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+		agent_id: text().notNull(),
+		tag_id: text().notNull(),
+		created_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
 	},
 	(table) => [
 		index("agent_tags_agent_id_idx").using(
 			"btree",
-			table.agentId.asc().nullsLast().op("text_ops"),
+			table.agent_id.asc().nullsLast().op("text_ops"),
 		),
 		index("agent_tags_tag_id_idx").using(
 			"btree",
-			table.tagId.asc().nullsLast().op("text_ops"),
+			table.tag_id.asc().nullsLast().op("text_ops"),
 		),
 		foreignKey({
-			columns: [table.agentId],
+			columns: [table.agent_id],
 			foreignColumns: [agents.id],
 			name: "agent_tags_agent_id_fkey",
 		})
 			.onUpdate("cascade")
 			.onDelete("cascade"),
 		foreignKey({
-			columns: [table.tagId],
+			columns: [table.tag_id],
 			foreignColumns: [tags.id],
 			name: "agent_tags_tag_id_fkey",
 		})
 			.onUpdate("cascade")
 			.onDelete("cascade"),
 		primaryKey({
-			columns: [table.agentId, table.tagId],
+			columns: [table.agent_id, table.tag_id],
 			name: "agent_tags_pkey",
 		}),
 	],
@@ -381,23 +367,23 @@ export const providers = pgTable(
 		id: text().primaryKey().notNull(),
 		name: text().notNull(),
 		type: text().notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+		created_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
-		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+		updated_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
-		workspaceId: text("workspace_id").notNull(),
-		encryptedDataProduction: text("encrypted_data_production").notNull(),
-		encryptedDataStaging: text("encrypted_data_staging"),
+		workspace_id: text().notNull(),
+		encrypted_data_production: text().notNull(),
+		encrypted_data_staging: text(),
 	},
 	(table) => [
 		index("providers_workspace_id_idx").using(
 			"btree",
-			table.workspaceId.asc().nullsLast().op("text_ops"),
+			table.workspace_id.asc().nullsLast().op("text_ops"),
 		),
 		foreignKey({
-			columns: [table.workspaceId],
+			columns: [table.workspace_id],
 			foreignColumns: [workspaces.id],
 			name: "providers_workspace_id_fkey",
 		})
@@ -410,26 +396,26 @@ export const mcps = pgTable(
 	"mcps",
 	{
 		id: text().primaryKey().notNull(),
-		workspaceId: text("workspace_id").notNull(),
-		encryptedDataProduction: jsonb("encrypted_data_production").notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+		workspace_id: text().notNull(),
+		encrypted_data_production: jsonb().notNull(),
+		created_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
-		updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+		updated_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
 		name: text().notNull(),
 		tools: jsonb(),
-		customHeaders: text("custom_headers").default("").notNull(),
-		encryptedDataStaging: jsonb("encrypted_data_staging"),
+		custom_headers: text().default("").notNull(),
+		encrypted_data_staging: jsonb(),
 	},
 	(table) => [
 		index("mcps_workspace_id_idx").using(
 			"btree",
-			table.workspaceId.asc().nullsLast().op("text_ops"),
+			table.workspace_id.asc().nullsLast().op("text_ops"),
 		),
 		foreignKey({
-			columns: [table.workspaceId],
+			columns: [table.workspace_id],
 			foreignColumns: [workspaces.id],
 			name: "mcps_workspace_id_fkey",
 		})
@@ -442,43 +428,43 @@ export const runs = pgTable(
 	"runs",
 	{
 		id: text().primaryKey().notNull(),
-		workspaceId: text("workspace_id").notNull(),
-		versionId: text("version_id"),
-		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+		workspace_id: text().notNull(),
+		version_id: text(),
+		created_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
-		isError: boolean("is_error").default(false).notNull(),
-		isTest: boolean("is_test").default(false).notNull(),
-		preProcessingTime: numeric("pre_processing_time").notNull(),
-		firstTokenTime: numeric("first_token_time").notNull(),
-		responseTime: numeric("response_time").notNull(),
-		isStream: boolean("is_stream"),
+		is_error: boolean().default(false).notNull(),
+		is_test: boolean().default(false).notNull(),
+		pre_processing_time: numeric().notNull(),
+		first_token_time: numeric().notNull(),
+		response_time: numeric().notNull(),
+		is_stream: boolean(),
 		tokens: numeric(),
 		cost: numeric(),
-		parentRunId: text("parent_run_id"),
+		parent_run_id: text(),
 	},
 	(table) => [
 		index("runs_created_at_idx").using(
 			"btree",
-			table.createdAt.asc().nullsLast().op("timestamptz_ops"),
+			table.created_at.asc().nullsLast().op("timestamptz_ops"),
 		),
 		index("runs_parent_run_id_idx").using(
 			"btree",
-			table.parentRunId.asc().nullsLast().op("text_ops"),
+			table.parent_run_id.asc().nullsLast().op("text_ops"),
 		),
 		index("runs_workspace_id_idx").using(
 			"btree",
-			table.workspaceId.asc().nullsLast().op("text_ops"),
+			table.workspace_id.asc().nullsLast().op("text_ops"),
 		),
 		foreignKey({
-			columns: [table.versionId],
+			columns: [table.version_id],
 			foreignColumns: [agentVersions.id],
 			name: "runs_agent_version_id_fkey",
 		})
 			.onUpdate("cascade")
 			.onDelete("set null"),
 		foreignKey({
-			columns: [table.workspaceId],
+			columns: [table.workspace_id],
 			foreignColumns: [workspaces.id],
 			name: "runs_workspace_id_fkey",
 		})
@@ -492,27 +478,27 @@ export const apiKeys = pgTable(
 	{
 		id: text().primaryKey().notNull(),
 		name: text().notNull(),
-		userId: uuid("user_id").notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+		user_id: uuid().notNull(),
+		created_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
-		workspaceId: text("workspace_id").notNull(),
+		workspace_id: text().notNull(),
 		key: text().notNull(),
 		scopes: text().array().default(["*:*:*"]).notNull(),
-		allowedOrigins: text("allowed_origins").array(),
+		allowed_origins: text().array(),
 	},
 	(table) => [
 		index("api_keys_workspace_id_idx").using(
 			"btree",
-			table.workspaceId.asc().nullsLast().op("text_ops"),
+			table.workspace_id.asc().nullsLast().op("text_ops"),
 		),
 		foreignKey({
-			columns: [table.userId],
+			columns: [table.user_id],
 			foreignColumns: [users.id],
 			name: "api_keys_user_id_fkey",
 		}),
 		foreignKey({
-			columns: [table.workspaceId],
+			columns: [table.workspace_id],
 			foreignColumns: [workspaces.id],
 			name: "api_keys_workspace_id_fkey",
 		})
@@ -526,32 +512,29 @@ export const personalAccessTokens = pgTable(
 	"personal_access_tokens",
 	{
 		id: text().primaryKey().notNull(),
-		userId: uuid("user_id").notNull(),
-		tokenHash: text("token_hash").notNull(),
-		tokenPrefix: text("token_prefix").notNull(),
+		user_id: uuid().notNull(),
+		token_hash: text().notNull(),
+		token_prefix: text().notNull(),
 		name: text().notNull(),
-		createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+		created_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
-		lastUsedAt: timestamp("last_used_at", {
-			withTimezone: true,
-			mode: "string",
-		}),
-		expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }),
-		revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "string" }),
+		last_used_at: timestamp({ withTimezone: true, mode: "string" }),
+		expires_at: timestamp({ withTimezone: true, mode: "string" }),
+		revoked_at: timestamp({ withTimezone: true, mode: "string" }),
 	},
 	(table) => [
 		index("personal_access_tokens_user_id_idx").using(
 			"btree",
-			table.userId.asc().nullsLast().op("uuid_ops"),
+			table.user_id.asc().nullsLast().op("uuid_ops"),
 		),
 		foreignKey({
-			columns: [table.userId],
+			columns: [table.user_id],
 			foreignColumns: [users.id],
 			name: "personal_access_tokens_user_id_fkey",
 		})
 			.onUpdate("cascade")
 			.onDelete("cascade"),
-		unique("personal_access_tokens_token_hash_key").on(table.tokenHash),
+		unique("personal_access_tokens_token_hash_key").on(table.token_hash),
 	],
 );

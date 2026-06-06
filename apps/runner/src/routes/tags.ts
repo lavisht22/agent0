@@ -5,15 +5,11 @@ import { nanoid } from "nanoid";
 import { db } from "../lib/pg.js";
 import { requireScope, requireUserId } from "../lib/scopes.js";
 
-/**
- * Columns returned to the web, named snake_case to preserve the API contract
- * the Supabase SDK produced (the web's `Tag` type reads `workspace_id`).
- */
 const tagColumns = {
 	id: tags.id,
 	name: tags.name,
 	color: tags.color,
-	workspace_id: tags.workspaceId,
+	workspace_id: tags.workspace_id,
 };
 
 const TagSchema = {
@@ -56,7 +52,7 @@ export async function registerTagsRoutes(fastify: FastifyInstance) {
 				const data = await db
 					.select(tagColumns)
 					.from(tags)
-					.where(eq(tags.workspaceId, workspaceId))
+					.where(eq(tags.workspace_id, workspaceId))
 					.orderBy(asc(tags.name));
 
 				return reply.send({ data });
@@ -110,7 +106,7 @@ export async function registerTagsRoutes(fastify: FastifyInstance) {
 					.insert(tags)
 					.values({
 						id: nanoid(),
-						workspaceId,
+						workspace_id: workspaceId,
 						name: trimmedName,
 						color: trimmedColor,
 					})
@@ -159,7 +155,7 @@ export async function registerTagsRoutes(fastify: FastifyInstance) {
 			try {
 				const deleted = await db
 					.delete(tags)
-					.where(and(eq(tags.id, tagId), eq(tags.workspaceId, workspaceId)))
+					.where(and(eq(tags.id, tagId), eq(tags.workspace_id, workspaceId)))
 					.returning({ id: tags.id });
 
 				if (deleted.length === 0) {

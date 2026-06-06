@@ -1,20 +1,38 @@
+import { providers } from "@repo/database";
+import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
-import { supabase } from "../lib/db.js";
+import { db } from "../lib/pg.js";
 import { requireScope, requireUserId } from "../lib/scopes.js";
 
 // Provider config arrives already encrypted (PGP-armored) from the client; these
 // endpoints only ever persist the opaque blobs. Decryption happens solely on the
 // run path (helpers.ts), so create/update never see plaintext.
-const SELECT_COLUMNS =
-	"id, name, type, created_at, updated_at, encrypted_data_staging";
+// `encrypted_data_production` is never selected (write-only).
+const providerColumns = {
+	id: providers.id,
+	name: providers.name,
+	type: providers.type,
+	created_at: providers.created_at,
+	updated_at: providers.updated_at,
+	encrypted_data_staging: providers.encrypted_data_staging,
+};
 
 function toProvider(row: {
-	encrypted_data_staging: unknown;
-	[key: string]: unknown;
+	id: string;
+	name: string;
+	type: string;
+	created_at: string;
+	updated_at: string;
+	encrypted_data_staging: string | null;
 }) {
-	const { encrypted_data_staging, ...rest } = row;
-	return { ...rest, has_staging_config: !!encrypted_data_staging };
+	const { encrypted_data_staging, created_at, updated_at, ...rest } = row;
+	return {
+		...rest,
+		created_at: new Date(created_at).toISOString(),
+		updated_at: new Date(updated_at).toISOString(),
+		has_staging_config: !!encrypted_data_staging,
+	};
 }
 
 const ProviderSchema = {
@@ -55,17 +73,17 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 		handler: async (request, reply) => {
 			const { workspaceId } = request.params as { workspaceId: string };
 
-			const { data, error } = await supabase
-				.from("providers")
-				.select(SELECT_COLUMNS)
-				.eq("workspace_id", workspaceId)
-				.order("created_at", { ascending: false });
+			try {
+				const data = await db
+					.select(providerColumns)
+					.from(providers)
+					.where(eq(providers.workspace_id, workspaceId))
+					.orderBy(desc(providers.created_at));
 
-			if (error) {
+				return reply.send({ data: data.map(toProvider) });
+			} catch {
 				return reply.code(500).send({ message: "Failed to fetch providers" });
 			}
-
-			return reply.send({ data: data.map(toProvider) });
 		},
 	});
 
@@ -113,24 +131,27 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 				return reply.code(400).send({ message: "name must not be empty" });
 			}
 
-			const { data, error } = await supabase
-				.from("providers")
-				.insert({
-					id: nanoid(),
-					workspace_id: workspaceId,
-					name: trimmedName,
-					type,
-					encrypted_data_production,
-					encrypted_data_staging: encrypted_data_staging ?? null,
-				})
-				.select(SELECT_COLUMNS)
-				.single();
+			try {
+				const [data] = await db
+					.insert(providers)
+					.values({
+						id: nanoid(),
+						workspace_id: workspaceId,
+						name: trimmedName,
+						type,
+						encrypted_data_production,
+						encrypted_data_staging: encrypted_data_staging ?? null,
+					})
+					.returning(providerColumns);
 
-			if (error || !data) {
+				if (!data) {
+					return reply.code(500).send({ message: "Failed to create provider" });
+				}
+
+				return reply.code(201).send({ data: toProvider(data) });
+			} catch {
 				return reply.code(500).send({ message: "Failed to create provider" });
 			}
-
-			return reply.code(201).send({ data: toProvider(data) });
 		},
 	});
 
@@ -181,7 +202,7 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 				encrypted_data_staging?: string | null;
 			};
 
-			const updates: Record<string, unknown> = {};
+			const updates: Partial<typeof providers.$inferInsert> = {};
 			if (body.name !== undefined) {
 				const trimmedName = body.name.trim();
 				if (trimmedName.length === 0) {
@@ -202,22 +223,26 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 			}
 			updates.updated_at = new Date().toISOString();
 
-			const { data, error } = await supabase
-				.from("providers")
-				.update(updates)
-				.eq("id", providerId)
-				.eq("workspace_id", workspaceId)
-				.select(SELECT_COLUMNS)
-				.maybeSingle();
+			try {
+				const [data] = await db
+					.update(providers)
+					.set(updates)
+					.where(
+						and(
+							eq(providers.id, providerId),
+							eq(providers.workspace_id, workspaceId),
+						),
+					)
+					.returning(providerColumns);
 
-			if (error) {
+				if (!data) {
+					return reply.code(404).send({ message: "Provider not found" });
+				}
+
+				return reply.send({ data: toProvider(data) });
+			} catch {
 				return reply.code(500).send({ message: "Failed to update provider" });
 			}
-			if (!data) {
-				return reply.code(404).send({ message: "Provider not found" });
-			}
-
-			return reply.send({ data: toProvider(data) });
 		},
 	});
 
@@ -246,20 +271,25 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 				providerId: string;
 			};
 
-			const { error, count } = await supabase
-				.from("providers")
-				.delete({ count: "exact" })
-				.eq("id", providerId)
-				.eq("workspace_id", workspaceId);
+			try {
+				const deleted = await db
+					.delete(providers)
+					.where(
+						and(
+							eq(providers.id, providerId),
+							eq(providers.workspace_id, workspaceId),
+						),
+					)
+					.returning({ id: providers.id });
 
-			if (error) {
+				if (deleted.length === 0) {
+					return reply.code(404).send({ message: "Provider not found" });
+				}
+
+				return reply.send({ success: true });
+			} catch {
 				return reply.code(500).send({ message: "Failed to delete provider" });
 			}
-			if (count === 0) {
-				return reply.code(404).send({ message: "Provider not found" });
-			}
-
-			return reply.send({ success: true });
 		},
 	});
 }

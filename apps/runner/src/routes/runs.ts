@@ -1,3 +1,4 @@
+import { agents, agentVersions, runs } from "@repo/database";
 import {
 	generateText,
 	type ModelMessage,
@@ -7,14 +8,74 @@ import {
 	streamText,
 	type ToolSet,
 } from "ai";
+import { and, desc, eq, gte, lte } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
 import { sumUsage } from "../lib/cost.js";
 import { supabase } from "../lib/db.js";
 import { createSSEStream } from "../lib/helpers.js";
+import { db } from "../lib/pg.js";
 import { prepareRun, RunPrepError, recordRun } from "../lib/run-agent.js";
 import { hasScope, requireScope } from "../lib/scopes.js";
 import type { RunOverrides } from "../lib/types.js";
+
+// Columns shared by the list + detail run queries. The two joined `agent_*`
+// columns come from agent_versions → agents and are folded into a nested
+// `agent` object by shapeRun.
+const runSelectColumns = {
+	id: runs.id,
+	version_id: runs.version_id,
+	parent_run_id: runs.parent_run_id,
+	is_error: runs.is_error,
+	is_test: runs.is_test,
+	is_stream: runs.is_stream,
+	cost: runs.cost,
+	tokens: runs.tokens,
+	response_time: runs.response_time,
+	first_token_time: runs.first_token_time,
+	pre_processing_time: runs.pre_processing_time,
+	created_at: runs.created_at,
+	agent_id: agents.id,
+	agent_name: agents.name,
+};
+
+// Normalize a joined run row to the API shape: numeric columns back to numbers,
+// timestamps to ISO, and the flat agent_id/agent_name columns into a nested
+// `agent` (null when the run's version is unsaved or since-deleted).
+function shapeRun<
+	T extends {
+		agent_id: string | null;
+		agent_name: string | null;
+		cost: string | null;
+		tokens: string | null;
+		response_time: string;
+		first_token_time: string;
+		pre_processing_time: string;
+		created_at: string;
+	},
+>(row: T) {
+	const {
+		agent_id,
+		agent_name,
+		cost,
+		tokens,
+		response_time,
+		first_token_time,
+		pre_processing_time,
+		created_at,
+		...rest
+	} = row;
+	return {
+		...rest,
+		cost: cost === null ? null : Number(cost),
+		tokens: tokens === null ? null : Number(tokens),
+		response_time: Number(response_time),
+		first_token_time: Number(first_token_time),
+		pre_processing_time: Number(pre_processing_time),
+		created_at: new Date(created_at).toISOString(),
+		agent: agent_id ? { id: agent_id, name: agent_name } : null,
+	};
+}
 
 const AgentRefSchema = {
 	type: "object" as const,
@@ -173,72 +234,49 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 			// Left join by default so runs whose agent version is null (unsaved or
 			// since-deleted agents) still appear. Switch to an inner join only when
-			// filtering by agent_id, since filtering on an embedded column requires
-			// the embed to be inner (PostgREST), and such a filter inherently
-			// excludes null-version runs anyway.
-			const versionEmbed = agent_id
-				? "agent_versions!inner(id, agent_id, agents:agent_id(id, name))"
-				: "agent_versions(id, agent_id, agents:agent_id(id, name))";
-
-			let query = supabase
-				.from("runs")
-				.select(
-					`id, version_id, parent_run_id, is_error, is_test, is_stream, cost, tokens, response_time, first_token_time, pre_processing_time, created_at, ${versionEmbed}`,
-				)
-				.eq("workspace_id", workspaceId);
-
-			if (agent_id) {
-				query = query.eq("agent_versions.agent_id", agent_id);
-			}
-
-			if (version_id) {
-				query = query.eq("version_id", version_id);
-			}
-
+			// filtering by agent_id, since that filter inherently excludes
+			// null-version runs anyway.
+			const conditions = [eq(runs.workspace_id, workspaceId)];
+			if (agent_id) conditions.push(eq(agentVersions.agent_id, agent_id));
+			if (version_id) conditions.push(eq(runs.version_id, version_id));
 			if (parent_run_id) {
-				query = query.eq("parent_run_id", parent_run_id);
+				conditions.push(eq(runs.parent_run_id, parent_run_id));
 			}
-
 			if (status === "success") {
-				query = query.eq("is_error", false);
+				conditions.push(eq(runs.is_error, false));
 			} else if (status === "failed") {
-				query = query.eq("is_error", true);
+				conditions.push(eq(runs.is_error, true));
 			}
-
 			if (is_test === "true") {
-				query = query.eq("is_test", true);
+				conditions.push(eq(runs.is_test, true));
 			} else if (is_test === "false") {
-				query = query.eq("is_test", false);
+				conditions.push(eq(runs.is_test, false));
 			}
+			if (start_date) conditions.push(gte(runs.created_at, start_date));
+			if (end_date) conditions.push(lte(runs.created_at, end_date));
 
-			if (start_date) {
-				query = query.gte("created_at", start_date);
-			}
+			try {
+				const base = db.select(runSelectColumns).from(runs);
+				const joined = agent_id
+					? base
+							.innerJoin(agentVersions, eq(runs.version_id, agentVersions.id))
+							.innerJoin(agents, eq(agentVersions.agent_id, agents.id))
+					: base
+							.leftJoin(agentVersions, eq(runs.version_id, agentVersions.id))
+							.leftJoin(agents, eq(agentVersions.agent_id, agents.id));
 
-			if (end_date) {
-				query = query.lte("created_at", end_date);
-			}
+				const rows = await joined
+					.where(and(...conditions))
+					.orderBy(desc(runs.created_at))
+					.limit(limitNum)
+					.offset(offset);
 
-			query = query
-				.order("created_at", { ascending: false })
-				.range(offset, offset + limitNum - 1);
+				const result = rows.map(shapeRun);
 
-			const { data: runs, error } = await query;
-
-			if (error) {
+				return reply.send({ data: result, page: pageNum, limit: limitNum });
+			} catch {
 				return reply.code(500).send({ message: "Failed to fetch runs" });
 			}
-
-			// Flatten the nested version/agent info
-			const result = runs.map((run) => {
-				const { agent_versions, ...rest } = run;
-				return {
-					...rest,
-					agent: agent_versions?.agents,
-				};
-			});
-
-			return reply.send({ data: result, page: pageNum, limit: limitNum });
 		},
 	});
 
@@ -272,14 +310,15 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				runId: string;
 			};
 
-			const { data: run, error } = await supabase
-				.from("runs")
-				.select("*, agent_versions(id, agent_id, agents:agent_id(id, name))")
-				.eq("id", runId)
-				.eq("workspace_id", workspaceId)
-				.single();
+			const [run] = await db
+				.select({ ...runSelectColumns, workspace_id: runs.workspace_id })
+				.from(runs)
+				.leftJoin(agentVersions, eq(runs.version_id, agentVersions.id))
+				.leftJoin(agents, eq(agentVersions.agent_id, agents.id))
+				.where(and(eq(runs.id, runId), eq(runs.workspace_id, workspaceId)))
+				.limit(1);
 
-			if (error || !run) {
+			if (!run) {
 				return reply.code(404).send({ message: "Run not found" });
 			}
 
@@ -294,11 +333,9 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				runData = JSON.parse(text);
 			}
 
-			const { agent_versions, ...rest } = run;
 			return reply.send({
 				data: {
-					...rest,
-					agent: agent_versions?.agents,
+					...shapeRun(run),
 					run_data: runData,
 				},
 			});

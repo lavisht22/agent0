@@ -1,5 +1,6 @@
 import { ReadableStream } from "node:stream/web";
 import { experimental_createMCPClient as createMCPClient } from "@ai-sdk/mcp";
+import { mcps, providers } from "@repo/database";
 import {
 	jsonSchema,
 	type LanguageModel,
@@ -9,12 +10,19 @@ import {
 	type ToolSet,
 	wrapLanguageModel,
 } from "ai";
+import { eq } from "drizzle-orm";
+import { cachedQuery } from "./cache.js";
 import { supabase } from "./db.js";
 import { vertexAnthropicCacheMiddleware } from "./middleware.js";
 import { decryptMessage } from "./openpgp.js";
+import { db } from "./pg.js";
 import { getAIProvider } from "./providers.js";
-import type { Environment, MCPConfig, MCPOptions, VersionData } from "./types.js";
-import { cachedQuery } from "./cache.js";
+import type {
+	Environment,
+	MCPConfig,
+	MCPOptions,
+	VersionData,
+} from "./types.js";
 import { applyVariablesToMessages } from "./variables.js";
 
 // Pick the encrypted blob for the requested environment, falling back to
@@ -42,22 +50,28 @@ export const resolveProviderModel = async (
 		`provider-resolved:${model.provider_id}:${environment}`,
 		300_000,
 		async () => {
-			const { data, error } = await supabase
-				.from("providers")
-				.select("*")
-				.eq("id", model.provider_id)
-				.single();
-			if (error) throw error;
-
-			const decrypted = await decryptMessage(pickEncrypted(data, environment));
-			const config = JSON.parse(decrypted);
-			const resolved = getAIProvider(data.type, config);
-
-			if (!resolved) {
-				throw new Error(`Unsupported provider type: ${data.type}`);
+			const [row] = await db
+				.select({
+					type: providers.type,
+					encrypted_data_production: providers.encrypted_data_production,
+					encrypted_data_staging: providers.encrypted_data_staging,
+				})
+				.from(providers)
+				.where(eq(providers.id, model.provider_id))
+				.limit(1);
+			if (!row) {
+				throw new Error(`Provider not found: ${model.provider_id}`);
 			}
 
-			return { provider: data, aiProvider: resolved };
+			const decrypted = await decryptMessage(pickEncrypted(row, environment));
+			const config = JSON.parse(decrypted);
+			const resolved = getAIProvider(row.type, config);
+
+			if (!resolved) {
+				throw new Error(`Unsupported provider type: ${row.type}`);
+			}
+
+			return { provider: row, aiProvider: resolved };
 		},
 	);
 
@@ -121,36 +135,42 @@ export const prepareMCPServers = async (
 	if (mcp_ids.size > 0) {
 		// Fetch each MCP config individually so they can be cached and deduplicated
 		const mcpIds = Array.from(mcp_ids);
-		const mcps = await Promise.all(
+		const mcpRows = await Promise.all(
 			mcpIds.map((id) =>
 				cachedQuery(
 					`mcp:${id}`,
 					300_000, // 5 min TTL
 					async () => {
-						const { data, error } = await supabase
-							.from("mcps")
-							.select("*")
-							.eq("id", id)
-							.single();
-						if (error || !data) throw new Error(`Failed to fetch MCP server ${id}`);
-						return data;
+						const [row] = await db
+							.select({
+								id: mcps.id,
+								encrypted_data_production: mcps.encrypted_data_production,
+								encrypted_data_staging: mcps.encrypted_data_staging,
+							})
+							.from(mcps)
+							.where(eq(mcps.id, id))
+							.limit(1);
+						if (!row) throw new Error(`Failed to fetch MCP server ${id}`);
+						return row;
 					},
 				),
 			),
 		);
 
-		if (!mcps.length) {
+		if (!mcpRows.length) {
 			throw new Error("Failed to fetch MCP servers");
 		}
 
 		await Promise.all(
-			mcps.map(async (mcp) => {
+			mcpRows.map(async (mcp) => {
 				// Cache the decrypted MCP config (DB row is already cached, this caches decryption)
 				const config: MCPConfig = await cachedQuery(
 					`mcp-config:${mcp.id}:${environment}`,
 					300_000, // 5 min TTL
 					async () => {
-						const decrypted = await decryptMessage(pickEncrypted(mcp, environment));
+						const decrypted = await decryptMessage(
+							pickEncrypted(mcp, environment),
+						);
 						return JSON.parse(decrypted) as MCPConfig;
 					},
 				);
