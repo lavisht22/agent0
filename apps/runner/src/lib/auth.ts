@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { fromNodeHeaders } from "better-auth/node";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { toWebHeaders } from "./auth/headers.js";
 import { auth } from "./auth/index.js";
 import { supabase } from "./db.js";
 import { scopesForRole } from "./scopes.js";
@@ -99,7 +99,7 @@ async function authenticateBrowserSession(
 	reply: FastifyReply,
 ): Promise<AuthResult> {
 	const session = await auth.api.getSession({
-		headers: fromNodeHeaders(request.headers),
+		headers: toWebHeaders(request.headers),
 	});
 
 	if (!session) {

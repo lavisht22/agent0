@@ -1,7 +1,7 @@
 import { experimental_createMCPClient as createMCPClient } from "@ai-sdk/mcp";
 import type { Json } from "@repo/database";
-import { fromNodeHeaders } from "better-auth/node";
 import type { FastifyInstance } from "fastify";
+import { toWebHeaders } from "../lib/auth/headers.js";
 import { auth } from "../lib/auth/index.js";
 import { supabase } from "../lib/db.js";
 import { decryptMessage } from "../lib/openpgp.js";
@@ -37,7 +37,7 @@ export async function registerRefreshMCPRoute(fastify: FastifyInstance) {
 		// Validate the better-auth session (bearer token on the Authorization
 		// header). Registered outside `addAuth`, so it authenticates inline.
 		const session = await auth.api.getSession({
-			headers: fromNodeHeaders(request.headers),
+			headers: toWebHeaders(request.headers),
 		});
 
 		if (!session) {

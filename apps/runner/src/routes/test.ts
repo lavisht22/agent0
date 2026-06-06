@@ -1,7 +1,7 @@
 import { Output, stepCountIs, streamText, type ToolSet } from "ai";
-import { fromNodeHeaders } from "better-auth/node";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
+import { toWebHeaders } from "../lib/auth/headers.js";
 import { auth } from "../lib/auth/index.js";
 import { sumUsage } from "../lib/cost.js";
 import { supabase } from "../lib/db.js";
@@ -20,7 +20,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 		// header). This /internal route does its own auth — it's registered
 		// outside `addAuth` — but uses the same browser-session credential.
 		const session = await auth.api.getSession({
-			headers: fromNodeHeaders(request.headers),
+			headers: toWebHeaders(request.headers),
 		});
 
 		if (!session) {

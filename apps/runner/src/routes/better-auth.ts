@@ -1,5 +1,5 @@
-import { fromNodeHeaders } from "better-auth/node";
 import type { FastifyInstance } from "fastify";
+import { toWebHeaders } from "../lib/auth/headers.js";
 import { auth } from "../lib/auth/index.js";
 
 /**
@@ -20,7 +20,7 @@ export async function registerBetterAuthRoutes(fastify: FastifyInstance) {
 
 			const req = new Request(url.toString(), {
 				method: request.method,
-				headers: fromNodeHeaders(request.headers),
+				headers: toWebHeaders(request.headers),
 				body:
 					request.method !== "GET" && request.body
 						? JSON.stringify(request.body)
