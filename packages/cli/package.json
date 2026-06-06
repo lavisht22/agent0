@@ -1,6 +1,6 @@
 {
 	"name": "agent0-cli",
-	"version": "2.1.0",
+	"version": "2.2.1",
 	"description": "Command-line interface for agent0 — manage agents, prompt versions, runs, tags, providers, and MCP servers from a shell.",
 	"type": "module",
 	"bin": {
@@ -11,7 +11,8 @@
 		"build": "tsup",
 		"dev": "tsup --watch",
 		"start": "node dist/index.js",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"prepublishOnly": "tsup"
 	},
 	"engines": {
 		"node": ">=20"
