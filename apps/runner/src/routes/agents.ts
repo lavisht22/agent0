@@ -2,6 +2,7 @@ import { agents, agentTags, agentVersions, tags } from "@repo/database";
 import { and, desc, eq, ilike, inArray } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
+import { userPrincipal } from "../lib/auth.js";
 import { db } from "../lib/pg.js";
 import { checkScope, requireScope, requireUserId } from "../lib/scopes.js";
 
@@ -949,7 +950,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 				}
 
 				const versionId = nanoid();
-				const userId = request.userId as string; // guaranteed by requireUserId
+				const userId = userPrincipal(request).userId;
 
 				// Start by inserting the new version
 				const [newVersion] = await db

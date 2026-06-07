@@ -31,10 +31,22 @@ export type Principal =
 declare module "fastify" {
 	interface FastifyRequest {
 		principal: Principal | undefined;
-		userId: string | undefined;
-		tokenId: string | undefined;
-		scopes: string[];
 	}
+}
+
+/**
+ * Narrow the request's principal to the user kind. Safe to call only after
+ * `requireUserId` (or an equivalent guard) has run; it throws otherwise, which
+ * surfaces a misconfigured route as a 500 rather than a silent `undefined`.
+ */
+export function userPrincipal(
+	request: FastifyRequest,
+): Extract<Principal, { kind: "user" }> {
+	const principal = request.principal;
+	if (principal?.kind !== "user") {
+		throw new Error("userPrincipal called without a user-kind principal");
+	}
+	return principal;
 }
 
 function sha256Hex(input: string): string {
@@ -272,25 +284,6 @@ async function authenticateApiKey(
 }
 
 /**
- * Project the resolved principal onto the request. Route handlers read the
- * discrete `userId` / `tokenId` / `scopes` decorations directly. (Origin
- * enforcement for API keys happens inside `authenticateApiKey`; no handler reads
- * the allowlist, so it lives only on the principal.)
- */
-function applyPrincipal(request: FastifyRequest, principal: Principal): void {
-	request.principal = principal;
-	if (principal.kind === "user") {
-		request.userId = principal.userId;
-		request.tokenId = principal.tokenId;
-		request.scopes = principal.scopes;
-	} else {
-		request.userId = undefined;
-		request.tokenId = undefined;
-		request.scopes = principal.scopes;
-	}
-}
-
-/**
  * Registers authentication on the given Fastify instance.
  *
  * The middleware is an ordered list of authenticators (Passport-style
@@ -313,9 +306,6 @@ function applyPrincipal(request: FastifyRequest, principal: Principal): void {
  */
 export function addAuth(fastify: FastifyInstance) {
 	fastify.decorateRequest("principal", undefined);
-	fastify.decorateRequest("userId", undefined);
-	fastify.decorateRequest("tokenId", undefined);
-	fastify.decorateRequest("scopes", null as unknown as string[]);
 
 	fastify.addHook(
 		"preHandler",
@@ -345,7 +335,7 @@ export function addAuth(fastify: FastifyInstance) {
 				return;
 			}
 
-			applyPrincipal(request, result.principal);
+			request.principal = result.principal;
 		},
 	);
 }

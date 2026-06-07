@@ -489,7 +489,9 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 			// Scope check (depends on body.agent_id, so done here rather than in a
 			// preHandler).
-			if (!hasScope(request.scopes, `agents:run:${agent_id}`)) {
+			if (
+				!hasScope(request.principal?.scopes ?? [], `agents:run:${agent_id}`)
+			) {
 				return reply
 					.code(403)
 					.send({ message: `Missing required scope: agents:run:${agent_id}` });

@@ -2,6 +2,7 @@ import { users, workspaces, workspaceUser } from "@repo/database";
 import { and, asc, eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { nanoid } from "nanoid";
+import { userPrincipal } from "../lib/auth.js";
 import { db } from "../lib/pg.js";
 import { hasScope, requireScope, requireUserId } from "../lib/scopes.js";
 
@@ -82,7 +83,7 @@ const MemberSchema = {
 
 // Admin ⟺ the resolved scopes include `*:*:*` (only admins get it).
 function isAdmin(request: FastifyRequest): boolean {
-	return hasScope(request.scopes, "workspaces:write:*");
+	return hasScope(request.principal?.scopes ?? [], "workspaces:write:*");
 }
 
 // Workspace management is allowed for admins OR the workspace owner. The owner
@@ -147,8 +148,7 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			// requireUserId guarantees this is set when authed via PAT.
-			const userId = request.userId as string;
+			const userId = userPrincipal(request).userId;
 
 			try {
 				const rows = await db
@@ -203,7 +203,7 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			const userId = request.userId as string;
+			const userId = userPrincipal(request).userId;
 			const { name } = request.body as { name: string };
 
 			const trimmedName = name.trim();
@@ -260,7 +260,7 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			const userId = request.userId as string;
+			const userId = userPrincipal(request).userId;
 			const { workspaceId } = request.params as { workspaceId: string };
 			const body = request.body as { name?: string };
 
@@ -324,7 +324,7 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			const userId = request.userId as string;
+			const userId = userPrincipal(request).userId;
 			const { workspaceId } = request.params as { workspaceId: string };
 
 			if (!(await requireAdminOrOwner(request, reply, workspaceId, userId))) {
@@ -509,7 +509,7 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			const callerId = request.userId as string;
+			const callerId = userPrincipal(request).userId;
 			const { workspaceId, userId } = request.params as {
 				workspaceId: string;
 				userId: string;

@@ -1,6 +1,7 @@
 import { personalAccessTokens, users } from "@repo/database";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
+import { userPrincipal } from "../lib/auth.js";
 import { db } from "../lib/pg.js";
 import { requireUserId } from "../lib/scopes.js";
 
@@ -40,9 +41,10 @@ export async function registerAuthRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			// requireUserId guarantees both are set when authed via PAT.
-			const userId = request.userId as string;
-			const tokenId = request.tokenId as string;
+			// requireUserId guarantees a user principal; tokenId is set for PATs.
+			const principal = userPrincipal(request);
+			const userId = principal.userId;
+			const tokenId = principal.tokenId as string;
 
 			// Email + name both live on public.users (better-auth owns the table).
 			let user: { name: string | null; email: string } | undefined;
@@ -92,7 +94,7 @@ export async function registerAuthRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			const tokenId = request.tokenId as string;
+			const tokenId = userPrincipal(request).tokenId as string;
 			const revokedAt = new Date().toISOString();
 
 			try {

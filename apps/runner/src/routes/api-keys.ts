@@ -2,6 +2,7 @@ import { apiKeys } from "@repo/database";
 import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { customAlphabet, nanoid } from "nanoid";
+import { userPrincipal } from "../lib/auth.js";
 import { db } from "../lib/pg.js";
 import { requireScope, requireUserId } from "../lib/scopes.js";
 
@@ -154,8 +155,7 @@ export async function registerApiKeysRoutes(fastify: FastifyInstance) {
 				return reply.code(400).send({ message: "name must not be empty" });
 			}
 
-			// `requireUserId` guarantees a user-kind principal, so `userId` is set.
-			const userId = request.userId as string;
+			const userId = userPrincipal(request).userId;
 
 			try {
 				const [data] = await db

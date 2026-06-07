@@ -30,8 +30,8 @@ export async function registerRoutes(fastify: FastifyInstance) {
 	await registerBetterAuthRoutes(fastify);
 
 	// Public API routes — authenticated by `addAuth` (PAT first, then x-api-key).
-	// PATs set request.userId; API keys leave it undefined. Routes that mutate
-	// state should chain `requireUserId` to block API keys.
+	// PATs/sessions yield a user-kind principal; API keys yield apiKey-kind. Routes
+	// that mutate state should chain `requireUserId` to block API keys.
 	await fastify.register(async (scoped) => {
 		addAuth(scoped);
 

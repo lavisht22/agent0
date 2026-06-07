@@ -22,12 +22,7 @@ export function scopesForRole(role: WorkspaceRole): string[] {
 		case "admin":
 			return ["*:*:*"];
 		case "writer":
-			return [
-				"*:read:*",
-				"agents:run:*",
-				"agents:write:*",
-				"tags:write:*",
-			];
+			return ["*:read:*", "agents:run:*", "agents:write:*", "tags:write:*"];
 		case "reader":
 			return ["*:read:*", "agents:run:*"];
 	}
@@ -71,7 +66,7 @@ export function hasScope(granted: string[], required: string): boolean {
  */
 export function requireScope(required: string) {
 	return async (request: FastifyRequest, reply: FastifyReply) => {
-		if (!hasScope(request.scopes, required)) {
+		if (!hasScope(request.principal?.scopes ?? [], required)) {
 			return reply
 				.code(403)
 				.send({ message: `Missing required scope: ${required}` });
@@ -89,7 +84,7 @@ export function checkScope(
 	reply: FastifyReply,
 	required: string,
 ): boolean {
-	if (hasScope(request.scopes, required)) return true;
+	if (hasScope(request.principal?.scopes ?? [], required)) return true;
 	reply.code(403).send({ message: `Missing required scope: ${required}` });
 	return false;
 }

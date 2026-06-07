@@ -3,12 +3,13 @@ import { personalAccessTokens } from "@repo/database";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { customAlphabet, nanoid } from "nanoid";
+import { userPrincipal } from "../lib/auth.js";
 import { db } from "../lib/pg.js";
 import { requireUserId } from "../lib/scopes.js";
 
 // PATs are user-bound, not workspace-bound, so there is no workspace scope to
 // check. Authorization is "a user manages only their own tokens", enforced by
-// filtering every query on `.eq("user_id", request.userId)`. `requireUserId`
+// filtering every query on the principal's `userId`. `requireUserId`
 // keeps machine API keys out (they have no user identity) while admitting both
 // browser sessions and PATs.
 
@@ -116,7 +117,7 @@ export async function registerPersonalAccessTokensRoutes(
 			},
 		},
 		handler: async (request, reply) => {
-			const userId = request.userId as string;
+			const userId = userPrincipal(request).userId;
 
 			try {
 				const data = await db
@@ -171,7 +172,7 @@ export async function registerPersonalAccessTokensRoutes(
 			},
 		},
 		handler: async (request, reply) => {
-			const userId = request.userId as string;
+			const userId = userPrincipal(request).userId;
 			const { name } = request.body as { name: string };
 
 			const trimmedName = name.trim();
@@ -239,7 +240,7 @@ export async function registerPersonalAccessTokensRoutes(
 			},
 		},
 		handler: async (request, reply) => {
-			const userId = request.userId as string;
+			const userId = userPrincipal(request).userId;
 			const { tokenId } = request.params as { tokenId: string };
 			const revokedAt = new Date().toISOString();
 
