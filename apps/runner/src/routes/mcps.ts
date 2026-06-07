@@ -2,6 +2,7 @@ import { mcps } from "@repo/database";
 import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
+import { encryptSecret } from "../lib/crypto.js";
 import { db } from "../lib/pg.js";
 import { requireScope, requireUserId } from "../lib/scopes.js";
 import {
@@ -10,10 +11,9 @@ import {
 	type ToolsByEnv,
 } from "./refresh-mcp.js";
 
-// MCP config arrives already encrypted (PGP-armored) from the client; these
-// endpoints only ever persist the opaque blobs. Decryption happens solely on the
-// run path, so create/update never see plaintext. `tools` is populated separately
-// by the refresh endpoint below, never on create/update.
+// MCP config arrives as plaintext over TLS; the runner encrypts it (AES-256-GCM,
+// lib/crypto.ts) before persisting and only decrypts on the run path. `tools` is
+// populated separately by the refresh endpoint below, never on create/update.
 // `encrypted_data_production` is never selected (write-only).
 const mcpColumns = {
 	id: mcps.id,
@@ -110,15 +110,15 @@ export async function registerMcpsRoutes(fastify: FastifyInstance) {
 				type: "object" as const,
 				properties: {
 					name: { type: "string" as const, minLength: 1 },
-					encrypted_data_production: { type: "string" as const, minLength: 1 },
-					encrypted_data_staging: {
+					data_production: { type: "string" as const, minLength: 1 },
+					data_staging: {
 						type: "string" as const,
 						minLength: 1,
 						nullable: true,
 					},
 					custom_headers: { type: "string" as const },
 				},
-				required: ["name", "encrypted_data_production"],
+				required: ["name", "data_production"],
 				additionalProperties: false,
 			},
 			response: {
@@ -132,17 +132,13 @@ export async function registerMcpsRoutes(fastify: FastifyInstance) {
 		},
 		handler: async (request, reply) => {
 			const { workspaceId } = request.params as { workspaceId: string };
-			const {
-				name,
-				encrypted_data_production,
-				encrypted_data_staging,
-				custom_headers,
-			} = request.body as {
-				name: string;
-				encrypted_data_production: string;
-				encrypted_data_staging?: string | null;
-				custom_headers?: string;
-			};
+			const { name, data_production, data_staging, custom_headers } =
+				request.body as {
+					name: string;
+					data_production: string;
+					data_staging?: string | null;
+					custom_headers?: string;
+				};
 
 			const trimmedName = name.trim();
 			if (trimmedName.length === 0) {
@@ -156,8 +152,9 @@ export async function registerMcpsRoutes(fastify: FastifyInstance) {
 						id: nanoid(),
 						workspace_id: workspaceId,
 						name: trimmedName,
-						encrypted_data_production,
-						encrypted_data_staging: encrypted_data_staging ?? null,
+						encrypted_data_production: encryptSecret(data_production),
+						encrypted_data_staging:
+							data_staging != null ? encryptSecret(data_staging) : null,
 						custom_headers: custom_headers?.trim() ?? "",
 					})
 					.returning(mcpColumns);
@@ -189,9 +186,9 @@ export async function registerMcpsRoutes(fastify: FastifyInstance) {
 				type: "object" as const,
 				properties: {
 					name: { type: "string" as const, minLength: 1 },
-					encrypted_data_production: { type: "string" as const, minLength: 1 },
+					data_production: { type: "string" as const, minLength: 1 },
 					// null clears the staging override; omitting leaves it untouched.
-					encrypted_data_staging: {
+					data_staging: {
 						type: "string" as const,
 						minLength: 1,
 						nullable: true,
@@ -217,8 +214,8 @@ export async function registerMcpsRoutes(fastify: FastifyInstance) {
 			};
 			const body = request.body as {
 				name?: string;
-				encrypted_data_production?: string;
-				encrypted_data_staging?: string | null;
+				data_production?: string;
+				data_staging?: string | null;
 				custom_headers?: string;
 			};
 
@@ -230,11 +227,12 @@ export async function registerMcpsRoutes(fastify: FastifyInstance) {
 				}
 				updates.name = trimmedName;
 			}
-			if (body.encrypted_data_production !== undefined) {
-				updates.encrypted_data_production = body.encrypted_data_production;
+			if (body.data_production !== undefined) {
+				updates.encrypted_data_production = encryptSecret(body.data_production);
 			}
-			if (body.encrypted_data_staging !== undefined) {
-				updates.encrypted_data_staging = body.encrypted_data_staging;
+			if (body.data_staging !== undefined) {
+				updates.encrypted_data_staging =
+					body.data_staging === null ? null : encryptSecret(body.data_staging);
 			}
 			if (body.custom_headers !== undefined) {
 				updates.custom_headers = body.custom_headers.trim();

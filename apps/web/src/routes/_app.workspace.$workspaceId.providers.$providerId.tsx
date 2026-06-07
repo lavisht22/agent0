@@ -15,7 +15,6 @@ import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Pencil, ShieldAlert } from "lucide-react";
-import * as openpgp from "openpgp";
 import { useState } from "react";
 import { MonacoJsonField } from "@/components/monaco-json-field";
 import { PageHeader } from "@/components/page-header";
@@ -47,16 +46,6 @@ function validateJsonField(value: string) {
 	} catch (e) {
 		return e instanceof Error ? e.message : "Invalid JSON format";
 	}
-}
-
-async function encryptConfig(value: string) {
-	const publicKey = await openpgp.readKey({
-		armoredKey: import.meta.env.VITE_PUBLIC_PGP_PUBLIC_KEY,
-	});
-	return openpgp.encrypt({
-		encryptionKeys: publicKey,
-		message: await openpgp.createMessage({ text: value }),
-	});
 }
 
 function RouteComponent() {
@@ -101,18 +90,11 @@ function RouteComponent() {
 			data_staging: string;
 			usePerEnvConfig: boolean;
 		}) => {
-			const encrypted_data_production = await encryptConfig(
-				values.data_production,
-			);
-			const encrypted_data_staging = values.usePerEnvConfig
-				? await encryptConfig(values.data_staging)
-				: null;
-
 			await createProvider(workspaceId, {
 				name: values.name,
 				type: values.type,
-				encrypted_data_production,
-				encrypted_data_staging,
+				data_production: values.data_production,
+				data_staging: values.usePerEnvConfig ? values.data_staging : null,
 			});
 		},
 		onSuccess: () => {
@@ -143,28 +125,24 @@ function RouteComponent() {
 			const updatePayload: {
 				name: string;
 				type: string;
-				encrypted_data_production?: string;
-				encrypted_data_staging?: string | null;
+				data_production?: string;
+				data_staging?: string | null;
 			} = {
 				name: values.name,
 				type: values.type,
 			};
 
 			if (values.updateProduction) {
-				updatePayload.encrypted_data_production = await encryptConfig(
-					values.data_production,
-				);
+				updatePayload.data_production = values.data_production;
 			}
 
 			if (values.usePerEnvConfig) {
 				if (values.updateStaging) {
-					updatePayload.encrypted_data_staging = await encryptConfig(
-						values.data_staging,
-					);
+					updatePayload.data_staging = values.data_staging;
 				}
 			} else {
 				// Per-env toggle is OFF: clear any existing staging override.
-				updatePayload.encrypted_data_staging = null;
+				updatePayload.data_staging = null;
 			}
 
 			await updateProvider(workspaceId, providerId, updatePayload);

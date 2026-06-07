@@ -12,8 +12,8 @@ import {
 } from "ai";
 import { eq } from "drizzle-orm";
 import { cachedQuery } from "./cache.js";
+import { decryptSecret } from "./crypto.js";
 import { vertexAnthropicCacheMiddleware } from "./middleware.js";
-import { decryptMessage } from "./openpgp.js";
 import { db } from "./pg.js";
 import { getAIProvider } from "./providers.js";
 import { runLogStore } from "./storage.js";
@@ -25,7 +25,7 @@ import type {
 } from "./types.js";
 import { applyVariablesToMessages } from "./variables.js";
 
-// Pick the encrypted blob for the requested environment, falling back to
+// Pick the encrypted config blob for the requested environment, falling back to
 // production when no staging override is configured.
 const pickEncrypted = (
 	row: { encrypted_data_production: unknown; encrypted_data_staging: unknown },
@@ -63,7 +63,7 @@ export const resolveProviderModel = async (
 				throw new Error(`Provider not found: ${model.provider_id}`);
 			}
 
-			const decrypted = await decryptMessage(pickEncrypted(row, environment));
+			const decrypted = decryptSecret(pickEncrypted(row, environment));
 			const config = JSON.parse(decrypted);
 			const resolved = getAIProvider(row.type, config);
 
@@ -168,9 +168,7 @@ export const prepareMCPServers = async (
 					`mcp-config:${mcp.id}:${environment}`,
 					300_000, // 5 min TTL
 					async () => {
-						const decrypted = await decryptMessage(
-							pickEncrypted(mcp, environment),
-						);
+						const decrypted = decryptSecret(pickEncrypted(mcp, environment));
 						return JSON.parse(decrypted) as MCPConfig;
 					},
 				);

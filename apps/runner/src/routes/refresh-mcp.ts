@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { toWebHeaders } from "../lib/auth/headers.js";
 import { auth } from "../lib/auth/index.js";
-import { decryptMessage } from "../lib/openpgp.js";
+import { decryptSecret } from "../lib/crypto.js";
 import { db } from "../lib/pg.js";
 import type { MCPConfig } from "../lib/types.js";
 
@@ -18,7 +18,7 @@ export type ToolsByEnv = {
 export async function fetchToolsForEnv(
 	encrypted: string,
 ): Promise<ToolEntry[]> {
-	const decrypted = await decryptMessage(encrypted);
+	const decrypted = decryptSecret(encrypted);
 	const config: MCPConfig = JSON.parse(decrypted);
 
 	const client = await createMCPClient(config);
