@@ -671,7 +671,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      delete_old_runs: { Args: never; Returns: undefined }
       get_dashboard_stats: {
         Args: {
           p_end_date?: string
