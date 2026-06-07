@@ -14,8 +14,8 @@
 	"scripts": {
 		"build": "tsc",
 		"types": "supabase gen types typescript --linked > database.types.ts",
-		"pull": "supabase db pull",
-		"push": "supabase db push"
+		"generate": "drizzle-kit generate",
+		"migrate": "drizzle-kit migrate"
 	},
 	"devDependencies": {
 		"drizzle-kit": "^0.31.10",

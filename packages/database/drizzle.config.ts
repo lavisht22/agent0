@@ -1,21 +1,26 @@
 import { defineConfig } from "drizzle-kit";
 
 /**
- * Drizzle Kit config for introspecting the live (Supabase) Postgres into a
- * Drizzle schema — Phase 3 of the Supabase -> self-contained migration.
+ * Drizzle Kit config — `./schema.ts` is the single source of truth, and SQL
+ * migrations are generated from it into `./drizzle`.
  *
- * `pull` generates ./drizzle/{schema,relations}.ts + a baseline snapshot in
- * ./drizzle/meta. We curate the generated schema into the package's exported
- * `schema.ts`. Only the `public` schema is introspected; Supabase's internal
- * `auth`/`storage`/etc. schemas are excluded.
+ *   pnpm generate  → diff schema.ts against the last snapshot, emit a new
+ *                    migration + meta snapshot under ./drizzle
+ *   pnpm migrate   → apply pending migrations to DATABASE_URL
  *
- * DATABASE_URL is the Supabase session pooler (port 5432) — same string the
- * runner uses. Pass it inline when running drizzle-kit.
+ * `0000_*` is the baseline: the full schema as it stood when we moved off the
+ * Supabase CLI. Only the `public` schema is managed; Supabase's internal
+ * `auth`/`storage`/etc. schemas are out of scope.
+ *
+ * DATABASE_URL is the target Postgres (the Supabase session pooler on port
+ * 5432 today; the bundled Postgres after Phase 4). Pass it inline when running
+ * `migrate`.
  */
 export default defineConfig({
 	dialect: "postgresql",
+	schema: "./schema.ts",
 	out: "./drizzle",
 	schemaFilter: ["public"],
-	// biome-ignore lint/style/noNonNullAssertion: required at introspection time
+	// biome-ignore lint/style/noNonNullAssertion: required at migrate time
 	dbCredentials: { url: process.env.DATABASE_URL! },
 });

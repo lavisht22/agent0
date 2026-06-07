@@ -23,10 +23,10 @@ pnpm --filter web check        # biome check
 pnpm --filter runner dev       # tsx watch src/index.ts
 pnpm --filter runner build     # tsc + copy openpgp files
 
-# Database (packages/database)
-pnpm --filter @repo/database types   # regenerate Supabase TypeScript types
-pnpm --filter @repo/database push    # push migrations to Supabase
-pnpm --filter @repo/database pull    # pull schema from Supabase
+# Database (packages/database) — schema.ts is the source of truth; Drizzle Kit owns migrations
+pnpm --filter @repo/database generate   # diff schema.ts → emit a SQL migration under drizzle/
+pnpm --filter @repo/database migrate     # apply pending migrations to DATABASE_URL
+pnpm --filter @repo/database types       # regenerate database.types.ts (legacy, still Supabase-linked)
 
 # SDK (packages/agent0)
 pnpm --filter agent0 build    # tsc

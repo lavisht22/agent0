@@ -153,9 +153,7 @@ export const workspaces = pgTable(
 		created_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
-		user_id: uuid()
-			.default(sql`auth.uid()`)
-			.notNull(),
+		user_id: uuid().notNull(),
 		updated_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
@@ -295,9 +293,7 @@ export const agentVersions = pgTable(
 		created_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
-		user_id: uuid()
-			.default(sql`auth.uid()`)
-			.notNull(),
+		user_id: uuid().notNull(),
 	},
 	(table) => [
 		index("agent_versions_agent_id_idx").using(
