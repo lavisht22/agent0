@@ -26,7 +26,13 @@ const TAG_BYTES = 16; // GCM auth tag length
 // `openssl rand -base64 32`) or 64-char hex. Validated eagerly at module load,
 // like pg.ts / storage.ts, so a misconfigured runner fails fast at boot.
 const parseKey = (): Buffer => {
-	const raw = process.env.CONFIG_ENCRYPTION_KEY;
+	// Tolerate whitespace/newlines and surrounding quotes that some env/secret
+	// stores wrap values in — those would otherwise corrupt the decode and
+	// crash the runner at boot.
+	const raw = process.env.CONFIG_ENCRYPTION_KEY?.trim().replace(
+		/^["']|["']$/g,
+		"",
+	);
 	if (!raw) {
 		throw new Error(
 			"CONFIG_ENCRYPTION_KEY is not set (32-byte base64 or hex key for config encryption)",

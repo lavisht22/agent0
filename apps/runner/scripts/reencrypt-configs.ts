@@ -69,7 +69,18 @@ const convert = async (
 	return { value: encryptSecret(plaintext), changed: true };
 };
 
-const migrateTable = async (table: "providers" | "mcps") => {
+const migrateTable = async (table: "providers" | "mcps", jsonb: boolean) => {
+	// providers.encrypted_data_* is `text`; mcps.encrypted_data_* is `jsonb`
+	// (a schema inconsistency). For jsonb we store the AES blob as a JSON string
+	// via `to_jsonb(<text>)` — matching how the app's Drizzle write path encodes
+	// it and how the runtime reads it back (Drizzle returns it as a JS string).
+	const encode = (value: string | null) =>
+		value === null
+			? sql`null`
+			: jsonb
+				? sql`to_jsonb(${value}::text)`
+				: sql`${value}`;
+
 	const rows = (await sql`
 		select id, encrypted_data_production, encrypted_data_staging
 		from ${sql(table)}
@@ -96,8 +107,8 @@ const migrateTable = async (table: "providers" | "mcps") => {
 			if (!DRY_RUN) {
 				await sql`
 					update ${sql(table)}
-					set encrypted_data_production = ${prod.value},
-						encrypted_data_staging = ${stag.value}
+					set encrypted_data_production = ${encode(prod.value)},
+						encrypted_data_staging = ${encode(stag.value)}
 					where id = ${row.id}
 				`;
 			}
@@ -130,8 +141,8 @@ const main = async () => {
 	);
 
 	let failed = 0;
-	failed += await migrateTable("providers");
-	failed += await migrateTable("mcps");
+	failed += await migrateTable("providers", false);
+	failed += await migrateTable("mcps", true);
 
 	await sql.end();
 
