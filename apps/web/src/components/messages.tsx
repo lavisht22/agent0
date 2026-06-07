@@ -14,6 +14,32 @@ export const messageSchema = z.discriminatedUnion("role", [
 
 export type MessageT = z.infer<typeof messageSchema>;
 
+// The AI SDK types assistant/user content as `string | Array<...part>`: a
+// plain-text reply (no tool calls) is stored as a bare string. Our message
+// components assume content is always an array of parts, so wrap any string
+// content in a single text part before rendering. Response messages also lack
+// an `id`, so synthesize a stable one for React keys / reordering.
+export function normalizeMessages(messages: MessageT[]): MessageT[] {
+	return messages.map((message, index) => {
+		const m = message as MessageT & { id?: string };
+		const id = m.id ?? `msg-${index}`;
+		const content: unknown = (m as { content: unknown }).content;
+
+		if (
+			(m.role === "assistant" || m.role === "user") &&
+			typeof content === "string"
+		) {
+			return {
+				...m,
+				id,
+				content: [{ type: "text", text: content }],
+			} as MessageT;
+		}
+
+		return (m.id ? m : { ...m, id }) as MessageT;
+	});
+}
+
 interface MessagesProps {
 	value: MessageT[];
 	onValueChange: (value: MessageT[]) => void;

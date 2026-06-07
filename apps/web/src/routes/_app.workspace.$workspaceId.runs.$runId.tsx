@@ -20,7 +20,11 @@ import {
 	LucideInfo,
 	RotateCcw,
 } from "lucide-react";
-import { Messages, type MessageT } from "@/components/messages";
+import {
+	Messages,
+	type MessageT,
+	normalizeMessages,
+} from "@/components/messages";
 import { MonacoJsonEditor } from "@/components/monaco-json-editor";
 import { PageHeader } from "@/components/page-header";
 import { childRunsQuery, runQuery } from "@/lib/queries";
@@ -459,7 +463,7 @@ function RouteComponent() {
 												{runData.request?.messages &&
 												runData.request.messages.length > 0 ? (
 													<Messages
-														value={runData.request.messages}
+														value={normalizeMessages(runData.request.messages)}
 														onValueChange={() => {}}
 														isReadOnly
 														onVariablePress={() => {}}
@@ -491,10 +495,10 @@ function RouteComponent() {
 											<div className="p-4 pt-0">
 												{runData.steps && runData.steps.length > 0 ? (
 													<Messages
-														value={
+														value={normalizeMessages(
 															runData.steps[runData.steps.length - 1].response
-																.messages as MessageT[]
-														}
+																.messages as MessageT[],
+														)}
 														onValueChange={() => {}}
 														isReadOnly
 														onVariablePress={() => {}}
