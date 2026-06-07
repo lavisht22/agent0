@@ -1,6 +1,8 @@
+import { users, workspaces, workspaceUser } from "@repo/database";
+import { and, asc, eq } from "drizzle-orm";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { nanoid } from "nanoid";
-import { supabase } from "../lib/db.js";
+import { db } from "../lib/pg.js";
 import { hasScope, requireScope, requireUserId } from "../lib/scopes.js";
 
 const ErrorSchema = {
@@ -9,6 +11,42 @@ const ErrorSchema = {
 		message: { type: "string" as const },
 	},
 };
+
+const workspaceColumns = {
+	id: workspaces.id,
+	name: workspaces.name,
+	user_id: workspaces.user_id,
+	created_at: workspaces.created_at,
+	updated_at: workspaces.updated_at,
+};
+
+function toWorkspace(row: {
+	id: string;
+	name: string;
+	user_id: string;
+	created_at: string;
+	updated_at: string;
+}) {
+	return {
+		...row,
+		created_at: new Date(row.created_at).toISOString(),
+		updated_at: new Date(row.updated_at).toISOString(),
+	};
+}
+
+function toMember(row: {
+	user_id: string;
+	role: "admin" | "writer" | "reader";
+	created_at: string;
+	updated_at: string;
+	user: { id: string; name: string | null } | null;
+}) {
+	return {
+		...row,
+		created_at: new Date(row.created_at).toISOString(),
+		updated_at: new Date(row.updated_at).toISOString(),
+	};
+}
 
 const WorkspaceSchema = {
 	type: "object" as const,
@@ -51,12 +89,12 @@ function isAdmin(request: FastifyRequest): boolean {
 // check is an escape hatch so the creator can never lock themselves out (e.g.
 // after being demoted). Only consulted when the caller isn't already an admin.
 async function isOwner(workspaceId: string, userId: string): Promise<boolean> {
-	const { data } = await supabase
-		.from("workspaces")
-		.select("user_id")
-		.eq("id", workspaceId)
-		.maybeSingle();
-	return !!data && data.user_id === userId;
+	const [row] = await db
+		.select({ user_id: workspaces.user_id })
+		.from(workspaces)
+		.where(eq(workspaces.id, workspaceId))
+		.limit(1);
+	return !!row && row.user_id === userId;
 }
 
 async function requireAdminOrOwner(
@@ -112,24 +150,28 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 			// requireUserId guarantees this is set when authed via PAT.
 			const userId = request.userId as string;
 
-			const { data, error } = await supabase
-				.from("workspace_user")
-				.select("role, workspaces!inner(id, name, created_at)")
-				.eq("user_id", userId)
-				.order("created_at", { referencedTable: "workspaces" });
+			try {
+				const rows = await db
+					.select({
+						id: workspaces.id,
+						name: workspaces.name,
+						role: workspaceUser.role,
+						created_at: workspaces.created_at,
+					})
+					.from(workspaceUser)
+					.innerJoin(workspaces, eq(workspaceUser.workspace_id, workspaces.id))
+					.where(eq(workspaceUser.user_id, userId))
+					.orderBy(asc(workspaces.created_at));
 
-			if (error) {
+				return reply.send({
+					data: rows.map((row) => ({
+						...row,
+						created_at: new Date(row.created_at).toISOString(),
+					})),
+				});
+			} catch {
 				return reply.code(500).send({ message: "Failed to list workspaces" });
 			}
-
-			return reply.send({
-				data: data.map((row) => ({
-					id: row.workspaces.id,
-					name: row.workspaces.name,
-					role: row.role,
-					created_at: row.workspaces.created_at,
-				})),
-			});
 		},
 	});
 
@@ -169,17 +211,22 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 				return reply.code(400).send({ message: "name must not be empty" });
 			}
 
-			const { data, error } = await supabase
-				.from("workspaces")
-				.insert({ id: nanoid(), name: trimmedName, user_id: userId })
-				.select("id, name, user_id, created_at, updated_at")
-				.single();
+			try {
+				const [data] = await db
+					.insert(workspaces)
+					.values({ id: nanoid(), name: trimmedName, user_id: userId })
+					.returning(workspaceColumns);
 
-			if (error || !data) {
+				if (!data) {
+					return reply
+						.code(500)
+						.send({ message: "Failed to create workspace" });
+				}
+
+				return reply.code(201).send({ data: toWorkspace(data) });
+			} catch {
 				return reply.code(500).send({ message: "Failed to create workspace" });
 			}
-
-			return reply.code(201).send({ data });
 		},
 	});
 
@@ -229,21 +276,29 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 				return reply.code(400).send({ message: "name must not be empty" });
 			}
 
-			const { data, error } = await supabase
-				.from("workspaces")
-				.update({ name: trimmedName, updated_at: new Date().toISOString() })
-				.eq("id", workspaceId)
-				.select("id, name, user_id, created_at, updated_at")
-				.maybeSingle();
-
-			if (error) {
+			let data:
+				| {
+						id: string;
+						name: string;
+						user_id: string;
+						created_at: string;
+						updated_at: string;
+				  }
+				| undefined;
+			try {
+				[data] = await db
+					.update(workspaces)
+					.set({ name: trimmedName, updated_at: new Date().toISOString() })
+					.where(eq(workspaces.id, workspaceId))
+					.returning(workspaceColumns);
+			} catch {
 				return reply.code(500).send({ message: "Failed to update workspace" });
 			}
 			if (!data) {
 				return reply.code(404).send({ message: "Workspace not found" });
 			}
 
-			return reply.send({ data });
+			return reply.send({ data: toWorkspace(data) });
 		},
 	});
 
@@ -276,15 +331,16 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 				return;
 			}
 
-			const { error, count } = await supabase
-				.from("workspaces")
-				.delete({ count: "exact" })
-				.eq("id", workspaceId);
-
-			if (error) {
+			let deleted: { id: string }[];
+			try {
+				deleted = await db
+					.delete(workspaces)
+					.where(eq(workspaces.id, workspaceId))
+					.returning({ id: workspaces.id });
+			} catch {
 				return reply.code(500).send({ message: "Failed to delete workspace" });
 			}
-			if (count === 0) {
+			if (deleted.length === 0) {
 				return reply.code(404).send({ message: "Workspace not found" });
 			}
 
@@ -319,22 +375,24 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 		handler: async (request, reply) => {
 			const { workspaceId } = request.params as { workspaceId: string };
 
-			const { data, error } = await supabase
-				.from("workspace_user")
-				.select("user_id, role, created_at, updated_at, users(id, name)")
-				.eq("workspace_id", workspaceId)
-				.order("created_at", { ascending: true });
+			try {
+				const rows = await db
+					.select({
+						user_id: workspaceUser.user_id,
+						role: workspaceUser.role,
+						created_at: workspaceUser.created_at,
+						updated_at: workspaceUser.updated_at,
+						user: { id: users.id, name: users.name },
+					})
+					.from(workspaceUser)
+					.leftJoin(users, eq(workspaceUser.user_id, users.id))
+					.where(eq(workspaceUser.workspace_id, workspaceId))
+					.orderBy(asc(workspaceUser.created_at));
 
-			if (error) {
+				return reply.send({ data: rows.map(toMember) });
+			} catch {
 				return reply.code(500).send({ message: "Failed to list members" });
 			}
-
-			return reply.send({
-				data: data.map((row) => {
-					const { users, ...rest } = row;
-					return { ...rest, user: users };
-				}),
-			});
 		},
 	});
 
@@ -384,23 +442,44 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 				role: "admin" | "writer" | "reader";
 			};
 
-			const { data, error } = await supabase
-				.from("workspace_user")
-				.update({ role, updated_at: new Date().toISOString() })
-				.eq("workspace_id", workspaceId)
-				.eq("user_id", userId)
-				.select("user_id, role, created_at, updated_at, users(id, name)")
-				.maybeSingle();
-
-			if (error) {
+			let updated:
+				| {
+						user_id: string;
+						role: "admin" | "writer" | "reader";
+						created_at: string;
+						updated_at: string;
+				  }
+				| undefined;
+			try {
+				[updated] = await db
+					.update(workspaceUser)
+					.set({ role, updated_at: new Date().toISOString() })
+					.where(
+						and(
+							eq(workspaceUser.workspace_id, workspaceId),
+							eq(workspaceUser.user_id, userId),
+						),
+					)
+					.returning({
+						user_id: workspaceUser.user_id,
+						role: workspaceUser.role,
+						created_at: workspaceUser.created_at,
+						updated_at: workspaceUser.updated_at,
+					});
+			} catch {
 				return reply.code(500).send({ message: "Failed to update member" });
 			}
-			if (!data) {
+			if (!updated) {
 				return reply.code(404).send({ message: "Member not found" });
 			}
 
-			const { users, ...rest } = data;
-			return reply.send({ data: { ...rest, user: users } });
+			const [user] = await db
+				.select({ id: users.id, name: users.name })
+				.from(users)
+				.where(eq(users.id, userId))
+				.limit(1);
+
+			return reply.send({ data: toMember({ ...updated, user: user ?? null }) });
 		},
 	});
 
@@ -443,16 +522,21 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 					.send({ message: "Admin required to remove other members" });
 			}
 
-			const { error, count } = await supabase
-				.from("workspace_user")
-				.delete({ count: "exact" })
-				.eq("workspace_id", workspaceId)
-				.eq("user_id", userId);
-
-			if (error) {
+			let deleted: { user_id: string }[];
+			try {
+				deleted = await db
+					.delete(workspaceUser)
+					.where(
+						and(
+							eq(workspaceUser.workspace_id, workspaceId),
+							eq(workspaceUser.user_id, userId),
+						),
+					)
+					.returning({ user_id: workspaceUser.user_id });
+			} catch {
 				return reply.code(500).send({ message: "Failed to remove member" });
 			}
-			if (count === 0) {
+			if (deleted.length === 0) {
 				return reply.code(404).send({ message: "Member not found" });
 			}
 

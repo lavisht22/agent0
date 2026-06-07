@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
+import { personalAccessTokens } from "@repo/database";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { customAlphabet, nanoid } from "nanoid";
-import { supabase } from "../lib/db.js";
+import { db } from "../lib/pg.js";
 import { requireUserId } from "../lib/scopes.js";
 
 // PATs are user-bound, not workspace-bound, so there is no workspace scope to
@@ -30,8 +32,36 @@ function sha256Hex(input: string): string {
 
 // Never expose token_hash. The raw token is only ever returned once, from the
 // create handler.
-const SELECT_COLUMNS =
-	"id, name, token_prefix, created_at, last_used_at, expires_at, revoked_at";
+const patColumns = {
+	id: personalAccessTokens.id,
+	name: personalAccessTokens.name,
+	token_prefix: personalAccessTokens.token_prefix,
+	created_at: personalAccessTokens.created_at,
+	last_used_at: personalAccessTokens.last_used_at,
+	expires_at: personalAccessTokens.expires_at,
+	revoked_at: personalAccessTokens.revoked_at,
+};
+
+const isoOrNull = (value: string | null) =>
+	value ? new Date(value).toISOString() : null;
+
+function toPat(row: {
+	id: string;
+	name: string;
+	token_prefix: string;
+	created_at: string;
+	last_used_at: string | null;
+	expires_at: string | null;
+	revoked_at: string | null;
+}) {
+	return {
+		...row,
+		created_at: new Date(row.created_at).toISOString(),
+		last_used_at: isoOrNull(row.last_used_at),
+		expires_at: isoOrNull(row.expires_at),
+		revoked_at: isoOrNull(row.revoked_at),
+	};
+}
 
 const PatSchema = {
 	type: "object" as const,
@@ -88,18 +118,22 @@ export async function registerPersonalAccessTokensRoutes(
 		handler: async (request, reply) => {
 			const userId = request.userId as string;
 
-			const { data, error } = await supabase
-				.from("personal_access_tokens")
-				.select(SELECT_COLUMNS)
-				.eq("user_id", userId)
-				.is("revoked_at", null)
-				.order("created_at", { ascending: false });
+			try {
+				const data = await db
+					.select(patColumns)
+					.from(personalAccessTokens)
+					.where(
+						and(
+							eq(personalAccessTokens.user_id, userId),
+							isNull(personalAccessTokens.revoked_at),
+						),
+					)
+					.orderBy(desc(personalAccessTokens.created_at));
 
-			if (error) {
+				return reply.send({ data: data.map(toPat) });
+			} catch {
 				return reply.code(500).send({ message: "Failed to fetch tokens" });
 			}
-
-			return reply.send({ data });
 		},
 	});
 
@@ -147,23 +181,26 @@ export async function registerPersonalAccessTokensRoutes(
 
 			const token = `${TOKEN_PREFIX}${tokenRandom()}`;
 
-			const { data, error } = await supabase
-				.from("personal_access_tokens")
-				.insert({
-					id: nanoid(),
-					user_id: userId,
-					token_hash: sha256Hex(token),
-					token_prefix: token.slice(0, PREFIX_DISPLAY_LEN),
-					name: trimmedName,
-				})
-				.select(SELECT_COLUMNS)
-				.single();
+			try {
+				const [data] = await db
+					.insert(personalAccessTokens)
+					.values({
+						id: nanoid(),
+						user_id: userId,
+						token_hash: sha256Hex(token),
+						token_prefix: token.slice(0, PREFIX_DISPLAY_LEN),
+						name: trimmedName,
+					})
+					.returning(patColumns);
 
-			if (error || !data) {
+				if (!data) {
+					return reply.code(500).send({ message: "Failed to create token" });
+				}
+
+				return reply.code(201).send({ data: { ...toPat(data), token } });
+			} catch {
 				return reply.code(500).send({ message: "Failed to create token" });
 			}
-
-			return reply.code(201).send({ data: { ...data, token } });
 		},
 	});
 
@@ -206,19 +243,23 @@ export async function registerPersonalAccessTokensRoutes(
 			const { tokenId } = request.params as { tokenId: string };
 			const revokedAt = new Date().toISOString();
 
-			const { data, error } = await supabase
-				.from("personal_access_tokens")
-				.update({ revoked_at: revokedAt })
-				.eq("id", tokenId)
-				.eq("user_id", userId)
-				.is("revoked_at", null)
-				.select("id")
-				.maybeSingle();
-
-			if (error) {
+			let revoked: { id: string }[];
+			try {
+				revoked = await db
+					.update(personalAccessTokens)
+					.set({ revoked_at: revokedAt })
+					.where(
+						and(
+							eq(personalAccessTokens.id, tokenId),
+							eq(personalAccessTokens.user_id, userId),
+							isNull(personalAccessTokens.revoked_at),
+						),
+					)
+					.returning({ id: personalAccessTokens.id });
+			} catch {
 				return reply.code(500).send({ message: "Failed to revoke token" });
 			}
-			if (!data) {
+			if (revoked.length === 0) {
 				return reply.code(404).send({ message: "Token not found" });
 			}
 

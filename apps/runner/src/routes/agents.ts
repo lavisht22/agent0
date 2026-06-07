@@ -1,6 +1,8 @@
+import { agents, agentTags, agentVersions, tags } from "@repo/database";
+import { and, desc, eq, ilike, inArray } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
-import { supabase } from "../lib/db.js";
+import { db } from "../lib/pg.js";
 import { checkScope, requireScope, requireUserId } from "../lib/scopes.js";
 
 const TagSchema = {
@@ -55,10 +57,16 @@ function extractModel(
 	return { provider_id, name };
 }
 
-// Columns for the list/detail responses, embedding only the deployed versions'
-// `data` (so we can derive the model summary) plus the tag join.
-const AGENT_SELECT =
-	"id, name, staging_version_id, production_version_id, created_at, updated_at, agent_tags(tags(id, name, color)), staging_version:agent_versions!staging_version_id(data), production_version:agent_versions!production_version_id(data)";
+// Base agent columns shared by every read path. The model summaries and tags are
+// hydrated separately (see `hydrateAgents`) since they live in joined tables.
+const agentColumns = {
+	id: agents.id,
+	name: agents.name,
+	staging_version_id: agents.staging_version_id,
+	production_version_id: agents.production_version_id,
+	created_at: agents.created_at,
+	updated_at: agents.updated_at,
+};
 
 type AgentRow = {
 	id: string;
@@ -67,25 +75,67 @@ type AgentRow = {
 	production_version_id: string | null;
 	created_at: string;
 	updated_at: string;
-	agent_tags?:
-		| { tags: { id: string; name: string; color: string } | null }[]
-		| null;
-	staging_version?: { data: unknown } | null;
-	production_version?: { data: unknown } | null;
 };
 
-function toAgent(agent: AgentRow) {
-	return {
+type Tag = { id: string; name: string; color: string };
+
+// Attach each agent's tags and deployed-version model summaries. Batches the two
+// lookups across all rows (one tag query, one version query) to avoid N+1, then
+// stitches the results back together in memory.
+async function hydrateAgents(rows: AgentRow[]) {
+	if (rows.length === 0) return [];
+
+	const agentIds = rows.map((r) => r.id);
+	const versionIds = Array.from(
+		new Set(
+			rows.flatMap((r) =>
+				[r.staging_version_id, r.production_version_id].filter(
+					(id): id is string => !!id,
+				),
+			),
+		),
+	);
+
+	const tagRows = await db
+		.select({
+			agent_id: agentTags.agent_id,
+			id: tags.id,
+			name: tags.name,
+			color: tags.color,
+		})
+		.from(agentTags)
+		.innerJoin(tags, eq(agentTags.tag_id, tags.id))
+		.where(inArray(agentTags.agent_id, agentIds));
+
+	const versionRows = versionIds.length
+		? await db
+				.select({ id: agentVersions.id, data: agentVersions.data })
+				.from(agentVersions)
+				.where(inArray(agentVersions.id, versionIds))
+		: [];
+
+	const tagsByAgent = new Map<string, Tag[]>();
+	for (const { agent_id, id, name, color } of tagRows) {
+		const list = tagsByAgent.get(agent_id) ?? [];
+		list.push({ id, name, color });
+		tagsByAgent.set(agent_id, list);
+	}
+	const dataByVersion = new Map(versionRows.map((v) => [v.id, v.data]));
+
+	const modelFor = (versionId: string | null) =>
+		extractModel(versionId ? dataByVersion.get(versionId) : null);
+
+	return rows.map((agent) => ({
 		id: agent.id,
 		name: agent.name,
 		staging_version_id: agent.staging_version_id,
 		production_version_id: agent.production_version_id,
-		staging_model: extractModel(agent.staging_version?.data),
-		production_model: extractModel(agent.production_version?.data),
-		tags: agent.agent_tags?.map((at) => at.tags).filter(Boolean) ?? [],
-		created_at: agent.created_at,
-		updated_at: agent.updated_at,
-	};
+		staging_model: modelFor(agent.staging_version_id),
+		production_model: modelFor(agent.production_version_id),
+		tags: tagsByAgent.get(agent.id) ?? [],
+		created_at: new Date(agent.created_at).toISOString(),
+		updated_at: new Date(agent.updated_at).toISOString(),
+	}));
 }
 
 const VersionSummarySchema = {
@@ -151,18 +201,24 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 				agentId: string;
 			};
 
-			const { data: agent, error } = await supabase
-				.from("agents")
-				.select(AGENT_SELECT)
-				.eq("id", agentId)
-				.eq("workspace_id", workspaceId)
-				.single();
+			try {
+				const [agent] = await db
+					.select(agentColumns)
+					.from(agents)
+					.where(
+						and(eq(agents.id, agentId), eq(agents.workspace_id, workspaceId)),
+					)
+					.limit(1);
 
-			if (error || !agent) {
-				return reply.code(404).send({ message: "Agent not found" });
+				if (!agent) {
+					return reply.code(404).send({ message: "Agent not found" });
+				}
+
+				const [hydrated] = await hydrateAgents([agent]);
+				return reply.send({ data: hydrated });
+			} catch {
+				return reply.code(500).send({ message: "Failed to fetch agent" });
 			}
-
-			return reply.send({ data: toAgent(agent as unknown as AgentRow) });
 		},
 	});
 
@@ -229,69 +285,60 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			);
 			const offset = (pageNum - 1) * limitNum;
 
-			// If tag_ids provided, filter agents that have ALL specified tags
-			let matchingAgentIds: string[] | null = null;
+			try {
+				// If tag_ids provided, filter agents that have ALL specified tags
+				let matchingAgentIds: string[] | null = null;
 
-			if (tag_ids) {
-				const tagIdList = tag_ids.split(",").filter(Boolean);
+				if (tag_ids) {
+					const tagIdList = tag_ids.split(",").filter(Boolean);
 
-				if (tagIdList.length > 0) {
-					const { data: agentTags, error: tagError } = await supabase
-						.from("agent_tags")
-						.select("agent_id")
-						.in("tag_id", tagIdList);
+					if (tagIdList.length > 0) {
+						const links = await db
+							.select({ agent_id: agentTags.agent_id })
+							.from(agentTags)
+							.where(inArray(agentTags.tag_id, tagIdList));
 
-					if (tagError) {
-						return reply
-							.code(500)
-							.send({ message: "Failed to filter by tags" });
-					}
+						// Only include agents that have ALL selected tags
+						const agentIdCounts = links.reduce(
+							(acc, { agent_id }) => {
+								acc[agent_id] = (acc[agent_id] || 0) + 1;
+								return acc;
+							},
+							{} as Record<string, number>,
+						);
 
-					// Only include agents that have ALL selected tags
-					const agentIdCounts = agentTags.reduce(
-						(acc, { agent_id }) => {
-							acc[agent_id] = (acc[agent_id] || 0) + 1;
-							return acc;
-						},
-						{} as Record<string, number>,
-					);
+						matchingAgentIds = Object.entries(agentIdCounts)
+							.filter(([_, count]) => count >= tagIdList.length)
+							.map(([id]) => id);
 
-					matchingAgentIds = Object.entries(agentIdCounts)
-						.filter(([_, count]) => count >= tagIdList.length)
-						.map(([id]) => id);
-
-					if (matchingAgentIds.length === 0) {
-						return reply.send({ data: [], page: pageNum, limit: limitNum });
+						if (matchingAgentIds.length === 0) {
+							return reply.send({ data: [], page: pageNum, limit: limitNum });
+						}
 					}
 				}
-			}
 
-			let query = supabase
-				.from("agents")
-				.select(AGENT_SELECT)
-				.eq("workspace_id", workspaceId);
+				const conditions = [eq(agents.workspace_id, workspaceId)];
+				if (matchingAgentIds) {
+					conditions.push(inArray(agents.id, matchingAgentIds));
+				}
+				if (search) {
+					conditions.push(ilike(agents.name, `%${search}%`));
+				}
 
-			if (matchingAgentIds) {
-				query = query.in("id", matchingAgentIds);
-			}
+				const rows = await db
+					.select(agentColumns)
+					.from(agents)
+					.where(and(...conditions))
+					.orderBy(desc(agents.created_at))
+					.limit(limitNum)
+					.offset(offset);
 
-			if (search) {
-				query = query.ilike("name", `%${search}%`);
-			}
+				const data = await hydrateAgents(rows);
 
-			query = query
-				.order("created_at", { ascending: false })
-				.range(offset, offset + limitNum - 1);
-
-			const { data: agents, error } = await query;
-
-			if (error) {
+				return reply.send({ data, page: pageNum, limit: limitNum });
+			} catch {
 				return reply.code(500).send({ message: "Failed to fetch agents" });
 			}
-
-			const result = (agents as unknown as AgentRow[]).map(toAgent);
-
-			return reply.send({ data: result, page: pageNum, limit: limitNum });
 		},
 	});
 
@@ -343,77 +390,57 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 
 			const uniqueTagIds = tag_ids ? Array.from(new Set(tag_ids)) : [];
 
-			if (uniqueTagIds.length > 0) {
-				const { data: workspaceTags, error: tagLookupError } = await supabase
-					.from("tags")
-					.select("id")
-					.eq("workspace_id", workspaceId)
-					.in("id", uniqueTagIds);
+			try {
+				if (uniqueTagIds.length > 0) {
+					const workspaceTags = await db
+						.select({ id: tags.id })
+						.from(tags)
+						.where(
+							and(
+								eq(tags.workspace_id, workspaceId),
+								inArray(tags.id, uniqueTagIds),
+							),
+						);
 
-				if (tagLookupError) {
-					return reply.code(500).send({ message: "Failed to validate tags" });
+					const foundIds = new Set(workspaceTags.map((t) => t.id));
+					const unknown = uniqueTagIds.filter((id) => !foundIds.has(id));
+					if (unknown.length > 0) {
+						return reply.code(400).send({
+							message: `Unknown tag_ids for this workspace: ${unknown.join(", ")}`,
+						});
+					}
 				}
 
-				const foundIds = new Set(workspaceTags.map((t) => t.id));
-				const unknown = uniqueTagIds.filter((id) => !foundIds.has(id));
-				if (unknown.length > 0) {
-					return reply.code(400).send({
-						message: `Unknown tag_ids for this workspace: ${unknown.join(", ")}`,
-					});
+				const agentId = nanoid();
+				const [created] = await db
+					.insert(agents)
+					.values({ id: agentId, name: trimmedName, workspace_id: workspaceId })
+					.returning(agentColumns);
+
+				if (!created) {
+					return reply.code(500).send({ message: "Failed to create agent" });
 				}
-			}
 
-			const agentId = nanoid();
-			const { data: created, error: insertError } = await supabase
-				.from("agents")
-				.insert({
-					id: agentId,
-					name: trimmedName,
-					workspace_id: workspaceId,
-				})
-				.select(
-					"id, name, staging_version_id, production_version_id, created_at, updated_at",
-				)
-				.single();
+				if (uniqueTagIds.length > 0) {
+					try {
+						await db.insert(agentTags).values(
+							uniqueTagIds.map((tagId) => ({
+								agent_id: agentId,
+								tag_id: tagId,
+							})),
+						);
+					} catch {
+						// Roll back the agent so the caller doesn't end up with a half-created record.
+						await db.delete(agents).where(eq(agents.id, agentId));
+						return reply.code(500).send({ message: "Failed to attach tags" });
+					}
+				}
 
-			if (insertError || !created) {
+				const [hydrated] = await hydrateAgents([created]);
+				return reply.code(201).send({ data: hydrated });
+			} catch {
 				return reply.code(500).send({ message: "Failed to create agent" });
 			}
-
-			if (uniqueTagIds.length > 0) {
-				const { error: tagInsertError } = await supabase
-					.from("agent_tags")
-					.insert(
-						uniqueTagIds.map((tagId) => ({ agent_id: agentId, tag_id: tagId })),
-					);
-
-				if (tagInsertError) {
-					// Roll back the agent so the caller doesn't end up with a half-created record.
-					await supabase.from("agents").delete().eq("id", agentId);
-					return reply.code(500).send({ message: "Failed to attach tags" });
-				}
-			}
-
-			const { data: tagRows, error: tagFetchError } = await supabase
-				.from("agent_tags")
-				.select("tags(id, name, color)")
-				.eq("agent_id", agentId);
-
-			if (tagFetchError) {
-				return reply.code(500).send({ message: "Failed to load agent tags" });
-			}
-
-			return reply.code(201).send({
-				data: {
-					id: created.id,
-					name: created.name,
-					staging_version_id: created.staging_version_id,
-					production_version_id: created.production_version_id,
-					tags: tagRows?.map((row) => row.tags).filter(Boolean) ?? [],
-					created_at: created.created_at,
-					updated_at: created.updated_at,
-				},
-			});
 		},
 	});
 
@@ -479,30 +506,43 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			);
 			const offset = (pageNum - 1) * limitNum;
 
-			// Verify agent belongs to workspace
-			const { data: agent, error: agentError } = await supabase
-				.from("agents")
-				.select("id")
-				.eq("id", agentId)
-				.eq("workspace_id", workspaceId)
-				.single();
+			try {
+				// Verify agent belongs to workspace
+				const [agent] = await db
+					.select({ id: agents.id })
+					.from(agents)
+					.where(
+						and(eq(agents.id, agentId), eq(agents.workspace_id, workspaceId)),
+					)
+					.limit(1);
 
-			if (agentError || !agent) {
-				return reply.code(404).send({ message: "Agent not found" });
-			}
+				if (!agent) {
+					return reply.code(404).send({ message: "Agent not found" });
+				}
 
-			const { data: versions, error } = await supabase
-				.from("agent_versions")
-				.select("id, agent_id, is_deployed, user_id, created_at")
-				.eq("agent_id", agentId)
-				.order("created_at", { ascending: false })
-				.range(offset, offset + limitNum - 1);
+				const versions = await db
+					.select({
+						id: agentVersions.id,
+						agent_id: agentVersions.agent_id,
+						is_deployed: agentVersions.is_deployed,
+						user_id: agentVersions.user_id,
+						created_at: agentVersions.created_at,
+					})
+					.from(agentVersions)
+					.where(eq(agentVersions.agent_id, agentId))
+					.orderBy(desc(agentVersions.created_at))
+					.limit(limitNum)
+					.offset(offset);
 
-			if (error) {
+				const data = versions.map((v) => ({
+					...v,
+					created_at: new Date(v.created_at).toISOString(),
+				}));
+
+				return reply.send({ data, page: pageNum, limit: limitNum });
+			} catch {
 				return reply.code(500).send({ message: "Failed to fetch versions" });
 			}
-
-			return reply.send({ data: versions, page: pageNum, limit: limitNum });
 		},
 	});
 
@@ -531,6 +571,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 					},
 				},
 				404: ErrorSchema,
+				500: ErrorSchema,
 			},
 		},
 		handler: async (request, reply) => {
@@ -540,30 +581,44 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 				versionId: string;
 			};
 
-			// Verify agent belongs to workspace
-			const { data: agent, error: agentError } = await supabase
-				.from("agents")
-				.select("id")
-				.eq("id", agentId)
-				.eq("workspace_id", workspaceId)
-				.single();
+			try {
+				// Verify agent belongs to workspace
+				const [agent] = await db
+					.select({ id: agents.id })
+					.from(agents)
+					.where(
+						and(eq(agents.id, agentId), eq(agents.workspace_id, workspaceId)),
+					)
+					.limit(1);
 
-			if (agentError || !agent) {
-				return reply.code(404).send({ message: "Agent not found" });
+				if (!agent) {
+					return reply.code(404).send({ message: "Agent not found" });
+				}
+
+				const [version] = await db
+					.select()
+					.from(agentVersions)
+					.where(
+						and(
+							eq(agentVersions.id, versionId),
+							eq(agentVersions.agent_id, agentId),
+						),
+					)
+					.limit(1);
+
+				if (!version) {
+					return reply.code(404).send({ message: "Version not found" });
+				}
+
+				return reply.send({
+					data: {
+						...version,
+						created_at: new Date(version.created_at).toISOString(),
+					},
+				});
+			} catch {
+				return reply.code(500).send({ message: "Failed to fetch version" });
 			}
-
-			const { data: version, error } = await supabase
-				.from("agent_versions")
-				.select("*")
-				.eq("id", versionId)
-				.eq("agent_id", agentId)
-				.single();
-
-			if (error || !version) {
-				return reply.code(404).send({ message: "Version not found" });
-			}
-
-			return reply.send({ data: version });
 		},
 	});
 
@@ -646,145 +701,125 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 				return reply.code(400).send({ message: "No updates provided" });
 			}
 
-			// Verify agent belongs to workspace
-			const { data: agent, error: agentError } = await supabase
-				.from("agents")
-				.select("id")
-				.eq("id", agentId)
-				.eq("workspace_id", workspaceId)
-				.single();
+			try {
+				// Verify agent belongs to workspace
+				const [agent] = await db
+					.select({ id: agents.id })
+					.from(agents)
+					.where(
+						and(eq(agents.id, agentId), eq(agents.workspace_id, workspaceId)),
+					)
+					.limit(1);
 
-			if (agentError || !agent) {
-				return reply.code(404).send({ message: "Agent not found" });
-			}
-
-			// Validate versions if provided
-			const versionIdsToCheck = [
-				staging_version_id,
-				production_version_id,
-			].filter((id): id is string => id !== undefined && id !== null);
-
-			if (versionIdsToCheck.length > 0) {
-				const { data: versions, error: versionsError } = await supabase
-					.from("agent_versions")
-					.select("id")
-					.eq("agent_id", agentId)
-					.in("id", versionIdsToCheck);
-
-				if (versionsError) {
-					return reply
-						.code(500)
-						.send({ message: "Failed to validate versions" });
+				if (!agent) {
+					return reply.code(404).send({ message: "Agent not found" });
 				}
 
-				const foundVersionIds = new Set(versions.map((v) => v.id));
-				for (const vid of versionIdsToCheck) {
-					if (!foundVersionIds.has(vid)) {
-						return reply.code(400).send({
-							message: `Version ${vid} does not exist for this agent`,
-						});
-					}
-				}
-			}
+				// Validate versions if provided
+				const versionIdsToCheck = [
+					staging_version_id,
+					production_version_id,
+				].filter((id): id is string => id !== undefined && id !== null);
 
-			const updateFields: Record<string, any> = {};
-			if (name !== undefined) {
-				const trimmed = name.trim();
-				if (trimmed.length === 0) {
-					return reply.code(400).send({ message: "name must not be empty" });
-				}
-				updateFields.name = trimmed;
-			}
-			if (staging_version_id !== undefined) {
-				updateFields.staging_version_id = staging_version_id;
-			}
-			if (production_version_id !== undefined) {
-				updateFields.production_version_id = production_version_id;
-			}
+				if (versionIdsToCheck.length > 0) {
+					const versions = await db
+						.select({ id: agentVersions.id })
+						.from(agentVersions)
+						.where(
+							and(
+								eq(agentVersions.agent_id, agentId),
+								inArray(agentVersions.id, versionIdsToCheck),
+							),
+						);
 
-			if (Object.keys(updateFields).length > 0) {
-				const { error: updateError } = await supabase
-					.from("agents")
-					.update(updateFields)
-					.eq("id", agentId);
-
-				if (updateError) {
-					return reply.code(500).send({ message: "Failed to update agent" });
-				}
-			}
-
-			// Handle tags
-			if (tag_ids !== undefined) {
-				const uniqueTagIds = Array.from(new Set(tag_ids));
-
-				// Validate tags belong to workspace
-				if (uniqueTagIds.length > 0) {
-					const { data: workspaceTags, error: tagLookupError } = await supabase
-						.from("tags")
-						.select("id")
-						.eq("workspace_id", workspaceId)
-						.in("id", uniqueTagIds);
-
-					if (tagLookupError) {
-						return reply.code(500).send({ message: "Failed to validate tags" });
-					}
-
-					const foundIds = new Set(workspaceTags.map((t) => t.id));
-					const unknown = uniqueTagIds.filter((id) => !foundIds.has(id));
-					if (unknown.length > 0) {
-						return reply.code(400).send({
-							message: `Unknown tag_ids for this workspace: ${unknown.join(", ")}`,
-						});
+					const foundVersionIds = new Set(versions.map((v) => v.id));
+					for (const vid of versionIdsToCheck) {
+						if (!foundVersionIds.has(vid)) {
+							return reply.code(400).send({
+								message: `Version ${vid} does not exist for this agent`,
+							});
+						}
 					}
 				}
 
-				// Delete existing tags
-				const { error: deleteError } = await supabase
-					.from("agent_tags")
-					.delete()
-					.eq("agent_id", agentId);
-
-				if (deleteError) {
-					return reply
-						.code(500)
-						.send({ message: "Failed to clear existing tags" });
+				const updateFields: Partial<typeof agents.$inferInsert> = {};
+				if (name !== undefined) {
+					const trimmed = name.trim();
+					if (trimmed.length === 0) {
+						return reply.code(400).send({ message: "name must not be empty" });
+					}
+					updateFields.name = trimmed;
+				}
+				if (staging_version_id !== undefined) {
+					updateFields.staging_version_id = staging_version_id;
+				}
+				if (production_version_id !== undefined) {
+					updateFields.production_version_id = production_version_id;
 				}
 
-				// Insert new tags
-				if (uniqueTagIds.length > 0) {
-					const { error: insertError } = await supabase
-						.from("agent_tags")
-						.insert(
+				if (Object.keys(updateFields).length > 0) {
+					await db
+						.update(agents)
+						.set(updateFields)
+						.where(eq(agents.id, agentId));
+				}
+
+				// Handle tags
+				if (tag_ids !== undefined) {
+					const uniqueTagIds = Array.from(new Set(tag_ids));
+
+					// Validate tags belong to workspace
+					if (uniqueTagIds.length > 0) {
+						const workspaceTags = await db
+							.select({ id: tags.id })
+							.from(tags)
+							.where(
+								and(
+									eq(tags.workspace_id, workspaceId),
+									inArray(tags.id, uniqueTagIds),
+								),
+							);
+
+						const foundIds = new Set(workspaceTags.map((t) => t.id));
+						const unknown = uniqueTagIds.filter((id) => !foundIds.has(id));
+						if (unknown.length > 0) {
+							return reply.code(400).send({
+								message: `Unknown tag_ids for this workspace: ${unknown.join(", ")}`,
+							});
+						}
+					}
+
+					// Replace the tag set: clear existing links, then insert the new set.
+					await db.delete(agentTags).where(eq(agentTags.agent_id, agentId));
+
+					if (uniqueTagIds.length > 0) {
+						await db.insert(agentTags).values(
 							uniqueTagIds.map((tagId) => ({
 								agent_id: agentId,
 								tag_id: tagId,
 							})),
 						);
-
-					if (insertError) {
-						return reply
-							.code(500)
-							.send({ message: "Failed to attach new tags" });
 					}
 				}
+
+				// Fetch final agent state
+				const [updatedAgent] = await db
+					.select(agentColumns)
+					.from(agents)
+					.where(eq(agents.id, agentId))
+					.limit(1);
+
+				if (!updatedAgent) {
+					return reply
+						.code(500)
+						.send({ message: "Failed to fetch updated agent" });
+				}
+
+				const [hydrated] = await hydrateAgents([updatedAgent]);
+				return reply.code(200).send({ data: hydrated });
+			} catch {
+				return reply.code(500).send({ message: "Failed to update agent" });
 			}
-
-			// Fetch final agent state
-			const { data: updatedAgent, error: fetchError } = await supabase
-				.from("agents")
-				.select(AGENT_SELECT)
-				.eq("id", agentId)
-				.single();
-
-			if (fetchError || !updatedAgent) {
-				return reply
-					.code(500)
-					.send({ message: "Failed to fetch updated agent" });
-			}
-
-			return reply
-				.code(200)
-				.send({ data: toAgent(updatedAgent as unknown as AgentRow) });
 		},
 	});
 
@@ -821,16 +856,18 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 				agentId: string;
 			};
 
-			const { error, count } = await supabase
-				.from("agents")
-				.delete({ count: "exact" })
-				.eq("id", agentId)
-				.eq("workspace_id", workspaceId);
-
-			if (error) {
+			let deleted: { id: string }[];
+			try {
+				deleted = await db
+					.delete(agents)
+					.where(
+						and(eq(agents.id, agentId), eq(agents.workspace_id, workspaceId)),
+					)
+					.returning({ id: agents.id });
+			} catch {
 				return reply.code(500).send({ message: "Failed to delete agent" });
 			}
-			if (count === 0) {
+			if (deleted.length === 0) {
 				return reply.code(404).send({ message: "Agent not found" });
 			}
 
@@ -895,59 +932,62 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 				agentId: string;
 			};
 			const { deploy } = request.query as { deploy?: "staging" | "production" };
-			const { data } = request.body as { data: Record<string, any> };
+			const { data } = request.body as { data: Record<string, unknown> };
 
-			// Verify agent belongs to workspace
-			const { data: agent, error: agentError } = await supabase
-				.from("agents")
-				.select("id")
-				.eq("id", agentId)
-				.eq("workspace_id", workspaceId)
-				.single();
+			try {
+				// Verify agent belongs to workspace
+				const [agent] = await db
+					.select({ id: agents.id })
+					.from(agents)
+					.where(
+						and(eq(agents.id, agentId), eq(agents.workspace_id, workspaceId)),
+					)
+					.limit(1);
 
-			if (agentError || !agent) {
-				return reply.code(404).send({ message: "Agent not found" });
-			}
+				if (!agent) {
+					return reply.code(404).send({ message: "Agent not found" });
+				}
 
-			const versionId = nanoid();
-			const userId = request.userId; // guaranteed by requireUserId
+				const versionId = nanoid();
+				const userId = request.userId as string; // guaranteed by requireUserId
 
-			// Start by inserting the new version
-			const { data: newVersion, error: versionError } = await supabase
-				.from("agent_versions")
-				.insert({
-					id: versionId,
-					agent_id: agentId,
-					data,
-					is_deployed: !!deploy,
-					user_id: userId,
-				})
-				.select("*")
-				.single();
+				// Start by inserting the new version
+				const [newVersion] = await db
+					.insert(agentVersions)
+					.values({
+						id: versionId,
+						agent_id: agentId,
+						data,
+						is_deployed: !!deploy,
+						user_id: userId,
+					})
+					.returning();
 
-			if (versionError || !newVersion) {
+				if (!newVersion) {
+					return reply.code(500).send({ message: "Failed to create version" });
+				}
+
+				// If deploy is requested, update the agent
+				if (deploy) {
+					const updateField =
+						deploy === "staging"
+							? { staging_version_id: versionId }
+							: { production_version_id: versionId };
+					await db
+						.update(agents)
+						.set(updateField)
+						.where(eq(agents.id, agentId));
+				}
+
+				return reply.code(201).send({
+					data: {
+						...newVersion,
+						created_at: new Date(newVersion.created_at).toISOString(),
+					},
+				});
+			} catch {
 				return reply.code(500).send({ message: "Failed to create version" });
 			}
-
-			// If deploy is requested, update the agent
-			if (deploy) {
-				const updateField =
-					deploy === "staging"
-						? { staging_version_id: versionId }
-						: { production_version_id: versionId };
-				const { error: deployError } = await supabase
-					.from("agents")
-					.update(updateField)
-					.eq("id", agentId);
-
-				if (deployError) {
-					return reply
-						.code(500)
-						.send({ message: "Version created but failed to deploy" });
-				}
-			}
-
-			return reply.code(201).send({ data: newVersion });
 		},
 	});
 }

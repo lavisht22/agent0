@@ -1,5 +1,7 @@
+import { personalAccessTokens, users } from "@repo/database";
+import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { supabase } from "../lib/db.js";
+import { db } from "../lib/pg.js";
 import { requireUserId } from "../lib/scopes.js";
 
 const ErrorSchema = {
@@ -42,15 +44,15 @@ export async function registerAuthRoutes(fastify: FastifyInstance) {
 			const userId = request.userId as string;
 			const tokenId = request.tokenId as string;
 
-			// Email + name both live on public.users now (Phase 2 extended the
-			// table); no more Supabase Auth admin lookup.
-			const { data: user, error } = await supabase
-				.from("users")
-				.select("name, email")
-				.eq("id", userId)
-				.maybeSingle();
-
-			if (error) {
+			// Email + name both live on public.users (better-auth owns the table).
+			let user: { name: string | null; email: string } | undefined;
+			try {
+				[user] = await db
+					.select({ name: users.name, email: users.email })
+					.from(users)
+					.where(eq(users.id, userId))
+					.limit(1);
+			} catch {
 				return reply.code(500).send({ message: "Failed to resolve identity" });
 			}
 
@@ -93,12 +95,12 @@ export async function registerAuthRoutes(fastify: FastifyInstance) {
 			const tokenId = request.tokenId as string;
 			const revokedAt = new Date().toISOString();
 
-			const { error } = await supabase
-				.from("personal_access_tokens")
-				.update({ revoked_at: revokedAt })
-				.eq("id", tokenId);
-
-			if (error) {
+			try {
+				await db
+					.update(personalAccessTokens)
+					.set({ revoked_at: revokedAt })
+					.where(eq(personalAccessTokens.id, tokenId));
+			} catch {
 				return reply.code(500).send({ message: "Failed to revoke token" });
 			}
 

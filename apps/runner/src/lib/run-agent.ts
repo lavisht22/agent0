@@ -1,3 +1,4 @@
+import { agents, agentVersions, runs } from "@repo/database";
 import {
 	generateText,
 	jsonSchema,
@@ -10,10 +11,10 @@ import {
 	type Tool,
 	type ToolSet,
 } from "ai";
+import { and, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { cachedQuery } from "./cache.js";
 import { calculateModelCost, sumUsage } from "./cost.js";
-import { supabase } from "./db.js";
 import {
 	applyMessageVariables,
 	applySkillCatalog,
@@ -22,6 +23,7 @@ import {
 	resolveProviderModel,
 	uploadRunData,
 } from "./helpers.js";
+import { db } from "./pg.js";
 import type {
 	AgentTool,
 	Environment,
@@ -215,14 +217,18 @@ export const prepareRun = async (
 		`agent:${agentId}:${workspaceId}`,
 		30_000, // 30s TTL — short to pick up new deploys quickly
 		async () => {
-			const { data, error } = await supabase
-				.from("agents")
-				.select("staging_version_id, production_version_id, workspace_id")
-				.eq("id", agentId)
-				.eq("workspace_id", workspaceId)
-				.single();
-			if (error || !data) return null;
-			return data;
+			const [row] = await db
+				.select({
+					staging_version_id: agents.staging_version_id,
+					production_version_id: agents.production_version_id,
+					workspace_id: agents.workspace_id,
+				})
+				.from(agents)
+				.where(
+					and(eq(agents.id, agentId), eq(agents.workspace_id, workspaceId)),
+				)
+				.limit(1);
+			return row ?? null;
 		},
 	);
 
@@ -247,13 +253,12 @@ export const prepareRun = async (
 		`version:${versionId}`,
 		600_000, // 10 min TTL — versions are immutable once created
 		async () => {
-			const { data, error } = await supabase
-				.from("agent_versions")
-				.select("*")
-				.eq("id", versionId)
-				.single();
-			if (error || !data) return null;
-			return data;
+			const [row] = await db
+				.select()
+				.from(agentVersions)
+				.where(eq(agentVersions.id, versionId))
+				.limit(1);
+			return row ?? null;
 		},
 	);
 
@@ -464,7 +469,9 @@ export type RecordRunOptions = {
  */
 export const recordRun = async (opts: RecordRunOptions): Promise<string> => {
 	const id = opts.id ?? nanoid();
-	await supabase.from("runs").insert({
+	// `numeric` columns are string-typed in the schema (see D12); stringify the
+	// numeric run metrics at the insert boundary.
+	await db.insert(runs).values({
 		id,
 		workspace_id: opts.workspaceId,
 		version_id: opts.versionId,
@@ -473,13 +480,13 @@ export const recordRun = async (opts: RecordRunOptions): Promise<string> => {
 		is_error: opts.isError,
 		is_test: opts.isTest ?? false,
 		is_stream: opts.isStream,
-		pre_processing_time: opts.preProcessingTime,
-		first_token_time: opts.firstTokenTime,
-		response_time: opts.responseTime,
+		pre_processing_time: String(opts.preProcessingTime),
+		first_token_time: String(opts.firstTokenTime),
+		response_time: String(opts.responseTime),
 		...(opts.usage
 			? {
-					tokens: opts.usage.totalTokens,
-					cost: calculateModelCost(opts.modelId, opts.usage),
+					tokens: String(opts.usage.totalTokens),
+					cost: String(calculateModelCost(opts.modelId, opts.usage)),
 				}
 			: {}),
 	});

@@ -1,11 +1,12 @@
 import type { FastifyInstance } from "fastify";
-import { supabase } from "../lib/db.js";
+import { sql } from "../lib/pg.js";
 import { requireScope } from "../lib/scopes.js";
 
 // The dashboard is run analytics, so it reads at `runs:read:*` (held by every
 // workspace role), same as the runs list. Aggregation is delegated to the
 // `get_dashboard_stats` / `get_top_agents` Postgres functions so it happens
-// DB-side rather than over a capped row fetch.
+// DB-side rather than over a capped row fetch. Both functions `RETURNS json`, so
+// each query yields a single row whose `data` column is the already-parsed JSON.
 
 const ErrorSchema = {
 	type: "object" as const,
@@ -57,19 +58,21 @@ export async function registerDashboardRoutes(fastify: FastifyInstance) {
 				end_date?: string;
 			};
 
-			const { data, error } = await supabase.rpc("get_dashboard_stats", {
-				p_workspace_id: workspaceId,
-				p_start_date: start_date,
-				p_end_date: end_date,
-			});
+			try {
+				const rows = await sql`
+					select get_dashboard_stats(
+						${workspaceId},
+						${start_date ?? null},
+						${end_date ?? null}
+					) as data
+				`;
 
-			if (error) {
+				return reply.send({ data: rows[0]?.data ?? null });
+			} catch {
 				return reply
 					.code(500)
 					.send({ message: "Failed to compute dashboard stats" });
 			}
-
-			return reply.send({ data });
 		},
 	});
 
@@ -120,20 +123,22 @@ export async function registerDashboardRoutes(fastify: FastifyInstance) {
 				limit?: number;
 			};
 
-			const { data, error } = await supabase.rpc("get_top_agents", {
-				p_workspace_id: workspaceId,
-				p_start_date: start_date,
-				p_end_date: end_date,
-				p_limit: limit ?? 5,
-			});
+			try {
+				const rows = await sql`
+					select get_top_agents(
+						${workspaceId},
+						${start_date ?? null},
+						${end_date ?? null},
+						${limit ?? 5}
+					) as data
+				`;
 
-			if (error) {
+				return reply.send({ data: rows[0]?.data ?? [] });
+			} catch {
 				return reply
 					.code(500)
 					.send({ message: "Failed to compute top agents" });
 			}
-
-			return reply.send({ data });
 		},
 	});
 }

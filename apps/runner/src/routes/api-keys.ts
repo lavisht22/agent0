@@ -1,6 +1,8 @@
+import { apiKeys } from "@repo/database";
+import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { customAlphabet, nanoid } from "nanoid";
-import { supabase } from "../lib/db.js";
+import { db } from "../lib/pg.js";
 import { requireScope, requireUserId } from "../lib/scopes.js";
 
 // API keys are an admin-only resource for the whole workspace — including reads,
@@ -14,8 +16,29 @@ const ADMIN_SCOPE = "api_keys:write:*";
 // Keys are minted server-side so the secret never round-trips from the client.
 const generateKey = customAlphabet("abcdefghijklmnopqrstuvwxyz1234567890", 21);
 
-const SELECT_COLUMNS =
-	"id, key, name, scopes, allowed_origins, user_id, workspace_id, created_at";
+const apiKeyColumns = {
+	id: apiKeys.id,
+	key: apiKeys.key,
+	name: apiKeys.name,
+	scopes: apiKeys.scopes,
+	allowed_origins: apiKeys.allowed_origins,
+	user_id: apiKeys.user_id,
+	workspace_id: apiKeys.workspace_id,
+	created_at: apiKeys.created_at,
+};
+
+function toApiKey(row: {
+	id: string;
+	key: string;
+	name: string;
+	scopes: string[];
+	allowed_origins: string[] | null;
+	user_id: string;
+	workspace_id: string;
+	created_at: string;
+}) {
+	return { ...row, created_at: new Date(row.created_at).toISOString() };
+}
 
 const ApiKeySchema = {
 	type: "object" as const,
@@ -73,17 +96,17 @@ export async function registerApiKeysRoutes(fastify: FastifyInstance) {
 		handler: async (request, reply) => {
 			const { workspaceId } = request.params as { workspaceId: string };
 
-			const { data, error } = await supabase
-				.from("api_keys")
-				.select(SELECT_COLUMNS)
-				.eq("workspace_id", workspaceId)
-				.order("created_at", { ascending: false });
+			try {
+				const data = await db
+					.select(apiKeyColumns)
+					.from(apiKeys)
+					.where(eq(apiKeys.workspace_id, workspaceId))
+					.orderBy(desc(apiKeys.created_at));
 
-			if (error) {
+				return reply.send({ data: data.map(toApiKey) });
+			} catch {
 				return reply.code(500).send({ message: "Failed to fetch API keys" });
 			}
-
-			return reply.send({ data });
 		},
 	});
 
@@ -134,25 +157,28 @@ export async function registerApiKeysRoutes(fastify: FastifyInstance) {
 			// `requireUserId` guarantees a user-kind principal, so `userId` is set.
 			const userId = request.userId as string;
 
-			const { data, error } = await supabase
-				.from("api_keys")
-				.insert({
-					id: nanoid(),
-					key: generateKey(),
-					name: trimmedName,
-					workspace_id: workspaceId,
-					user_id: userId,
-					scopes: cleanScopes(body.scopes),
-					allowed_origins: normalizeOrigins(body.allowed_origins),
-				})
-				.select(SELECT_COLUMNS)
-				.single();
+			try {
+				const [data] = await db
+					.insert(apiKeys)
+					.values({
+						id: nanoid(),
+						key: generateKey(),
+						name: trimmedName,
+						workspace_id: workspaceId,
+						user_id: userId,
+						scopes: cleanScopes(body.scopes),
+						allowed_origins: normalizeOrigins(body.allowed_origins),
+					})
+					.returning(apiKeyColumns);
 
-			if (error || !data) {
+				if (!data) {
+					return reply.code(500).send({ message: "Failed to create API key" });
+				}
+
+				return reply.code(201).send({ data: toApiKey(data) });
+			} catch {
 				return reply.code(500).send({ message: "Failed to create API key" });
 			}
-
-			return reply.code(201).send({ data });
 		},
 	});
 
@@ -205,7 +231,7 @@ export async function registerApiKeysRoutes(fastify: FastifyInstance) {
 
 			// The key, owner, and workspace are immutable — only name/scopes/origins
 			// are editable.
-			const updates: Record<string, unknown> = {};
+			const updates: Partial<typeof apiKeys.$inferInsert> = {};
 			if (body.name !== undefined) {
 				const trimmedName = body.name.trim();
 				if (trimmedName.length === 0) {
@@ -224,22 +250,37 @@ export async function registerApiKeysRoutes(fastify: FastifyInstance) {
 				return reply.code(400).send({ message: "No updates provided" });
 			}
 
-			const { data, error } = await supabase
-				.from("api_keys")
-				.update(updates)
-				.eq("id", apiKeyId)
-				.eq("workspace_id", workspaceId)
-				.select(SELECT_COLUMNS)
-				.maybeSingle();
-
-			if (error) {
+			let data:
+				| {
+						id: string;
+						key: string;
+						name: string;
+						scopes: string[];
+						allowed_origins: string[] | null;
+						user_id: string;
+						workspace_id: string;
+						created_at: string;
+				  }
+				| undefined;
+			try {
+				[data] = await db
+					.update(apiKeys)
+					.set(updates)
+					.where(
+						and(
+							eq(apiKeys.id, apiKeyId),
+							eq(apiKeys.workspace_id, workspaceId),
+						),
+					)
+					.returning(apiKeyColumns);
+			} catch {
 				return reply.code(500).send({ message: "Failed to update API key" });
 			}
 			if (!data) {
 				return reply.code(404).send({ message: "API key not found" });
 			}
 
-			return reply.send({ data });
+			return reply.send({ data: toApiKey(data) });
 		},
 	});
 
@@ -268,16 +309,21 @@ export async function registerApiKeysRoutes(fastify: FastifyInstance) {
 				apiKeyId: string;
 			};
 
-			const { error, count } = await supabase
-				.from("api_keys")
-				.delete({ count: "exact" })
-				.eq("id", apiKeyId)
-				.eq("workspace_id", workspaceId);
-
-			if (error) {
+			let deleted: { id: string }[];
+			try {
+				deleted = await db
+					.delete(apiKeys)
+					.where(
+						and(
+							eq(apiKeys.id, apiKeyId),
+							eq(apiKeys.workspace_id, workspaceId),
+						),
+					)
+					.returning({ id: apiKeys.id });
+			} catch {
 				return reply.code(500).send({ message: "Failed to delete API key" });
 			}
-			if (count === 0) {
+			if (deleted.length === 0) {
 				return reply.code(404).send({ message: "API key not found" });
 			}
 
