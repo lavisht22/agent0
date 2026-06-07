@@ -12,11 +12,11 @@ import {
 } from "ai";
 import { eq } from "drizzle-orm";
 import { cachedQuery } from "./cache.js";
-import { supabase } from "./db.js";
 import { vertexAnthropicCacheMiddleware } from "./middleware.js";
 import { decryptMessage } from "./openpgp.js";
 import { db } from "./pg.js";
 import { getAIProvider } from "./providers.js";
+import { runLogStore } from "./storage.js";
 import type {
 	Environment,
 	MCPConfig,
@@ -402,17 +402,5 @@ export const applySkillCatalog = (
 };
 
 export const uploadRunData = async (id: string, data: unknown) => {
-	const jsonString = JSON.stringify(data);
-
-	const { data: uploadData, error } = await supabase.storage
-		.from("runs-data")
-		.upload(`${id}`, jsonString, {
-			contentType: "application/json",
-		});
-
-	if (error) {
-		throw error;
-	}
-
-	return uploadData;
+	await runLogStore.put(id, data);
 };
