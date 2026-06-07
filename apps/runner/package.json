@@ -7,8 +7,7 @@
 		"dev": "tsx watch src/index.ts",
 		"prebuild": "pnpm --filter @repo/models --filter @repo/database build",
 		"build": "tsc",
-		"start": "node dist/index.js",
-		"reencrypt-configs": "tsx scripts/reencrypt-configs.ts"
+		"start": "node dist/index.js"
 	},
 	"dependencies": {
 		"@ai-sdk/amazon-bedrock": "^4.0.108",
@@ -31,14 +30,12 @@
 		"drizzle-orm": "^0.45.2",
 		"fastify": "^5.6.2",
 		"nanoid": "^5.1.6",
-		"openpgp": "^6.2.2",
 		"postgres": "^3.4.9",
 		"resend": "^6.12.4",
 		"zod": "^4.1.12"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.2.4",
-		"@openpgp/web-stream-tools": "^0.3.0",
 		"@types/json-schema": "^7.0.15",
 		"@types/node": "^22.19.1",
 		"tsx": "^4.20.6",
