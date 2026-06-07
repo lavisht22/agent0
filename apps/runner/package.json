@@ -6,8 +6,9 @@
 		"predev": "pnpm --filter @repo/models --filter @repo/database build",
 		"dev": "tsx watch src/index.ts",
 		"prebuild": "pnpm --filter @repo/models --filter @repo/database build",
-		"build": "tsc && cp src/lib/openpgp.js src/lib/openpgp.d.ts dist/lib/",
-		"start": "node dist/index.js"
+		"build": "tsc",
+		"start": "node dist/index.js",
+		"reencrypt-configs": "tsx scripts/reencrypt-configs.ts"
 	},
 	"dependencies": {
 		"@ai-sdk/amazon-bedrock": "^4.0.108",
@@ -17,13 +18,13 @@
 		"@ai-sdk/mcp": "^1.0.43",
 		"@ai-sdk/openai": "^3.0.65",
 		"@ai-sdk/xai": "^3.0.92",
+		"@aws-sdk/client-s3": "^3.1063.0",
 		"@fastify/cors": "^11.1.0",
 		"@fastify/static": "^8.3.0",
 		"@fastify/swagger": "^9.7.0",
 		"@fastify/swagger-ui": "^5.2.5",
 		"@repo/database": "workspace:*",
 		"@repo/models": "workspace:*",
-		"@supabase/supabase-js": "^2.84.0",
 		"ai": "^6.0.191",
 		"better-auth": "^1.6.14",
 		"dotenv": "^17.2.3",

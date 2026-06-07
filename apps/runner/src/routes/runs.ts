@@ -12,11 +12,11 @@ import { and, desc, eq, gte, lte } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
 import { sumUsage } from "../lib/cost.js";
-import { supabase } from "../lib/db.js";
 import { createSSEStream } from "../lib/helpers.js";
 import { db } from "../lib/pg.js";
 import { prepareRun, RunPrepError, recordRun } from "../lib/run-agent.js";
 import { hasScope, requireScope } from "../lib/scopes.js";
+import { runLogStore } from "../lib/storage.js";
 import type { RunOverrides } from "../lib/types.js";
 
 // Columns shared by the list + detail run queries. The two joined `agent_*`
@@ -322,16 +322,9 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				return reply.code(404).send({ message: "Run not found" });
 			}
 
-			// Download run data (steps, request, error details, usage) from storage
-			let runData = null;
-			const { data: blob, error: storageError } = await supabase.storage
-				.from("runs-data")
-				.download(`${runId}`);
-
-			if (!storageError && blob) {
-				const text = await blob.text();
-				runData = JSON.parse(text);
-			}
+			// Fetch run data (steps, request, error details, usage) from storage;
+			// null if it has been cleaned up.
+			const runData = await runLogStore.get(runId);
 
 			return reply.send({
 				data: {

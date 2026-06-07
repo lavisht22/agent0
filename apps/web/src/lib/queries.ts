@@ -107,15 +107,15 @@ export const providersQuery = (workspaceId: string) =>
 		enabled: !!workspaceId,
 	});
 
-// Config blobs are PGP-encrypted in the browser; the API only ever sees the
-// armored ciphertext. `encrypted_data_staging: null` clears the staging override.
+// Config is sent as plaintext over TLS; the runner encrypts it at rest.
+// `data_staging: null` clears the staging override.
 export async function createProvider(
 	workspaceId: string,
 	input: {
 		name: string;
 		type: string;
-		encrypted_data_production: string;
-		encrypted_data_staging: string | null;
+		data_production: string;
+		data_staging: string | null;
 	},
 ) {
 	const { data } = await api.post<{ data: Provider }>(
@@ -127,7 +127,7 @@ export async function createProvider(
 }
 
 // Partial update: omit a field to leave it untouched. Pass
-// `encrypted_data_staging: null` to clear the staging override. The runner
+// `data_staging: null` to clear the staging override. The runner
 // stamps `updated_at`, so the caller never sends it.
 export async function updateProvider(
 	workspaceId: string,
@@ -135,8 +135,8 @@ export async function updateProvider(
 	input: {
 		name?: string;
 		type?: string;
-		encrypted_data_production?: string;
-		encrypted_data_staging?: string | null;
+		data_production?: string;
+		data_staging?: string | null;
 	},
 ) {
 	const { data } = await api.patch<{ data: Provider }>(
@@ -176,14 +176,14 @@ export const mcpsQuery = (workspaceId: string) =>
 		enabled: !!workspaceId,
 	});
 
-// Config blobs are PGP-encrypted in the browser; the API only sees ciphertext.
+// Config is sent as plaintext over TLS; the runner encrypts it at rest.
 // `custom_headers` is a comma-separated header-name list (the runner trims it).
 export async function createMcp(
 	workspaceId: string,
 	input: {
 		name: string;
-		encrypted_data_production: string;
-		encrypted_data_staging: string | null;
+		data_production: string;
+		data_staging: string | null;
 		custom_headers: string;
 	},
 ) {
@@ -196,15 +196,15 @@ export async function createMcp(
 }
 
 // Partial update; omit a field to leave it untouched, pass
-// `encrypted_data_staging: null` to clear the staging override. The runner
+// `data_staging: null` to clear the staging override. The runner
 // stamps `updated_at`.
 export async function updateMcp(
 	workspaceId: string,
 	mcpId: string,
 	input: {
 		name?: string;
-		encrypted_data_production?: string;
-		encrypted_data_staging?: string | null;
+		data_production?: string;
+		data_staging?: string | null;
 		custom_headers?: string;
 	},
 ) {

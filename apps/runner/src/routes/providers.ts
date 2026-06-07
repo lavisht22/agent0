@@ -2,13 +2,13 @@ import { providers } from "@repo/database";
 import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
+import { encryptSecret } from "../lib/crypto.js";
 import { db } from "../lib/pg.js";
 import { requireScope, requireUserId } from "../lib/scopes.js";
 
-// Provider config arrives already encrypted (PGP-armored) from the client; these
-// endpoints only ever persist the opaque blobs. Decryption happens solely on the
-// run path (helpers.ts), so create/update never see plaintext.
-// `encrypted_data_production` is never selected (write-only).
+// Provider config arrives as plaintext over TLS; the runner encrypts it
+// (AES-256-GCM, lib/crypto.ts) before persisting and only decrypts on the run
+// path (helpers.ts). `encrypted_data_production` is never selected (write-only).
 const providerColumns = {
 	id: providers.id,
 	name: providers.name,
@@ -97,14 +97,14 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 				properties: {
 					name: { type: "string" as const, minLength: 1 },
 					type: { type: "string" as const, minLength: 1 },
-					encrypted_data_production: { type: "string" as const, minLength: 1 },
-					encrypted_data_staging: {
+					data_production: { type: "string" as const, minLength: 1 },
+					data_staging: {
 						type: "string" as const,
 						minLength: 1,
 						nullable: true,
 					},
 				},
-				required: ["name", "type", "encrypted_data_production"],
+				required: ["name", "type", "data_production"],
 				additionalProperties: false,
 			},
 			response: {
@@ -118,13 +118,12 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 		},
 		handler: async (request, reply) => {
 			const { workspaceId } = request.params as { workspaceId: string };
-			const { name, type, encrypted_data_production, encrypted_data_staging } =
-				request.body as {
-					name: string;
-					type: string;
-					encrypted_data_production: string;
-					encrypted_data_staging?: string | null;
-				};
+			const { name, type, data_production, data_staging } = request.body as {
+				name: string;
+				type: string;
+				data_production: string;
+				data_staging?: string | null;
+			};
 
 			const trimmedName = name.trim();
 			if (trimmedName.length === 0) {
@@ -139,8 +138,9 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 						workspace_id: workspaceId,
 						name: trimmedName,
 						type,
-						encrypted_data_production,
-						encrypted_data_staging: encrypted_data_staging ?? null,
+						encrypted_data_production: encryptSecret(data_production),
+						encrypted_data_staging:
+							data_staging != null ? encryptSecret(data_staging) : null,
 					})
 					.returning(providerColumns);
 
@@ -170,9 +170,9 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 				properties: {
 					name: { type: "string" as const, minLength: 1 },
 					type: { type: "string" as const, minLength: 1 },
-					encrypted_data_production: { type: "string" as const, minLength: 1 },
+					data_production: { type: "string" as const, minLength: 1 },
 					// null clears the staging override; omitting leaves it untouched.
-					encrypted_data_staging: {
+					data_staging: {
 						type: "string" as const,
 						minLength: 1,
 						nullable: true,
@@ -198,8 +198,8 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 			const body = request.body as {
 				name?: string;
 				type?: string;
-				encrypted_data_production?: string;
-				encrypted_data_staging?: string | null;
+				data_production?: string;
+				data_staging?: string | null;
 			};
 
 			const updates: Partial<typeof providers.$inferInsert> = {};
@@ -211,11 +211,12 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 				updates.name = trimmedName;
 			}
 			if (body.type !== undefined) updates.type = body.type;
-			if (body.encrypted_data_production !== undefined) {
-				updates.encrypted_data_production = body.encrypted_data_production;
+			if (body.data_production !== undefined) {
+				updates.encrypted_data_production = encryptSecret(body.data_production);
 			}
-			if (body.encrypted_data_staging !== undefined) {
-				updates.encrypted_data_staging = body.encrypted_data_staging;
+			if (body.data_staging !== undefined) {
+				updates.encrypted_data_staging =
+					body.data_staging === null ? null : encryptSecret(body.data_staging);
 			}
 
 			if (Object.keys(updates).length === 0) {

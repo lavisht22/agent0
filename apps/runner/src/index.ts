@@ -46,9 +46,9 @@ await fastify.register(cors, {
 // that the session cookie is httpOnly (an injected script can't read the token,
 // and CSP makes injecting one much harder). It permits what our bundle actually
 // needs: Monaco loads its editor + blob workers from the jsdelivr CDN and uses
-// eval for its tokenizer (which also covers openpgp's wasm), and HeroUI / React
-// Aria inject inline styles. Tightening to nonces + a locally-bundled Monaco
-// (dropping 'unsafe-eval' and the CDN) is a possible follow-up.
+// eval for its tokenizer, and HeroUI / React Aria inject inline styles.
+// Tightening to nonces + a locally-bundled Monaco (dropping 'unsafe-eval' and
+// the CDN) is a possible follow-up.
 const CONTENT_SECURITY_POLICY = [
 	"default-src 'self'",
 	"script-src 'self' 'unsafe-eval' blob: https://cdn.jsdelivr.net",

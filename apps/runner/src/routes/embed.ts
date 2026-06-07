@@ -2,7 +2,7 @@ import { providers } from "@repo/database";
 import { embed, embedMany } from "ai";
 import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
-import { decryptMessage } from "../lib/openpgp.js";
+import { decryptSecret } from "../lib/crypto.js";
 import { db } from "../lib/pg.js";
 import { getAIProvider } from "../lib/providers.js";
 import { requireScope } from "../lib/scopes.js";
@@ -62,7 +62,7 @@ async function getProvider(
 			? provider.encrypted_data_staging
 			: provider.encrypted_data_production;
 
-	const decrypted = await decryptMessage(encrypted);
+	const decrypted = decryptSecret(encrypted);
 	const config = JSON.parse(decrypted);
 	const aiProvider = getAIProvider(provider.type, config);
 
