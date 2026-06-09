@@ -2,8 +2,8 @@ import { emailOTPClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
 /**
- * better-auth client. The session is an httpOnly cookie (Phase 2 step 9) — the
- * token never touches JS, so there is nothing here to store or read. The browser
+ * better-auth client. The session is an httpOnly cookie — the token never
+ * touches JS, so there is nothing here to store or read. The browser
  * is same-origin with the runner (prod serves the SPA; dev proxies through Vite),
  * so the cookie flows on every request with no CORS involvement.
  */

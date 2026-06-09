@@ -9,7 +9,7 @@ import { auth } from "../lib/auth/index.js";
  *
  * Sessions ride an httpOnly cookie. The browser app is same-origin (the runner
  * serves the SPA in prod; a Vite proxy makes dev same-origin), so the cookie
- * flows without any credentialed-CORS dance. Phase 2.
+ * flows without any credentialed-CORS dance.
  */
 export async function registerBetterAuthRoutes(fastify: FastifyInstance) {
 	fastify.route({

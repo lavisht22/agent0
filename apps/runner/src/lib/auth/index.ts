@@ -6,28 +6,25 @@ import { db } from "../pg.js";
 import { sendSignInOtp } from "./email.js";
 
 /**
- * better-auth instance — Phase 2 of the Supabase -> self-contained migration.
+ * better-auth instance.
  *
  * Scope: this handles ONLY the browser-session credential — email-OTP login plus
- * an opaque, DB-backed session delivered as an **httpOnly cookie** (Phase 2
- * step 9: the session token never touches JS, so an XSS can't exfiltrate it).
- * The browser and runner are same-origin (the runner serves the SPA in prod; a
- * Vite proxy makes dev same-origin too), so cookies flow without CORS. PATs
- * (`x-pat`) and machine API keys (`x-api-key`) stay on agent0's own tables and
- * are resolved in lib/auth.ts; better-auth is not involved in those two paths.
+ * an opaque, DB-backed session delivered as an **httpOnly cookie** (the session
+ * token never touches JS, so an XSS can't exfiltrate it). The browser and runner
+ * are same-origin (the runner serves the SPA in prod; a Vite proxy makes dev
+ * same-origin too), so cookies flow without CORS. PATs (`x-pat`) and machine API
+ * keys (`x-api-key`) stay on agent0's own tables and are resolved in lib/auth.ts;
+ * better-auth is not involved in those two paths.
  *
- * Storage: the same Supabase Postgres as the rest of the app, via the Drizzle
- * connection in lib/pg.ts. The user model maps to the existing `users` table —
- * `usePlural: true` plus the adapter's default snake_case naming already line up
- * with our columns (`email_verified`, `created_at`, `updated_at`), so no field
- * overrides are needed. New users get UUID ids (`generateId: "uuid"`) to match
- * the existing rows' scheme, keeping every `user_id` FK homogeneous.
+ * Storage: the app's Postgres, via the Drizzle connection in lib/pg.ts. The user
+ * model maps to the existing `users` table — `usePlural: true` plus the adapter's
+ * default snake_case naming already line up with our columns (`email_verified`,
+ * `created_at`, `updated_at`), so no field overrides are needed. New users get
+ * UUID ids (`generateId: "uuid"`) to match the existing rows' scheme, keeping
+ * every `user_id` FK homogeneous.
  *
  * The adapter `schema` is the shared `authSchema` from `@repo/database` (the
- * users/sessions/accounts/verifications subset of the full Drizzle schema,
- * relocated there in Phase 3 from the runner-local CLI-generated copy). The
- * sessions/accounts/verifications tables are created in Supabase migration
- * 20260605130000.
+ * users/sessions/accounts/verifications subset of the full Drizzle schema).
  */
 export const auth = betterAuth({
 	baseURL: process.env.APP_URL,
