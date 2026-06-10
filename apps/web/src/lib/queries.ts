@@ -1,4 +1,4 @@
-import type { Json, Tables } from "@repo/database";
+import type { Json, tags } from "@repo/database";
 import { queryOptions } from "@tanstack/react-query";
 import {
 	computeDateRangeFromPreset,
@@ -9,7 +9,7 @@ import { getCachedSession } from "./auth-client";
 import type { RunData } from "./types";
 
 export type Tag = Pick<
-	Tables<"tags">,
+	typeof tags.$inferSelect,
 	"id" | "name" | "color" | "workspace_id"
 >;
 

@@ -24,7 +24,7 @@ It provides a comprehensive platform to build, run, test, and monitor AI agents 
 - **Framework**: [Fastify](https://fastify.dev/)
 
 ### Database
-- **Database**: [Supabase](https://supabase.com/)
+- **Database**: [PostgreSQL](https://www.postgresql.org/) with [Drizzle ORM](https://orm.drizzle.team/)
 
 ## Project Structure
 
@@ -80,7 +80,7 @@ This command will start both the web application and the runner in development m
 
 ## Database Setup
 
-The project uses Supabase as the database. The schema is currently evolving and will be checked into the repository once it reaches a stable state.
+The project uses PostgreSQL. The schema lives in `packages/database/schema.ts` (Drizzle, the single source of truth); SQL migrations are generated from it with `pnpm --filter @repo/database generate` and applied with `pnpm --filter @repo/database migrate` against `DATABASE_URL`.
 
 ## License
 

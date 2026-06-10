@@ -26,7 +26,6 @@ pnpm --filter runner build     # tsc + copy openpgp files
 # Database (packages/database) — schema.ts is the source of truth; Drizzle Kit owns migrations
 pnpm --filter @repo/database generate   # diff schema.ts → emit a SQL migration under drizzle/
 pnpm --filter @repo/database migrate     # apply pending migrations to DATABASE_URL
-pnpm --filter @repo/database types       # regenerate database.types.ts (legacy, still Supabase-linked)
 
 # SDK (packages/agent0)
 pnpm --filter agent0 build    # tsc
@@ -36,14 +35,14 @@ pnpm --filter agent0 build    # tsc
 
 Monorepo managed with pnpm workspaces. Four packages:
 
-- **apps/web** — React SPA (Vite, TanStack Router with file-based routing, HeroUI, Tailwind CSS). Talks directly to Supabase for data and to the runner for agent execution.
+- **apps/web** — React SPA (Vite, TanStack Router with file-based routing, HeroUI, Tailwind CSS). Talks to the runner's HTTP API for all data and agent execution.
 - **apps/runner** — Fastify server that hosts the built SPA and exposes `/api/v1/workspaces/:workspaceId/runs`, `/api/v1/test`, `/api/v1/embed`, `/api/v1/refresh-mcp`, and `/api/v1/invite` endpoints. Uses the Vercel AI SDK with multiple provider adapters (OpenAI, Google, XAI, Azure, Bedrock, Vertex). Handles MCP tool integration via `@ai-sdk/mcp`.
-- **packages/database** — Supabase schema migrations and auto-generated TypeScript types (`database.types.ts`). Imported as `@repo/database` by other packages.
+- **packages/database** — Drizzle schema (`schema.ts`, the single source of truth) and the SQL migrations Drizzle Kit generates from it under `drizzle/`. Imported as `@repo/database` by other packages. Exposes table objects (use `typeof table.$inferSelect`/`$inferInsert` for row types) and a `Json` helper type.
 - **packages/agent0** — TypeScript SDK for calling the agent0 API programmatically. Published as `agent0`.
 
 ### Key data flow
 
-1. Frontend fetches agent config from Supabase, sends run requests to `/api/v1/workspaces/:workspaceId/runs`
+1. Frontend fetches agent config from the runner API, sends run requests to `/api/v1/workspaces/:workspaceId/runs`
 2. Runner validates API key, loads agent version, decrypts provider credentials (OpenPGP), initializes AI provider
 3. Variable substitution applied to agent messages, MCP tools loaded dynamically
 4. Response returned as SSE stream or complete JSON

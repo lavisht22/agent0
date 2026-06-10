@@ -9,5 +9,5 @@
 		"strict": true,
 		"skipLibCheck": true
 	},
-	"include": ["index.ts", "schema.ts", "database.types.ts"]
+	"include": ["index.ts", "schema.ts", "migrate.ts"]
 }

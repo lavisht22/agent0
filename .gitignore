@@ -28,9 +28,6 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Supabase (Optional, if you download CLI locally)
-supabase/tmp
-
 
 count.txt
 .nitro
