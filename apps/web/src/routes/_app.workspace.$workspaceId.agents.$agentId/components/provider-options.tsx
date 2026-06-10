@@ -9,9 +9,6 @@ import {
 	TextField,
 } from "@heroui/react";
 
-/**
- * Provider-specific options type matching the form schema.
- */
 type GoogleVertexOptionsValue = {
 	thinkingConfig?: {
 		thinkingBudget?: number;
@@ -203,10 +200,7 @@ function GoogleVertexOptions({
 	);
 }
 
-/**
- * Provider-specific options UI for reasoning/thinking configuration.
- * Shows different options based on the provider type.
- */
+// Reasoning/thinking options; the visible controls depend on provider type.
 export function ProviderOptions({
 	providerType,
 	value,
@@ -225,7 +219,6 @@ export function ProviderOptions({
 		<>
 			<Separator className="my-2" />
 
-			{/* OpenAI / Azure reasoning options */}
 			{(providerType === "openai" || providerType === "azure") && (
 				<>
 					<Select
@@ -308,7 +301,6 @@ export function ProviderOptions({
 				</>
 			)}
 
-			{/* xAI reasoning effort */}
 			{providerType === "xai" && (
 				<Select
 					placeholder="Not set"
@@ -348,7 +340,6 @@ export function ProviderOptions({
 				</Select>
 			)}
 
-			{/* Google / Vertex thinking config */}
 			{(providerType === "google" || providerType === "google-vertex") && (
 				<GoogleVertexOptions
 					optionsKey={providerType === "google-vertex" ? "vertex" : "google"}

@@ -3,10 +3,6 @@ import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import type { XaiProviderOptions } from "@ai-sdk/xai";
 import type { LanguageModelUsage, ModelMessage, StepResult, ToolSet } from "ai";
 
-// /**
-//  * Provider-specific options for reasoning/thinking configuration.
-//  * Each provider has its own format for controlling reasoning behavior.
-//  */
 export type ProviderOptions = {
 	openai?: OpenAIResponsesProviderOptions;
 	xai?: XaiProviderOptions;
@@ -14,20 +10,13 @@ export type ProviderOptions = {
 	vertex?: GoogleGenerativeAIProviderOptions;
 };
 
-/**
- * A tool from an MCP server.
- */
 export type MCPTool = {
 	type: "mcp";
 	mcp_id: string;
 	name: string;
 };
 
-/**
- * A custom tool defined by the developer.
- * Custom tools have title, description, and inputSchema but no execute function.
- * The LLM will generate tool calls for these, but execution must be handled externally.
- */
+/** Client-executed tool: the LLM emits calls, execution happens externally. */
 export type CustomTool = {
 	type: "custom";
 	title: string;
@@ -36,31 +25,20 @@ export type CustomTool = {
 };
 
 /**
- * Another agent in the same workspace exposed as a tool. When the model calls
- * it, the runner executes the referenced agent's deployed version in-process
- * (see runAgent) and returns its text output. The model passes a single
- * free-form `prompt` string as the sub-agent's input.
+ * Another agent in the same workspace exposed as a tool. The runner executes the
+ * referenced agent's deployed version in-process (see runAgent), passing a single
+ * free-form `prompt` string as input, and returns its text output.
  */
 export type AgentTool = {
 	type: "agent";
-	/** The agent to invoke. Must belong to the same workspace. */
 	agent_id: string;
-	/** Tool name surfaced to the calling model (e.g. "research_assistant"). */
 	name: string;
-	/** When/why to call this agent — the calling model reasons over this. */
 	description: string;
 };
 
-/**
- * A tool can be from an MCP server, a custom (client-executed) tool, or another
- * agent exposed as a tool.
- */
 export type ToolDefinition = MCPTool | CustomTool | AgentTool;
 
-/**
- * A skill embedded inside the agent version. Versioned along with the rest
- * of the agent's config — no separate table.
- */
+/** Embedded in the agent version (versioned with it; no separate table). */
 export type Skill = {
 	id: string;
 	name: string;

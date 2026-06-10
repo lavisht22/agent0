@@ -47,7 +47,6 @@ export function Action({
 
 	const isLoading = isSubmitting || isMutationPending;
 
-	// Check if current version is deployed to each environment
 	const isDeployedToStaging = agent?.staging_version_id === versionId;
 	const isDeployedToProduction = agent?.production_version_id === versionId;
 

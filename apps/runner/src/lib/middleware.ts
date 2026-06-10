@@ -1,9 +1,7 @@
 import type { LanguageModelMiddleware } from "ai";
 
-// Mark the last prompt message as an Anthropic cache breakpoint so the
-// provider reuses everything up to that point on subsequent calls within
-// the 1-hour ephemeral cache window. Applied on the Vertex Anthropic
-// path where `anthropic.cacheControl` maps straight to the raw API block.
+// Mark the last prompt message as an Anthropic cache breakpoint so the provider
+// reuses everything up to it within the 1-hour ephemeral cache window.
 export const vertexAnthropicCacheMiddleware: LanguageModelMiddleware = {
 	specificationVersion: "v3",
 	transformParams: async ({ params }) => {

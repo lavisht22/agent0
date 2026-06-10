@@ -11,10 +11,8 @@ import {
 	type ToolsByEnv,
 } from "./refresh-mcp.js";
 
-// MCP config arrives as plaintext over TLS; the runner encrypts it (AES-256-GCM,
-// lib/crypto.ts) before persisting and only decrypts on the run path. `tools` is
-// populated separately by the refresh endpoint below, never on create/update.
-// `encrypted_data_production` is never selected (write-only).
+// `encrypted_data_production` is never selected (write-only); `tools` is
+// populated only by the refresh endpoint, never on create/update.
 const mcpColumns = {
 	id: mcps.id,
 	name: mcps.name,

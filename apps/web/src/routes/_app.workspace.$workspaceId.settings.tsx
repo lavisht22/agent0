@@ -56,7 +56,6 @@ function SettingsPage() {
 		null,
 	);
 
-	// Workspace Name Mutation
 	const updateWorkspaceNameMutation = useMutation({
 		mutationFn: (name: string) => updateWorkspace(workspaceId, name),
 		onSuccess: () => {
@@ -68,7 +67,6 @@ function SettingsPage() {
 		},
 	});
 
-	// Delete Workspace Mutation
 	const deleteWorkspaceMutation = useMutation({
 		mutationFn: () => deleteWorkspace(workspaceId),
 		onSuccess: () => {
@@ -83,7 +81,6 @@ function SettingsPage() {
 		},
 	});
 
-	// Remove Member Mutation
 	const removeMemberMutation = useMutation({
 		mutationFn: (userId: string) => removeWorkspaceMember(workspaceId, userId),
 		onSuccess: () => {
@@ -218,7 +215,6 @@ function SettingsPage() {
 
 					<Separator />
 
-					{/* Danger Zone */}
 					<div className="flex items-end justify-between">
 						<div>
 							<p className="text-sm font-medium">Delete Workspace</p>
@@ -232,7 +228,6 @@ function SettingsPage() {
 						</Button>
 					</div>
 
-					{/* Modals */}
 					<ConfirmationModal
 						isOpen={deleteWorkspaceState.isOpen}
 						onOpenChange={deleteWorkspaceState.setOpen}

@@ -30,7 +30,6 @@ export function MonacoJsonEditor({
 	const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
 	const [editorHeight, setEditorHeight] = useState(minHeight);
 
-	// Determine Monaco theme based on app theme
 	const monacoTheme = useMemo(() => {
 		if (appTheme === "dark") return "vs-dark";
 		if (appTheme === "light") return "vs";
@@ -43,7 +42,6 @@ export function MonacoJsonEditor({
 		return "vs";
 	}, [appTheme]);
 
-	// Update editor height based on content
 	const updateEditorHeight = useCallback(() => {
 		if (editorRef.current) {
 			const contentHeight = editorRef.current.getContentHeight();
@@ -52,25 +50,21 @@ export function MonacoJsonEditor({
 		}
 	}, [minHeight]);
 
-	// Handle editor mount
 	const handleEditorMount: OnMount = useCallback(
 		(editor) => {
 			editorRef.current = editor;
 
 			if (fillHeight) return;
 
-			// Update height on content change
 			editor.onDidContentSizeChange(() => {
 				updateEditorHeight();
 			});
 
-			// Initial height adjustment
 			updateEditorHeight();
 		},
 		[updateEditorHeight, fillHeight],
 	);
 
-	// Handle content change
 	const handleChange = useCallback(
 		(newValue: string | undefined) => {
 			if (!onValueChange || !newValue) return;

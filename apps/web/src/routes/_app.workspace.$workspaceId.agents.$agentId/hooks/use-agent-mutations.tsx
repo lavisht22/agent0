@@ -87,7 +87,6 @@ export const useAgentMutations = ({
 		},
 	});
 
-	// Deploy mutation - deploys a version to an environment (staging or production)
 	const deployMutation = useMutation({
 		mutationFn: ({
 			version_id,

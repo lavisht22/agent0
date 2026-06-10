@@ -44,13 +44,9 @@ async function request<T>(
 	path: string,
 	options: RequestOptions = {},
 ): Promise<T> {
-	// The runner authenticates browser callers via the httpOnly session cookie,
-	// which the browser attaches automatically (same-origin). A request made
-	// while logged out simply comes back 401 → ApiError below.
-	// Only send a JSON body (and its Content-Type) when there is one. Setting
-	// `Content-Type: application/json` on a bodyless request (e.g. DELETE) makes
-	// Fastify reject it with "Body cannot be empty when content-type is set to
-	// 'application/json'".
+	// The httpOnly session cookie is attached automatically (same-origin).
+	// Only send Content-Type when there's a body — Fastify rejects a bodyless
+	// request that declares `application/json`.
 	const hasBody = options.body !== undefined;
 	const response = await fetch(buildUrl(path, options.query), {
 		method,

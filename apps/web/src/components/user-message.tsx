@@ -75,7 +75,6 @@ function UserMessagePart({
 	}
 
 	if (value.type === "image") {
-		// Construct the image src from base64 or URL
 		const imageSrc = value.image.startsWith("data:")
 			? value.image
 			: value.image.startsWith("http")
@@ -89,7 +88,6 @@ function UserMessagePart({
 					alt="Preview"
 					className="max-w-full max-h-full h-48 object-contain"
 					onError={(e) => {
-						// Show placeholder on error
 						e.currentTarget.style.display = "none";
 					}}
 				/>
@@ -157,7 +155,6 @@ export function UserMessage({
 		return Array.from(new Set(vars));
 	}, [value.content]);
 
-	// Convert file to base64
 	const fileToBase64 = (file: File): Promise<string> => {
 		return new Promise((resolve, reject) => {
 			const reader = new FileReader();
@@ -172,7 +169,6 @@ export function UserMessage({
 		});
 	};
 
-	// Handle file upload
 	const handleFileUpload = async (
 		event: React.ChangeEvent<HTMLInputElement>,
 	) => {
@@ -183,7 +179,6 @@ export function UserMessage({
 			const base64Data = await fileToBase64(file);
 			const newContent = [...value.content];
 
-			// Detect if it's an image based on MIME type
 			if (file.type.startsWith("image/")) {
 				newContent.push({
 					type: "image",
@@ -203,13 +198,11 @@ export function UserMessage({
 			console.error("Error converting file to base64:", error);
 		}
 
-		// Reset file input
 		if (fileInputRef.current) {
 			fileInputRef.current.value = "";
 		}
 	};
 
-	// Handle embed modal submit
 	const handleEmbedSubmit = () => {
 		const newContent = [...value.content];
 
@@ -329,7 +322,6 @@ export function UserMessage({
 				</Card>
 			</Reorder.Item>
 
-			{/* Hidden file input for upload */}
 			<input
 				ref={fileInputRef}
 				type="file"
@@ -337,7 +329,6 @@ export function UserMessage({
 				onChange={handleFileUpload}
 			/>
 
-			{/* Embed Modal */}
 			<Modal>
 				<Modal.Backdrop
 					isOpen={isEmbedModalOpen}

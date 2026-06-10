@@ -8,16 +8,11 @@ import { db } from "./pg.js";
 import { scopesForRole } from "./scopes.js";
 
 /**
- * One principal, many credentials. Every authenticator below normalizes its
- * credential (browser session, PAT, API key) into this single shape; route
- * handlers depend only on `principal.scopes` (and, for mutations, `kind`),
- * never on *how* the caller authenticated.
- *
- *   - `kind: "user"`   — a human identity. Browser session (better-auth httpOnly
- *     cookie) or PAT (`agent0_pat_…`). Scopes are resolved per-request from the
- *     user's current `workspace_user.role` against the path's workspace.
- *   - `kind: "apiKey"` — a machine identity. Workspace-pinned, fixed scopes,
- *     optional origin allowlist. No user.
+ * Every authenticator normalizes its credential into this single shape; route
+ * handlers depend only on `principal.scopes` (and, for mutations, `kind`).
+ *   - `kind: "user"`   — human identity (browser session or PAT); scopes resolved
+ *     per-request from the user's current workspace role.
+ *   - `kind: "apiKey"` — machine identity; workspace-pinned, fixed scopes.
  */
 export type Principal =
 	| { kind: "user"; userId: string; tokenId?: string; scopes: string[] }
@@ -34,11 +29,7 @@ declare module "fastify" {
 	}
 }
 
-/**
- * Narrow the request's principal to the user kind. Safe to call only after
- * `requireUserId` (or an equivalent guard) has run; it throws otherwise, which
- * surfaces a misconfigured route as a 500 rather than a silent `undefined`.
- */
+/** Throws unless a `requireUserId`-style guard has already run. */
 export function userPrincipal(
 	request: FastifyRequest,
 ): Extract<Principal, { kind: "user" }> {
@@ -53,23 +44,14 @@ function sha256Hex(input: string): string {
 	return createHash("sha256").update(input).digest("hex");
 }
 
-/**
- * Outcome of an authenticator. On failure the authenticator has already sent a
- * reply (so the caller just `return`s); on success it yields a `Principal`.
- */
+// On failure the authenticator has already sent a reply (caller just `return`s).
 type AuthResult = { ok: true; principal: Principal } | { ok: false };
 
 /**
- * Resolve a user's effective scopes for the request's target workspace.
- *
- * The workspace a request targets is taken from the `:workspaceId` path param
- * (see the prefix block in routes/index.ts), not from the credential. Shared by
- * the browser-session and PAT authenticators so both derive identical scopes.
- *
- * Returns the scopes, or `null` if the user isn't a member of the path's
- * workspace (a 403 has already been sent). On unscoped routes (no path param —
- * e.g. /api/v1/me) the membership check is skipped and scopes default to empty;
- * routes there must not depend on `scopes` for resource access.
+ * The target workspace comes from the `:workspaceId` path param, not the
+ * credential. Returns `null` (after sending a 403) if the user isn't a member.
+ * On unscoped routes (no path param) scopes default to empty, so those routes
+ * must not depend on `scopes` for resource access.
  */
 async function resolveUserScopes(
 	request: FastifyRequest,
@@ -83,9 +65,8 @@ async function resolveUserScopes(
 		return [];
 	}
 
-	// Resolve the user's current role in this workspace. A user-kind credential
-	// is only as powerful as the holder's role — demote a user and their browser
-	// sessions and PATs lose access on the next request.
+	// A user-kind credential is only as powerful as the holder's current role —
+	// demote a user and their sessions and PATs lose access on the next request.
 	try {
 		const [membership] = await db
 			.select({ role: workspaceUser.role })
@@ -112,13 +93,6 @@ async function resolveUserScopes(
 	}
 }
 
-/**
- * Browser session → `kind: "user"`. Validates the better-auth session from the
- * httpOnly cookie and derives scopes from the user's current workspace role.
- * This is the fallback authenticator — it runs whenever the request carries
- * neither `x-pat` nor `x-api-key`, i.e. it's the browser app. `getSession`
- * reads the session cookie out of the forwarded request headers.
- */
 async function authenticateBrowserSession(
 	request: FastifyRequest,
 	reply: FastifyReply,
@@ -142,12 +116,6 @@ async function authenticateBrowserSession(
 	return { ok: true, principal: { kind: "user", userId, scopes } };
 }
 
-/**
- * PAT → `kind: "user"`. Looks up the hashed token, checks revocation/expiry,
- * then resolves scopes from the holder's current workspace role. Selected when
- * the `x-pat` header is present — a dedicated transport that keeps PATs cleanly
- * distinct from browser sessions (Bearer) and machine keys (`x-api-key`).
- */
 async function authenticatePat(
 	request: FastifyRequest,
 	reply: FastifyReply,
@@ -200,9 +168,7 @@ async function authenticatePat(
 		return { ok: false };
 	}
 
-	// Fire-and-forget last-used bump. Drizzle queries are lazy, so call
-	// `.execute()` to actually run it, and swallow errors to keep it
-	// non-blocking (a failed bump must never fail the request).
+	// Fire-and-forget last-used bump; swallow errors so it never fails the request.
 	void db
 		.update(personalAccessTokens)
 		.set({ last_used_at: new Date().toISOString() })
@@ -216,11 +182,6 @@ async function authenticatePat(
 	};
 }
 
-/**
- * API key → `kind: "apiKey"`. Workspace-pinned machine identity on the distinct
- * `x-api-key` header. 403s if the path's workspace differs from the key's pinned
- * workspace, and enforces the origin allowlist when configured.
- */
 async function authenticateApiKey(
 	request: FastifyRequest,
 	reply: FastifyReply,
@@ -284,23 +245,13 @@ async function authenticateApiKey(
 }
 
 /**
- * Registers authentication on the given Fastify instance.
+ * Dispatch is a pure header check, with the browser cookie session as fallback:
+ *   1. `x-pat`     → PAT     → kind "user"
+ *   2. `x-api-key` → API key → kind "apiKey"
+ *   3. otherwise   → browser session (httpOnly cookie) → kind "user"
  *
- * The middleware is an ordered list of authenticators (Passport-style
- * strategies); the credential present on the request selects which one runs,
- * and the winner is normalized to a single `Principal`. Dispatch is a pure
- * header check, with the browser cookie session as the fallback:
- *
- *   1. `x-pat: <token>`   → PAT                          → kind "user"
- *   2. `x-api-key: <key>` → API key                      → kind "apiKey"
- *   3. otherwise          → browser session (httpOnly cookie, better-auth) → kind "user"
- *
- * If a credential is present but invalid/expired/revoked, the request is
- * rejected — we do not fall through to a later authenticator, since silently
- * masking token issues would be confusing.
- *
- * Per-route scope checks: see `requireScope` / `checkScope` in ./scopes.js.
- * Mutating endpoints should chain `requireUserId` to keep API keys out.
+ * A credential that is present but invalid/expired/revoked is rejected outright;
+ * we never fall through to a later authenticator.
  *
  * Call this directly on a scoped instance — not via fastify.register().
  */
@@ -325,12 +276,9 @@ export function addAuth(fastify: FastifyInstance) {
 			} else if (apiKey) {
 				result = await authenticateApiKey(request, reply, apiKey);
 			} else {
-				// No PAT and no API key → the caller is the browser app, identified
-				// by its httpOnly better-auth session cookie (read inside getSession).
 				result = await authenticateBrowserSession(request, reply);
 			}
 
-			// Authenticator already sent the failure reply.
 			if (!result.ok) {
 				return;
 			}

@@ -8,15 +8,13 @@ import { api } from "./api-client";
 import { getCachedSession } from "./auth-client";
 import type { RunData } from "./types";
 
-// The runner's tags endpoints return this subset of the full row.
 export type Tag = Pick<
 	Tables<"tags">,
 	"id" | "name" | "color" | "workspace_id"
 >;
 
-// The runner returns a flat per-membership view (the caller's role in each
-// workspace), not the nested member roster the old direct query embedded.
-// Member rosters now come from `membersQuery`.
+// Flat per-membership view (the caller's role in each workspace); member
+// rosters come from `membersQuery`.
 export type Workspace = {
 	id: string;
 	name: string;
@@ -75,7 +73,6 @@ export async function deleteWorkspace(workspaceId: string) {
 	await api.delete(`/api/v1/workspaces/${workspaceId}`);
 }
 
-// Remove a member (admin) or leave the workspace (self).
 export async function removeWorkspaceMember(
 	workspaceId: string,
 	userId: string,
@@ -83,8 +80,7 @@ export async function removeWorkspaceMember(
 	await api.delete(`/api/v1/workspaces/${workspaceId}/members/${userId}`);
 }
 
-// The runner derives `has_staging_config` from the encrypted blob and never
-// returns the blobs themselves on the list/CRUD endpoints.
+// `has_staging_config` is derived server-side; the encrypted blobs are never returned.
 export type Provider = {
 	id: string;
 	name: string;
@@ -107,7 +103,6 @@ export const providersQuery = (workspaceId: string) =>
 		enabled: !!workspaceId,
 	});
 
-// Config is sent as plaintext over TLS; the runner encrypts it at rest.
 // `data_staging: null` clears the staging override.
 export async function createProvider(
 	workspaceId: string,
@@ -126,9 +121,7 @@ export async function createProvider(
 	return data;
 }
 
-// Partial update: omit a field to leave it untouched. Pass
-// `data_staging: null` to clear the staging override. The runner
-// stamps `updated_at`, so the caller never sends it.
+// Omit a field to leave it untouched; `data_staging: null` clears the override.
 export async function updateProvider(
 	workspaceId: string,
 	providerId: string,
@@ -151,8 +144,7 @@ export async function deleteProvider(workspaceId: string, providerId: string) {
 	await api.delete(`/api/v1/workspaces/${workspaceId}/providers/${providerId}`);
 }
 
-// `tools` is populated by the refresh endpoint, never on create/update;
-// `has_staging_config` is derived from the (never-returned) encrypted blob.
+// `tools` is populated by the refresh endpoint, never on create/update.
 export type Mcp = {
 	id: string;
 	name: string;
@@ -176,8 +168,7 @@ export const mcpsQuery = (workspaceId: string) =>
 		enabled: !!workspaceId,
 	});
 
-// Config is sent as plaintext over TLS; the runner encrypts it at rest.
-// `custom_headers` is a comma-separated header-name list (the runner trims it).
+// `custom_headers` is a comma-separated header-name list.
 export async function createMcp(
 	workspaceId: string,
 	input: {
@@ -195,9 +186,7 @@ export async function createMcp(
 	return data;
 }
 
-// Partial update; omit a field to leave it untouched, pass
-// `data_staging: null` to clear the staging override. The runner
-// stamps `updated_at`.
+// Omit a field to leave it untouched; `data_staging: null` clears the override.
 export async function updateMcp(
 	workspaceId: string,
 	mcpId: string,
@@ -220,8 +209,7 @@ export async function deleteMcp(workspaceId: string, mcpId: string) {
 	await api.delete(`/api/v1/workspaces/${workspaceId}/mcps/${mcpId}`);
 }
 
-// The runner derives the model summaries server-side from the deployed versions'
-// data, so the list no longer ships the full prompt blob per agent.
+// Model summaries are derived server-side; the list omits the full prompt blob.
 export type Agent = {
 	id: string;
 	name: string;
@@ -234,8 +222,6 @@ export type Agent = {
 	updated_at: string;
 };
 
-// Versions list is lightweight (no prompt data); fetch a single version's detail
-// when the editor needs its `data`.
 export type AgentVersionSummary = {
 	id: string;
 	agent_id: string;
@@ -250,8 +236,7 @@ export const agentsLiteQuery = (workspaceId: string) =>
 	queryOptions({
 		queryKey: ["agents-lite", workspaceId],
 		queryFn: async () => {
-			// Pickers/filters want the whole list; the runner caps at 100/page,
-			// which covers typical workspaces.
+			// Pickers want the whole list; the runner caps at 100/page.
 			const { data } = await api.get<{ data: Agent[] }>(
 				`/api/v1/workspaces/${workspaceId}/agents`,
 				{ query: { limit: 100 } },
@@ -296,8 +281,6 @@ export const agentsQuery = (
 	queryOptions({
 		queryKey: ["agents", workspaceId, page, search, tagIds],
 		queryFn: async () => {
-			// The runner does the ALL-tags filtering server-side from a
-			// comma-separated tag_ids list.
 			const { data } = await api.get<{ data: Agent[] }>(
 				`/api/v1/workspaces/${workspaceId}/agents`,
 				{
@@ -342,8 +325,7 @@ export const agentVersionsQuery = (workspaceId: string, agentId: string) =>
 		enabled: !!agentId,
 	});
 
-// Single version with its full prompt `data` — fetched on demand when the
-// editor selects a version (the versions list omits data for a lighter payload).
+// Single version with its full prompt `data` (the versions list omits data).
 export const agentVersionQuery = (
 	workspaceId: string,
 	agentId: string,
@@ -374,8 +356,7 @@ export async function deleteAgent(workspaceId: string, agentId: string) {
 	await api.delete(`/api/v1/workspaces/${workspaceId}/agents/${agentId}`);
 }
 
-// Rename / deploy a version / replace the tag set. Omit a field to leave it
-// untouched; `tag_ids` replaces the full set.
+// Omit a field to leave it untouched; `tag_ids` replaces the full set.
 export async function updateAgent(
 	workspaceId: string,
 	agentId: string,
@@ -394,8 +375,6 @@ export async function updateAgent(
 	return data;
 }
 
-// Push a new prompt version (optionally deploying it). Returns the full version
-// including its `data`.
 export async function createAgentVersion(
 	workspaceId: string,
 	agentId: string,
@@ -411,8 +390,7 @@ export async function createAgentVersion(
 	return version;
 }
 
-// API keys are an admin-only resource; the row holds the plaintext `key` (only
-// shown once on create, redacted thereafter in the list).
+// Admin-only; the plaintext `key` is shown once on create, redacted in the list.
 export type ApiKey = {
 	id: string;
 	key: string;
@@ -437,8 +415,7 @@ export const apiKeysQuery = (workspaceId: string) =>
 		enabled: !!workspaceId,
 	});
 
-// The runner mints the key server-side and sets the owner from the caller; an
-// empty `allowed_origins` is normalized to null ("any origin"). The returned row
+// Empty `allowed_origins` is normalized to null ("any origin"). The returned row
 // carries the plaintext `key` for the one-time reveal.
 export async function createApiKey(
 	workspaceId: string,
@@ -470,8 +447,7 @@ export async function deleteApiKey(workspaceId: string, apiKeyId: string) {
 	await api.delete(`/api/v1/workspaces/${workspaceId}/api-keys/${apiKeyId}`);
 }
 
-// PATs are user-bound, not workspace-bound — the runner scopes every op to the
-// caller's own tokens, so these paths carry no workspaceId.
+// PATs are user-bound, not workspace-bound, so these paths carry no workspaceId.
 export type PersonalAccessToken = {
 	id: string;
 	name: string;
@@ -493,8 +469,7 @@ export const personalAccessTokensQuery = queryOptions({
 	},
 });
 
-// The runner mints the token (hash + prefix persisted server-side) and returns
-// the raw secret exactly once, alongside the new row's metadata.
+// The raw secret is returned exactly once, alongside the new row's metadata.
 export async function createPersonalAccessToken(name: string) {
 	const { data } = await api.post<{
 		data: PersonalAccessToken & { token: string };
@@ -503,13 +478,11 @@ export async function createPersonalAccessToken(name: string) {
 	return data;
 }
 
-// Soft delete (sets revoked_at) scoped to the caller's own tokens.
 export async function revokePersonalAccessToken(tokenId: string) {
 	await api.delete(`/api/v1/personal-access-tokens/${tokenId}`);
 }
 
-// The runner flattens the version/agent embed to a single `agent` ref and (on
-// the detail endpoint) inlines the run-log blob as `run_data`.
+// The detail endpoint inlines the run-log blob as `run_data`.
 export type RunListItem = {
 	id: string;
 	version_id: string | null;
@@ -539,8 +512,7 @@ export const runsQuery = (
 	status?: "success" | "failed",
 ) =>
 	queryOptions({
-		// Use preset key or custom dates in the query key for stability
-		// When using a preset, the key stays stable even if time passes
+		// Keying on the preset (not resolved dates) keeps the key stable as time passes.
 		queryKey: [
 			"runs",
 			workspaceId,
@@ -552,8 +524,7 @@ export const runsQuery = (
 			status,
 		],
 		queryFn: async () => {
-			// Compute date range at query time. For presets, this ensures we always
-			// query with fresh dates.
+			// Resolve presets at query time so they always use fresh dates.
 			let dateRange: { from: string; to: string } | null = null;
 			if (dateFilter.datePreset) {
 				dateRange = computeDateRangeFromPreset(dateFilter.datePreset);
@@ -606,8 +577,7 @@ export const childRunsQuery = (
 				{ query: { parent_run_id: parentRunId } },
 			);
 
-			// The runner returns newest-first; sub-runs read better in call order
-			// (oldest-first), matching the old ascending sort.
+			// Runner returns newest-first; sub-runs read better in call order.
 			return [...data].reverse();
 		},
 		enabled: !!workspaceId && !!parentRunId,
@@ -617,8 +587,7 @@ export const workspaceUserQuery = (workspaceId: string) =>
 	queryOptions({
 		queryKey: ["workspace-user", workspaceId],
 		queryFn: async () => {
-			// Identity (id + email) comes from the better-auth session; role +
-			// display name come from the members API.
+			// Identity comes from the session; role + display name from the members API.
 			const session = await getCachedSession();
 
 			if (!session?.user?.id) throw new Error("User not found");
@@ -655,7 +624,6 @@ export const dashboardStatsQuery = (
 				: { from: dateFilter.startDate, to: dateFilter.endDate },
 		],
 		queryFn: async () => {
-			// Compute date range
 			let dateRange: { from: string; to: string } | null = null;
 			if (dateFilter.datePreset) {
 				dateRange = computeDateRangeFromPreset(dateFilter.datePreset);
@@ -663,8 +631,6 @@ export const dashboardStatsQuery = (
 				dateRange = { from: dateFilter.startDate, to: dateFilter.endDate };
 			}
 
-			// The runner proxies the get_dashboard_stats Postgres function so the
-			// aggregation still happens DB-side (no 1000-row cap).
 			const { data: stats } = await api.get<{
 				data: {
 					total_runs: number;
@@ -719,7 +685,6 @@ export const topAgentsQuery = (
 				: { from: dateFilter.startDate, to: dateFilter.endDate },
 		],
 		queryFn: async () => {
-			// Compute date range
 			let dateRange: { from: string; to: string } | null = null;
 			if (dateFilter.datePreset) {
 				dateRange = computeDateRangeFromPreset(dateFilter.datePreset);
@@ -727,8 +692,6 @@ export const topAgentsQuery = (
 				dateRange = { from: dateFilter.startDate, to: dateFilter.endDate };
 			}
 
-			// The runner proxies the get_top_agents Postgres function (DB-side
-			// aggregation, no 1000-row cap).
 			const { data } = await api.get<{
 				data: Array<{
 					id: string;

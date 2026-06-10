@@ -2,15 +2,9 @@ import type { IncomingHttpHeaders } from "node:http";
 import { fromNodeHeaders } from "better-auth/node";
 
 /**
- * Convert Node request headers to a Web `Headers` for better-auth, stripping
- * HTTP/2 pseudo-headers first.
- *
- * Under HTTP/2 (e.g. behind the production proxy/load balancer) Node surfaces
- * pseudo-headers like `:method`, `:path`, `:scheme`, `:authority` in
- * `request.headers`. The Web `Headers` API rejects any name starting with `:`,
- * so passing them straight to `fromNodeHeaders` throws:
- *   `Headers.set: ":method" is an invalid header name.`
- * HTTP/1.1 (local dev) has no pseudo-headers, which is why this only bit prod.
+ * Convert Node request headers to a Web `Headers` for better-auth. Under HTTP/2
+ * Node surfaces pseudo-headers (`:method`, `:path`, …) that the Web `Headers`
+ * API rejects, so they must be stripped before `fromNodeHeaders`.
  */
 export function toWebHeaders(headers: IncomingHttpHeaders): Headers {
 	const filtered: IncomingHttpHeaders = {};

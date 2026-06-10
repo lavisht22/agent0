@@ -2,12 +2,9 @@ import type { FastifyInstance } from "fastify";
 import { sql } from "../lib/pg.js";
 import { requireScope } from "../lib/scopes.js";
 
-// The dashboard is run analytics, so it reads at `runs:read:*` (held by every
-// workspace role), same as the runs list. Aggregation is delegated to the
-// `get_dashboard_stats` / `get_top_agents` Postgres functions so it happens
-// DB-side rather than over a capped row fetch. Both functions `RETURNS json`, so
-// each query yields a single row whose `data` column is the already-parsed JSON.
-
+// Reads at `runs:read:*` (held by every role). Aggregation is delegated to the
+// `get_dashboard_stats` / `get_top_agents` Postgres functions (both `RETURNS
+// json`), so each query yields one row whose `data` column is parsed JSON.
 const ErrorSchema = {
 	type: "object" as const,
 	properties: {

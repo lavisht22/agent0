@@ -162,7 +162,6 @@ function RouteComponent() {
 			</PageHeader>
 
 			<div className="p-4 space-y-6">
-				{/* Stats Grid */}
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 					<StatCard
 						title="Total Runs"
@@ -199,7 +198,6 @@ function RouteComponent() {
 				</div>
 
 				<div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-					{/* Top Agents */}
 					<Card className="lg:col-span-2">
 						<Card.Header className="flex flex-row w-full items-center justify-between">
 							<div className="flex items-center gap-2">
@@ -278,7 +276,6 @@ function RouteComponent() {
 						</Card.Content>
 					</Card>
 
-					{/* Recent Runs */}
 					<Card className="lg:col-span-2">
 						<Card.Header className="flex flex-row w-full items-center justify-between">
 							<div className="flex items-center gap-2">

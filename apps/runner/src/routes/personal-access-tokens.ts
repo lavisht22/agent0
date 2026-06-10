@@ -7,21 +7,15 @@ import { userPrincipal } from "../lib/auth.js";
 import { db } from "../lib/pg.js";
 import { requireUserId } from "../lib/scopes.js";
 
-// PATs are user-bound, not workspace-bound, so there is no workspace scope to
-// check. Authorization is "a user manages only their own tokens", enforced by
-// filtering every query on the principal's `userId`. `requireUserId`
-// keeps machine API keys out (they have no user identity) while admitting both
-// browser sessions and PATs.
+// PATs are user-bound, not workspace-bound. Authorization is "a user manages
+// only their own tokens", enforced by filtering every query on the principal's
+// `userId`; `requireUserId` keeps machine API keys (no user identity) out.
 
-// Bearer tokens with this prefix are routed to the PAT authenticator
-// (apps/runner/src/lib/auth.ts), so a minted token authenticates as a PAT.
 const TOKEN_PREFIX = "agent0_pat_";
-// Prefix + 4 chars: enough to tell tokens apart in the list without storing the
-// secret itself.
+// Prefix + 4 chars: enough to tell tokens apart in the list without the secret.
 const PREFIX_DISPLAY_LEN = TOKEN_PREFIX.length + 4;
 
-// URL-/shell-safe alphabet (no +, /, =), 32 chars. Minted server-side so the raw
-// secret is never supplied by the caller.
+// URL-/shell-safe alphabet (no +, /, =), minted server-side.
 const tokenRandom = customAlphabet(
 	"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
 	32,
@@ -31,8 +25,7 @@ function sha256Hex(input: string): string {
 	return createHash("sha256").update(input).digest("hex");
 }
 
-// Never expose token_hash. The raw token is only ever returned once, from the
-// create handler.
+// Never expose token_hash; the raw token is returned once, from create.
 const patColumns = {
 	id: personalAccessTokens.id,
 	name: personalAccessTokens.name,
@@ -99,7 +92,6 @@ const ErrorSchema = {
 export async function registerPersonalAccessTokensRoutes(
 	fastify: FastifyInstance,
 ) {
-	// List the caller's own active (non-revoked) tokens.
 	fastify.get("/api/v1/personal-access-tokens", {
 		preHandler: requireUserId,
 		schema: {
@@ -138,7 +130,7 @@ export async function registerPersonalAccessTokensRoutes(
 		},
 	});
 
-	// Mint a new token for the caller. The raw secret is returned exactly once.
+	// The raw secret is returned exactly once.
 	fastify.post("/api/v1/personal-access-tokens", {
 		preHandler: requireUserId,
 		schema: {
@@ -158,7 +150,6 @@ export async function registerPersonalAccessTokensRoutes(
 					properties: {
 						data: {
 							type: "object" as const,
-							// The minted token's metadata plus the raw secret, shown once.
 							properties: {
 								...PatSchema.properties,
 								token: { type: "string" as const },
@@ -205,9 +196,8 @@ export async function registerPersonalAccessTokensRoutes(
 		},
 	});
 
-	// Revoke one of the caller's tokens. Soft delete (sets revoked_at) so audit
-	// history and last_used_at survive. The `user_id` filter is the
-	// authorization: a user can only revoke their own tokens.
+	// Soft delete (sets revoked_at) so audit history survives; the `user_id`
+	// filter is the authorization.
 	fastify.delete("/api/v1/personal-access-tokens/:tokenId", {
 		preHandler: requireUserId,
 		schema: {

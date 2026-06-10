@@ -6,13 +6,7 @@ interface CacheEntry<T> {
 const cache = new Map<string, CacheEntry<unknown>>();
 const inflight = new Map<string, Promise<unknown>>();
 
-/**
- * Generic cached query with in-flight deduplication.
- *
- * - Cache hit (not expired) → returns immediately
- * - Cache miss + no in-flight request → calls fetcher, deduplicates concurrent callers
- * - Cache miss + in-flight request exists → awaits the same promise
- */
+/** Cached query that also deduplicates concurrent callers of the same key. */
 export async function cachedQuery<T>(
 	key: string,
 	ttlMs: number,

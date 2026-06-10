@@ -8,47 +8,40 @@ import fastifySwaggerUi from "@fastify/swagger-ui";
 import Fastify from "fastify";
 import { registerRoutes } from "./routes/index.js";
 
-// ESM fix for __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Enable HTTP/2 (cleartext) when running behind a proxy that needs to propagate
-// client cancellation via RST_STREAM — most notably GCP Cloud Run, whose
-// HTTP/1.1 path silently holds the upstream connection open after the client
-// disconnects, leaving `reply.raw` 'close' events un-fired. With h2c the
-// frontend forwards stream resets immediately, so the abort wiring in routes/
-// actually triggers. Off by default for local dev (browsers / Vite proxy can't
-// talk h2c cleanly without TLS).
+// Enable HTTP/2 (cleartext) behind a proxy that needs to propagate client
+// cancellation via RST_STREAM — notably GCP Cloud Run, whose HTTP/1.1 path holds
+// the upstream connection open after the client disconnects, leaving
+// `reply.raw` 'close' events un-fired. With h2c the abort wiring in routes/
+// actually triggers. Off for local dev (browsers / Vite proxy can't do h2c
+// cleanly without TLS).
 const useHttp2 = process.env.USE_HTTP2 === "true";
 
 const fastify = Fastify({
 	logger: true,
-	bodyLimit: 50 * 1024 * 1024, // 50 MB
+	bodyLimit: 50 * 1024 * 1024,
 	...(useHttp2 ? { http2: true as const } : {}),
 });
 
-// 1. Register Static File Serving
 fastify.register(fastifyStatic, {
-	root: path.join(__dirname, "../public"), // Points to the copied web/dist folder
-	prefix: "/", // Serve at root
+	root: path.join(__dirname, "../public"),
+	prefix: "/",
 });
 
-// Wildcard CORS is for the cross-origin *machine* clients — the embed widget
-// and API-key callers on customer sites. The browser app never relies on it:
-// it's same-origin (prod serves the SPA; dev proxies through Vite), and its
-// session rides a same-origin httpOnly cookie, not a CORS-readable header.
+// Wildcard CORS is for cross-origin *machine* clients — the embed widget and
+// API-key callers on customer sites. The browser app never relies on it: it's
+// same-origin and its session rides a same-origin httpOnly cookie.
 await fastify.register(cors, {
 	origin: "*",
 	methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
 });
 
-// Content-Security-Policy for the SPA document — the primary XSS mitigation now
-// that the session cookie is httpOnly (an injected script can't read the token,
-// and CSP makes injecting one much harder). It permits what our bundle actually
-// needs: Monaco loads its editor + blob workers from the jsdelivr CDN and uses
-// eval for its tokenizer, and HeroUI / React Aria inject inline styles.
-// Tightening to nonces + a locally-bundled Monaco (dropping 'unsafe-eval' and
-// the CDN) is a possible follow-up.
+// CSP for the SPA document — the primary XSS mitigation now that the session
+// cookie is httpOnly. Permits what the bundle needs: Monaco loads its editor +
+// blob workers from jsdelivr and uses eval for its tokenizer; HeroUI / React
+// Aria inject inline styles.
 const CONTENT_SECURITY_POLICY = [
 	"default-src 'self'",
 	"script-src 'self' 'unsafe-eval' blob: https://cdn.jsdelivr.net",
@@ -64,13 +57,11 @@ const CONTENT_SECURITY_POLICY = [
 ].join("; ");
 
 fastify.addHook("onSend", async (request, reply, payload) => {
-	// Cheap, universally-safe headers on every response.
 	reply.header("X-Content-Type-Options", "nosniff");
 	reply.header("Referrer-Policy", "no-referrer");
 
 	// CSP + anti-framing only on the SPA document — not the JSON API, and not the
-	// Swagger UI at /api/v1/docs (which ships its own inline init script this
-	// policy would block).
+	// Swagger UI at /api/v1/docs (whose inline init script this policy would block).
 	const contentType = reply.getHeader("content-type");
 	const isHtml =
 		typeof contentType === "string" && contentType.includes("text/html");
@@ -82,19 +73,15 @@ fastify.addHook("onSend", async (request, reply, payload) => {
 	return payload;
 });
 
-// 2. Catch-all for SPA (Single Page App) Routing
-// If a user goes to /prompts/edit/123, Fastify shouldn't 404, it should serve index.html
+// Serve index.html for non-API paths so client-side routing handles deep links.
 fastify.setNotFoundHandler((req, reply) => {
 	if (req.raw.url?.startsWith("/api")) {
-		// If it's an actual API 404, return JSON
 		reply.code(404).send({ error: "API endpoint not found" });
 	} else {
-		// Otherwise, return the App (Client-side routing handles the rest)
 		reply.sendFile("index.html");
 	}
 });
 
-// 3. Register Swagger
 await fastify.register(fastifySwagger, {
 	openapi: {
 		info: {
@@ -130,7 +117,6 @@ await fastify.register(fastifySwaggerUi, {
 	routePrefix: "/api/v1/docs",
 });
 
-// 4. Register API Routes
 await registerRoutes(fastify);
 
 const start = async () => {

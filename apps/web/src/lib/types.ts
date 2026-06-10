@@ -1,18 +1,12 @@
 import type { LanguageModelUsage, StepResult, ToolSet } from "ai";
 import type { MessageT } from "@/components/messages";
 
-/**
- * MCP Tool - tool from an MCP server
- */
 export type MCPTool = {
 	type: "mcp";
 	mcp_id: string;
 	name: string;
 };
 
-/**
- * Custom Tool - defined inline by the developer
- */
 export type CustomTool = {
 	type: "custom";
 	title: string;
@@ -20,10 +14,8 @@ export type CustomTool = {
 	inputSchema?: Record<string, unknown>;
 };
 
-/**
- * Agent Tool - another agent in the same workspace exposed as a tool. The
- * runner executes the referenced agent's deployed version and returns its text.
- */
+// Another agent in the same workspace exposed as a tool; the runner executes its
+// deployed version and returns the text.
 export type AgentTool = {
 	type: "agent";
 	agent_id: string;

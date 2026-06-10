@@ -6,9 +6,7 @@ import { encryptSecret } from "../lib/crypto.js";
 import { db } from "../lib/pg.js";
 import { requireScope, requireUserId } from "../lib/scopes.js";
 
-// Provider config arrives as plaintext over TLS; the runner encrypts it
-// (AES-256-GCM, lib/crypto.ts) before persisting and only decrypts on the run
-// path (helpers.ts). `encrypted_data_production` is never selected (write-only).
+// `encrypted_data_production` is never selected (write-only).
 const providerColumns = {
 	id: providers.id,
 	name: providers.name,

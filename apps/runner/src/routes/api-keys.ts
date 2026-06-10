@@ -6,12 +6,9 @@ import { userPrincipal } from "../lib/auth.js";
 import { db } from "../lib/pg.js";
 import { requireScope, requireUserId } from "../lib/scopes.js";
 
-// API keys are an admin-only resource for the whole workspace — including reads,
-// since each row holds a plaintext `key`. The scope model only expresses
-// "admin-only" as `*:*:*`; any `:read:` scope would also be granted to readers
-// and writers (via `*:read:*`) and leak the keys. So every endpoint here gates on
-// the write scope, matched only by an admin's `*:*:*`. `requireUserId` keeps
-// machine API keys out.
+// Admin-only, including reads (each row holds a plaintext `key`). A `:read:`
+// scope would leak keys to readers/writers via `*:read:*`, so every endpoint
+// gates on the write scope, matched only by an admin's `*:*:*`.
 const ADMIN_SCOPE = "api_keys:write:*";
 
 // Keys are minted server-side so the secret never round-trips from the client.

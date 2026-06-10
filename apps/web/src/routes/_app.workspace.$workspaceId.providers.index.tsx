@@ -32,18 +32,15 @@ function RouteComponent() {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 
-	// Delete confirmation modal state
 	const deleteState = useOverlayState();
 	const [providerToDelete, setProviderToDelete] = useState<{
 		id: string;
 		name: string;
 	} | null>(null);
 
-	// Fetch Providers
 	const { data: providers } = useQuery(providersQuery(workspaceId));
 	const { data: user } = useQuery(workspaceUserQuery(workspaceId));
 
-	// Delete mutation
 	const deleteMutation = useMutation({
 		mutationFn: (providerId: string) => deleteProvider(workspaceId, providerId),
 		onSuccess: () => {

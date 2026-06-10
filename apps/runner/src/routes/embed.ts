@@ -7,32 +7,21 @@ import { db } from "../lib/pg.js";
 import { getAIProvider } from "../lib/providers.js";
 import { requireScope } from "../lib/scopes.js";
 
-/**
- * Model specification for Agent0 embedding requests.
- * Instead of passing an EmbeddingModel instance, pass the provider_id and model name.
- */
+// Embedding requests reference a provider_id + model name instead of a
+// Vercel AI SDK EmbeddingModel instance; the SDK params are otherwise unchanged.
 interface Agent0EmbedModel {
 	provider_id: string;
 	name: string;
 }
 
-/**
- * Embed request body - extends Vercel AI SDK's embed parameters.
- * Only the `model` property is different (using provider_id + name instead of EmbeddingModel).
- */
 type SingleEmbedRequest = Omit<Parameters<typeof embed>[0], "model"> & {
 	model: Agent0EmbedModel;
 };
 
-/**
- * EmbedMany request body - extends Vercel AI SDK's embedMany parameters.
- * Only the `model` property is different (using provider_id + name instead of EmbeddingModel).
- */
 type ManyEmbedRequest = Omit<Parameters<typeof embedMany>[0], "model"> & {
 	model: Agent0EmbedModel;
 };
 
-// Helper to get provider scoped to the authenticated workspace
 async function getProvider(
 	workspaceId: string,
 	providerId: string,
@@ -70,7 +59,6 @@ async function getProvider(
 }
 
 export async function registerEmbedRoutes(fastify: FastifyInstance) {
-	// Single embedding endpoint
 	fastify.post("/embed", {
 		preHandler: requireScope("embeddings:run:*"),
 		schema: {
@@ -130,7 +118,6 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 				environment?: "staging" | "production";
 			};
 
-			// Validate request body
 			if (!body.model?.provider_id || !body.model?.name) {
 				return reply
 					.code(400)
@@ -163,7 +150,7 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 					});
 				}
 
-				// Spread all other options from body, replacing model with the resolved embedding model
+				// Forward the remaining SDK options, swapping in the resolved model.
 				const { model: _, ...restOptions } = body;
 				const embedResult = await embed({
 					...restOptions,
@@ -183,7 +170,6 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 		},
 	});
 
-	// Multiple embeddings endpoint
 	fastify.post("/embed-many", {
 		preHandler: requireScope("embeddings:run:*"),
 		schema: {
@@ -250,7 +236,6 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 				environment?: "staging" | "production";
 			};
 
-			// Validate request body
 			if (!body.model?.provider_id || !body.model?.name) {
 				return reply
 					.code(400)
@@ -289,7 +274,7 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 					});
 				}
 
-				// Spread all other options from body, replacing model with the resolved embedding model
+				// Forward the remaining SDK options, swapping in the resolved model.
 				const { model: _, ...restOptions } = body;
 				const embedResult = await embedMany({
 					...restOptions,
