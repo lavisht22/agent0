@@ -18,9 +18,8 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 		// back to this test run as parent_run_id.
 		const runId = nanoid();
 
-		// Validate the better-auth session (bearer token on the Authorization
-		// header). This /internal route does its own auth — it's registered
-		// outside `addAuth` — but uses the same browser-session credential.
+		// This /internal route is registered outside `addAuth` and validates the
+		// browser session itself.
 		const session = await auth.api.getSession({
 			headers: toWebHeaders(request.headers),
 		});
@@ -47,7 +46,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 
 		const versionData = data as VersionData;
 
-		// Get the provider to check workspace access (also fetch workspace_id for logging)
+		// Resolve the provider's workspace (also used for run logging).
 		const [provider] = await db
 			.select({ workspace_id: providers.workspace_id })
 			.from(providers)
@@ -58,7 +57,6 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			return reply.code(404).send({ message: "Provider not found" });
 		}
 
-		// The provider exists; confirm the caller is a member of its workspace.
 		const [membership] = await db
 			.select({ user_id: workspaceUser.user_id })
 			.from(workspaceUser)
@@ -74,11 +72,9 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			return reply.code(403).send({ message: "Access denied" });
 		}
 
-		// Resolve the agent/version this draft belongs to. An unsaved draft has no
-		// row in agent_versions: we still log the run (so it shows in the dashboard
-		// as a test run), just without a version link, and seed the cycle guard
-		// from the owning agent when we can resolve it. Logging a non-existent
-		// version_id would violate the runs_version_id foreign key.
+		// Unsaved drafts have no agent_versions row; log the run without a version
+		// link (a non-existent version_id would violate the FK) and seed the cycle
+		// guard from the owning agent when resolvable.
 		const [versionRow] = version_id
 			? await db
 					.select({ agent_id: agentVersions.agent_id })
@@ -97,9 +93,6 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			providerOptions,
 		} = versionData;
 
-		// Assemble the runnable pieces from the (possibly unsaved) draft data —
-		// shared with the saved-version path so agent tools, skills, and MCP tools
-		// are wired identically.
 		const { model, modelId, finalMessages, allTools, closeAll, runData } =
 			await assembleRun(versionData, {
 				workspaceId: provider.workspace_id,

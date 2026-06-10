@@ -53,9 +53,6 @@ interface DateRangePickerProps {
 	onValueChange: (value: DateRangeValue) => void;
 }
 
-/**
- * Helper to compute from/to ISO dates based on a preset key
- */
 export function computeDateRangeFromPreset(
 	presetKey: string,
 ): { from: string; to: string } | null {
@@ -101,9 +98,6 @@ export function computeDateRangeFromPreset(
 	};
 }
 
-/**
- * Helper to get display label for custom date range
- */
 function getCustomDateLabel(value: DateRangeValue): string {
 	if (value.startDate && value.endDate) {
 		const start = new Date(value.startDate);
@@ -139,7 +133,6 @@ export function DateRangePicker({
 		return null;
 	}, [value.startDate, value.endDate]);
 
-	// Determine selected key for the Select
 	const selectedKey = value.datePreset || (showCustom ? "custom" : undefined);
 
 	const displayLabel =

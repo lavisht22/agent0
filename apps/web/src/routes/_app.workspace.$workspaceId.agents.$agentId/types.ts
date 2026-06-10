@@ -10,7 +10,6 @@ export const skillSchema = z.object({
 
 export type Skill = z.infer<typeof skillSchema>;
 
-// Zod schema for form validation
 export const agentFormSchema = z.object({
 	model: z.object({
 		provider_id: z.string(),
@@ -23,20 +22,17 @@ export const agentFormSchema = z.object({
 	messages: z.array(messageSchema).min(1, "At least one message is required"),
 	tools: z.array(
 		z.union([
-			// MCP Tool
 			z.object({
 				type: z.literal("mcp").optional(),
 				mcp_id: z.string(),
 				name: z.string(),
 			}),
-			// Custom Tool
 			z.object({
 				type: z.literal("custom"),
 				title: z.string(),
 				description: z.string(),
 				inputSchema: z.record(z.string(), z.unknown()).optional(),
 			}),
-			// Agent Tool — another agent exposed as a tool
 			z.object({
 				type: z.literal("agent"),
 				agent_id: z.string(),

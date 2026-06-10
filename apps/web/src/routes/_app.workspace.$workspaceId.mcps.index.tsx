@@ -25,18 +25,15 @@ function RouteComponent() {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 
-	// Delete confirmation modal state
 	const deleteState = useOverlayState();
 	const [mcpToDelete, setMcpToDelete] = useState<{
 		id: string;
 		name: string;
 	} | null>(null);
 
-	// Fetch MCPs
 	const { data: mcps } = useQuery(mcpsQuery(workspaceId));
 	const { data: user } = useQuery(workspaceUserQuery(workspaceId));
 
-	// Delete mutation
 	const deleteMutation = useMutation({
 		mutationFn: (mcpId: string) => deleteMcp(workspaceId, mcpId),
 		onSuccess: () => {

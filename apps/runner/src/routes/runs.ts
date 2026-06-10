@@ -19,9 +19,8 @@ import { hasScope, requireScope } from "../lib/scopes.js";
 import { runLogStore } from "../lib/storage.js";
 import type { RunOverrides } from "../lib/types.js";
 
-// Columns shared by the list + detail run queries. The two joined `agent_*`
-// columns come from agent_versions → agents and are folded into a nested
-// `agent` object by shapeRun.
+// `agent_*` columns come from agent_versions → agents and are folded into a
+// nested `agent` object by shapeRun.
 const runSelectColumns = {
 	id: runs.id,
 	version_id: runs.version_id,
@@ -39,9 +38,8 @@ const runSelectColumns = {
 	agent_name: agents.name,
 };
 
-// Normalize a joined run row to the API shape: numeric columns back to numbers,
-// timestamps to ISO, and the flat agent_id/agent_name columns into a nested
-// `agent` (null when the run's version is unsaved or since-deleted).
+// Normalize a joined run row to the API shape; `agent` is null when the run's
+// version is unsaved or since-deleted.
 function shapeRun<
 	T extends {
 		agent_id: string | null;
@@ -105,8 +103,6 @@ const RunSummarySchema = {
 		first_token_time: { type: "number" as const },
 		pre_processing_time: { type: "number" as const },
 		created_at: { type: "string" as const, format: "date-time" },
-		// Null for runs whose agent version was never saved/since deleted
-		// (null version_id) — surfaced via a left join.
 		agent: { ...AgentRefSchema, nullable: true },
 	},
 };
@@ -322,8 +318,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				return reply.code(404).send({ message: "Run not found" });
 			}
 
-			// Fetch run data (steps, request, error details, usage) from storage;
-			// null if it has been cleaned up.
+			// Null if the run log has been cleaned up from storage.
 			const runData = await runLogStore.get(runId);
 
 			return reply.send({
@@ -475,13 +470,11 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				mcp_options?: Record<string, { headers?: Record<string, string> }>;
 			};
 
-			// Validate request body
 			if (!agent_id) {
 				return reply.code(400).send({ message: "agent_id is required" });
 			}
 
-			// Scope check (depends on body.agent_id, so done here rather than in a
-			// preHandler).
+			// Inline scope check since the required scope depends on body.agent_id.
 			if (
 				!hasScope(request.principal?.scopes ?? [], `agents:run:${agent_id}`)
 			) {
@@ -492,9 +485,6 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 			const { workspaceId } = request.params as { workspaceId: string };
 
-			// Resolve the agent version, apply overrides/variables, and load the
-			// provider model, tools, and skills. Throws RunPrepError (with an HTTP
-			// code) when the agent or version can't be found.
 			let prepared: Awaited<ReturnType<typeof prepareRun>>;
 			try {
 				prepared = await prepareRun({
@@ -530,7 +520,6 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				runData,
 			} = prepared;
 
-			// Wrap all remaining logic in try-finally to ensure MCP clients are always closed
 			try {
 				const {
 					maxOutputTokens,
@@ -541,7 +530,6 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				} = data;
 
 				if (stream) {
-					// Track if stream completed normally (via onFinish or onError)
 					let streamCompleted = false;
 
 					const controller = new AbortController();
@@ -703,7 +691,6 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 					return reply.send(streamResponse);
 				}
 
-				// Non-streaming path
 				const controller = new AbortController();
 				let completed = false;
 				const collectedSteps: StepResult<ToolSet>[] = [];
@@ -820,9 +807,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 					return reply.code(500).send(error);
 				}
 			} finally {
-				// Ensure MCP clients are always closed for non-streaming path
-				// For streaming, this runs immediately after returning the stream,
-				// but cleanup is handled by onFinish/onError/close handlers
+				// Streaming cleanup is handled by the onFinish/onError/close handlers.
 				if (!stream) {
 					closeAll();
 				}

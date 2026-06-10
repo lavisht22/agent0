@@ -32,12 +32,9 @@ import { MonacoJsonEditor } from "@/components/monaco-json-editor";
 import { agentsLiteQuery, mcpsQuery } from "@/lib/queries";
 import type { AgentTool, CustomTool, MCPTool } from "@/lib/types";
 
-/**
- * Union type for all tools
- */
 type ToolDefinition = MCPTool | CustomTool | AgentTool;
 
-// For backward compatibility, support old format without type field
+// Old tool shape, before the `type` field existed.
 type LegacyTool = { mcp_id: string; name: string };
 type ToolValue = ToolDefinition | LegacyTool;
 
@@ -51,7 +48,6 @@ interface ToolsSectionProps {
 	environment: "staging" | "production";
 }
 
-// Derive a default tool name from an agent name: lowercase, underscores.
 const slugifyToolName = (name: string): string =>
 	name
 		.trim()
@@ -61,9 +57,8 @@ const slugifyToolName = (name: string): string =>
 
 type ToolEntry = { name: string; description: string };
 
-// Read the tools list for the requested environment, accommodating both the
-// new per-env shape `{ production, staging }` and any legacy flat-array rows
-// that pre-date the migration backfill.
+// Tolerates both the per-env shape `{ production, staging }` and legacy
+// flat-array rows.
 const getToolsForEnv = (
 	rawTools: unknown,
 	environment: "staging" | "production",
@@ -82,12 +77,10 @@ const getToolsForEnv = (
 	return byEnv[environment] ?? byEnv.production;
 };
 
-// Helper to normalize tool to new format
 const normalizeTool = (tool: ToolValue): ToolDefinition => {
 	if ("type" in tool) {
 		return tool;
 	}
-	// Convert legacy format to new MCPTool format
 	return {
 		type: "mcp",
 		mcp_id: tool.mcp_id,
@@ -95,17 +88,14 @@ const normalizeTool = (tool: ToolValue): ToolDefinition => {
 	};
 };
 
-// Helper to check if tool is MCP type
 const isMCPTool = (tool: ToolValue): tool is MCPTool | LegacyTool => {
 	return !("type" in tool) || tool.type === "mcp";
 };
 
-// Helper to check if tool is custom type
 const isCustomTool = (tool: ToolValue): tool is CustomTool => {
 	return "type" in tool && tool.type === "custom";
 };
 
-// Helper to check if tool is an agent-as-tool
 const isAgentTool = (tool: ToolValue): tool is AgentTool => {
 	return "type" in tool && tool.type === "agent";
 };
@@ -118,16 +108,12 @@ export default function ToolsSection({
 	isInvalid,
 	environment,
 }: ToolsSectionProps) {
-	// Modal state for adding custom tool
 	const customToolModalState = useOverlayState();
 
-	// Modal state for MCP tool selection
 	const mcpToolModalState = useOverlayState();
 
-	// Modal state for adding/editing an agent-as-tool
 	const agentToolModalState = useOverlayState();
 
-	// Agent tool form state
 	const [agentToolAgentId, setAgentToolAgentId] = useState<string | null>(null);
 	const [agentToolName, setAgentToolName] = useState("");
 	const [agentToolDescription, setAgentToolDescription] = useState("");
@@ -137,10 +123,8 @@ export default function ToolsSection({
 		null,
 	);
 
-	// Search filter for MCP tools
 	const [mcpToolSearch, setMcpToolSearch] = useState("");
 
-	// Custom tool form state
 	const [customToolTitle, setCustomToolTitle] = useState("");
 	const [customToolDescription, setCustomToolDescription] = useState("");
 	const [customToolInputSchema, setCustomToolInputSchema] = useState(
@@ -158,7 +142,6 @@ export default function ToolsSection({
 	);
 	const [inputSchemaError, setInputSchemaError] = useState<string | null>(null);
 
-	// Track the custom tool being edited (null means adding new tool)
 	const [editingCustomTool, setEditingCustomTool] = useState<CustomTool | null>(
 		null,
 	);
@@ -177,7 +160,6 @@ export default function ToolsSection({
 			value.filter((item) => {
 				const normalizedItem = normalizeTool(item);
 
-				// Compare based on type
 				if (normalizedItem.type === "mcp" && normalized.type === "mcp") {
 					return !(
 						normalizedItem.mcp_id === normalized.mcp_id &&
@@ -196,7 +178,6 @@ export default function ToolsSection({
 	};
 
 	const handleAddMCPTool = (mcp_id: string, toolName: string) => {
-		// Check if already added
 		const isAlreadyAdded = value.some((item) => {
 			if (isMCPTool(item)) {
 				const mcpTool = item as { mcp_id: string; name: string };
@@ -240,7 +221,6 @@ export default function ToolsSection({
 			return;
 		}
 
-		// Parse and validate input schema if provided
 		let parsedInputSchema: Record<string, unknown> | undefined;
 		if (customToolInputSchema.trim()) {
 			try {
@@ -258,7 +238,6 @@ export default function ToolsSection({
 			}
 		}
 
-		// Check if a custom tool with this title already exists (excluding the one being edited)
 		const isAlreadyAdded = value.some((item) => {
 			if (isCustomTool(item)) {
 				// When editing, allow the same title if it matches the original
@@ -283,7 +262,6 @@ export default function ToolsSection({
 		};
 
 		if (editingCustomTool) {
-			// Update existing tool
 			onValueChange(
 				value.map((item) => {
 					if (isCustomTool(item) && item.title === editingCustomTool.title) {
@@ -293,11 +271,9 @@ export default function ToolsSection({
 				}),
 			);
 		} else {
-			// Add new tool
 			onValueChange([...value, newTool]);
 		}
 
-		// Reset form and close modal
 		setCustomToolTitle("");
 		setCustomToolDescription("");
 		setCustomToolInputSchema("");
@@ -381,19 +357,16 @@ export default function ToolsSection({
 		agentToolModalState.close();
 	};
 
-	// Get MCP name by id for display purposes
 	const getMcpName = (mcp_id: string) => {
 		const mcp = mcps?.find((m) => m.id === mcp_id);
 		return mcp?.name || mcp_id;
 	};
 
-	// Get agent name by id for display purposes
 	const getAgentName = (agent_id: string) => {
 		const agent = agents?.find((a) => a.id === agent_id);
 		return agent?.name || agent_id;
 	};
 
-	// Get all available MCP tools that are not yet selected
 	const getAvailableMCPTools = () => {
 		const availableTools: {
 			mcp_id: string;
@@ -431,7 +404,6 @@ export default function ToolsSection({
 	const availableMCPTools = getAvailableMCPTools();
 	const hasMCPs = mcps && mcps.length > 0;
 
-	// Separate MCP tools, custom tools, and agent tools from value
 	const mcpTools = value.filter(isMCPTool);
 	const customTools = value.filter(isCustomTool);
 	const agentTools = value.filter(isAgentTool);
@@ -496,7 +468,6 @@ export default function ToolsSection({
 						</p>
 					) : (
 						<div className="flex flex-wrap gap-2">
-							{/* MCP Tools */}
 							{mcpTools.map((tool) => {
 								const mcpTool = tool as { mcp_id: string; name: string };
 								return (
@@ -515,7 +486,6 @@ export default function ToolsSection({
 									</Chip>
 								);
 							})}
-							{/* Custom Tools */}
 							{customTools.map((tool) => (
 								<Chip
 									key={`custom-${tool.title}`}
@@ -533,7 +503,6 @@ export default function ToolsSection({
 									/>
 								</Chip>
 							))}
-							{/* Agent Tools */}
 							{agentTools.map((tool) => (
 								<Chip
 									key={`agent-${tool.name}`}
@@ -558,7 +527,6 @@ export default function ToolsSection({
 				</Card.Content>
 			</Card>
 
-			{/* MCP Tools Modal */}
 			<Drawer state={mcpToolModalState}>
 				<Drawer.Backdrop>
 					<Drawer.Content placement="right">
@@ -593,7 +561,6 @@ export default function ToolsSection({
 											const tools = getToolsForEnv(mcp?.tools, environment);
 
 											const availableMcpTools = tools?.filter((tool) => {
-												// Check if already selected
 												const isSelected = value.some((item) => {
 													if (isMCPTool(item)) {
 														const mcpTool = item as {
@@ -610,7 +577,6 @@ export default function ToolsSection({
 
 												if (isSelected) return false;
 
-												// Apply search filter
 												if (mcpToolSearch.trim()) {
 													const searchLower = mcpToolSearch.toLowerCase();
 													return (
@@ -670,7 +636,6 @@ export default function ToolsSection({
 				</Drawer.Backdrop>
 			</Drawer>
 
-			{/* Custom Tool Modal */}
 			<Drawer state={customToolModalState}>
 				<Drawer.Backdrop>
 					<Drawer.Content placement="right">
@@ -777,7 +742,6 @@ export default function ToolsSection({
 				</Drawer.Backdrop>
 			</Drawer>
 
-			{/* Agent Tool Modal */}
 			<Drawer state={agentToolModalState}>
 				<Drawer.Backdrop>
 					<Drawer.Content placement="right">

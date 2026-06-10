@@ -8,9 +8,6 @@ interface TagChipProps {
 	onClick?: () => void;
 }
 
-/**
- * Converts a hex color to an rgba string with the specified opacity.
- */
 function hexToRgba(hex: string, opacity: number): string {
 	const cleanHex = hex.replace("#", "");
 	const r = parseInt(cleanHex.substring(0, 2), 16);

@@ -13,9 +13,7 @@ const ErrorSchema = {
 };
 
 export async function registerAuthRoutes(fastify: FastifyInstance) {
-	// Identity check for the calling PAT. Used by `agent0 whoami` and by
-	// `agent0 login` to confirm a freshly pasted token works. PAT-only —
-	// API keys have no user identity, so they get a 403 from requireUserId.
+	// PAT-only — API keys have no user identity, so requireUserId 403s them.
 	fastify.get("/api/v1/me", {
 		preHandler: requireUserId,
 		schema: {
@@ -41,7 +39,6 @@ export async function registerAuthRoutes(fastify: FastifyInstance) {
 			},
 		},
 		handler: async (request, reply) => {
-			// requireUserId guarantees a user principal; tokenId is set for PATs.
 			const principal = userPrincipal(request);
 			const userId = principal.userId;
 			const tokenId = principal.tokenId as string;
@@ -69,8 +66,7 @@ export async function registerAuthRoutes(fastify: FastifyInstance) {
 		},
 	});
 
-	// Revoke the calling PAT. Soft delete (sets revoked_at) so audits and
-	// last_used_at survive. Used by `agent0 logout`.
+	// Soft delete (sets revoked_at) so audit history survives.
 	fastify.post("/api/v1/auth/logout", {
 		preHandler: requireUserId,
 		schema: {

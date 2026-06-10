@@ -91,7 +91,6 @@ function RouteComponent() {
 		"staging" | "production"
 	>("staging");
 
-	// Fetch agent
 	const { data: agent } = useQuery({
 		...agentQuery(workspaceId, agentId),
 		enabled: !isNewAgent,
@@ -102,7 +101,6 @@ function RouteComponent() {
 		setName(agent.name);
 	}, [agent]);
 
-	// Fetch available providers
 	const { data: providers } = useQuery(providersQuery(workspaceId));
 
 	// Fetch MCPs (for custom headers in the variables drawer)
@@ -119,7 +117,6 @@ function RouteComponent() {
 		agentVersionQuery(workspaceId, agentId, versionId),
 	);
 
-	// Tags are embedded on the agent now (no separate agent_tags query).
 	const selectedTagIds = agent?.tags.map((t) => t.id) ?? [];
 
 	useEffect(() => {
@@ -157,7 +154,6 @@ function RouteComponent() {
 		environment: testEnvironment,
 	});
 
-	// Initialize TanStack Form
 	const form = useForm({
 		defaultValues: {
 			model: { provider_id: "", name: "" },
@@ -228,7 +224,6 @@ function RouteComponent() {
 		);
 	}, [version, form]);
 
-	// Check for replay data from router state when creating a new agent
 	useEffect(() => {
 		if (!isNewAgent) return;
 
@@ -553,7 +548,6 @@ function RouteComponent() {
 											)}
 										</form.Field>
 
-										{/* Provider-specific options */}
 										<form.Subscribe selector={(state) => state.values.model}>
 											{(model) => {
 												const selectedProvider = providers?.find(

@@ -25,8 +25,7 @@ import type {
 } from "./types.js";
 import { applyVariablesToMessages } from "./variables.js";
 
-// Pick the encrypted config blob for the requested environment, falling back to
-// production when no staging override is configured.
+// Falls back to production when no staging override is configured.
 const pickEncrypted = (
 	row: { encrypted_data_production: unknown; encrypted_data_staging: unknown },
 	environment: Environment,
@@ -37,9 +36,6 @@ const pickEncrypted = (
 	return row.encrypted_data_production as string;
 };
 
-// Resolve the AI provider for a version: fetch the provider row, decrypt
-// credentials for the environment, and instantiate the SDK adapter. The full
-// pipeline is cached for 5 min since credentials change rarely.
 export const resolveProviderModel = async (
 	data: VersionData,
 	environment: Environment,
@@ -48,7 +44,7 @@ export const resolveProviderModel = async (
 
 	const { provider, aiProvider } = await cachedQuery(
 		`provider-resolved:${model.provider_id}:${environment}`,
-		300_000,
+		300_000, // 5 min TTL — credentials change rarely
 		async () => {
 			const [row] = await db
 				.select({
@@ -90,7 +86,6 @@ export const resolveProviderModel = async (
 	};
 };
 
-// Apply per-request variable substitution to the version's messages.
 export const applyMessageVariables = (
 	data: VersionData,
 	variables: Record<string, string>,
@@ -113,16 +108,14 @@ export const prepareMCPServers = async (
 		return { tools: {}, closeAll: () => {} };
 	}
 
-	// Separate MCP tools from custom tools
 	const mcpTools = tools.filter(
 		(tool) => tool.type === "mcp" || !("type" in tool),
 	);
 	const customTools = tools.filter((tool) => tool.type === "custom");
 
-	// Collect unique MCP IDs
 	const mcp_ids: Set<string> = new Set();
 	mcpTools.forEach((tool) => {
-		// Handle both old format (without type) and new format (with type: "mcp")
+		// Tolerates both old (no type) and new (type: "mcp") tool shapes.
 		const mcpTool = tool as { mcp_id: string; name: string };
 		if (mcpTool.mcp_id) {
 			mcp_ids.add(mcpTool.mcp_id);
@@ -131,29 +124,23 @@ export const prepareMCPServers = async (
 
 	const servers: Record<string, { client: MCPClient; tools: Tools }> = {};
 
-	// Only fetch MCP servers if there are MCP tools
 	if (mcp_ids.size > 0) {
-		// Fetch each MCP config individually so they can be cached and deduplicated
 		const mcpIds = Array.from(mcp_ids);
 		const mcpRows = await Promise.all(
 			mcpIds.map((id) =>
-				cachedQuery(
-					`mcp:${id}`,
-					300_000, // 5 min TTL
-					async () => {
-						const [row] = await db
-							.select({
-								id: mcps.id,
-								encrypted_data_production: mcps.encrypted_data_production,
-								encrypted_data_staging: mcps.encrypted_data_staging,
-							})
-							.from(mcps)
-							.where(eq(mcps.id, id))
-							.limit(1);
-						if (!row) throw new Error(`Failed to fetch MCP server ${id}`);
-						return row;
-					},
-				),
+				cachedQuery(`mcp:${id}`, 300_000, async () => {
+					const [row] = await db
+						.select({
+							id: mcps.id,
+							encrypted_data_production: mcps.encrypted_data_production,
+							encrypted_data_staging: mcps.encrypted_data_staging,
+						})
+						.from(mcps)
+						.where(eq(mcps.id, id))
+						.limit(1);
+					if (!row) throw new Error(`Failed to fetch MCP server ${id}`);
+					return row;
+				}),
 			),
 		);
 
@@ -163,19 +150,17 @@ export const prepareMCPServers = async (
 
 		await Promise.all(
 			mcpRows.map(async (mcp) => {
-				// Cache the decrypted MCP config (DB row is already cached, this caches decryption)
 				const config: MCPConfig = await cachedQuery(
 					`mcp-config:${mcp.id}:${environment}`,
-					300_000, // 5 min TTL
+					300_000,
 					async () => {
 						const decrypted = decryptSecret(pickEncrypted(mcp, environment));
 						return JSON.parse(decrypted) as MCPConfig;
 					},
 				);
-				// Deep clone since we may mutate headers below
+				// Deep clone since we may mutate headers below.
 				const mcpConfig: MCPConfig = JSON.parse(JSON.stringify(config));
 
-				// Merge runtime custom headers from mcpOptions
 				if (mcpOptions?.[mcp.id]?.headers) {
 					mcpConfig.transport.headers = {
 						...mcpConfig.transport.headers,
@@ -196,7 +181,6 @@ export const prepareMCPServers = async (
 		});
 	};
 
-	// Process MCP tools
 	const selectedMcpTools = mcpTools.map((tool) => {
 		const mcpTool = tool as { mcp_id: string; name: string };
 		if (!servers[mcpTool.mcp_id]) {
@@ -241,24 +225,23 @@ export const prepareMCPServers = async (
 	return { tools: toolSet, closeAll };
 };
 
-// Helper to create SSE stream from AI result
-// Includes a keep-alive ping mechanism to prevent connection timeouts during long LLM thinking periods
+/** Keep-alive pings prevent connection timeouts during long LLM thinking. */
 export const createSSEStream = (
 	result: Awaited<ReturnType<typeof streamText>>,
 ) => {
 	const encoder = new TextEncoder();
-	const PING_INTERVAL_MS = 5000; // Send ping every 5 seconds
+	const PING_INTERVAL_MS = 5000;
 
 	return new ReadableStream({
 		async start(controller) {
-			// Set up ping interval to keep connection alive
-			// SSE comments (lines starting with :) are ignored by clients but keep the connection alive
+			// SSE comments (lines starting with `:`) are ignored by clients but keep
+			// the connection alive.
 			const pingInterval = setInterval(() => {
 				try {
 					const timestamp = Date.now();
 					controller.enqueue(encoder.encode(`: ping ${timestamp}\r\n\r\n`));
 				} catch {
-					// Controller may be closed, ignore errors
+					// Controller may be closed.
 				}
 			}, PING_INTERVAL_MS);
 
@@ -271,9 +254,8 @@ export const createSSEStream = (
 							encoder.encode(`data: ${JSON.stringify(part)}\r\n\r\n`),
 						);
 					} catch {
-						// Downstream (Fastify reply) tore down the controller mid-stream
-						// because the client disconnected. Stop iterating; the abort
-						// handler in the route is responsible for stopping the AI SDK.
+						// Client disconnected and Fastify tore down the controller. Stop
+						// iterating; the route's abort handler stops the AI SDK.
 						downstreamClosed = true;
 						break;
 					}
@@ -284,7 +266,7 @@ export const createSSEStream = (
 					try {
 						controller.error(err);
 					} catch {
-						// Controller already closed
+						// Already closed.
 					}
 				}
 			} finally {
@@ -293,7 +275,7 @@ export const createSSEStream = (
 					try {
 						controller.close();
 					} catch {
-						// Already closed
+						// Already closed.
 					}
 				}
 			}
@@ -319,8 +301,7 @@ export const prepareSkills = (data: VersionData) => {
 		return { systemAddendum: "", skillTools: {} as ToolSet };
 	}
 
-	// Defensive filter: tolerate malformed entries from any in-flight schema
-	// changes (e.g. legacy string-ID references from the workspace-skill prototype).
+	// Defensive filter: tolerate malformed entries from in-flight schema changes.
 	const validSkills = rawSkills.filter(isRuntimeSkill);
 
 	if (validSkills.length === 0) {
@@ -368,9 +349,7 @@ export const prepareSkills = (data: VersionData) => {
 	};
 };
 
-// Append the skill-catalog addendum to the messages list. If a system message
-// already exists at the top, append to its content; otherwise prepend a new
-// system message. No-op when the addendum is empty.
+/** Merge the skill catalog into the leading system message, or prepend one. */
 export const applySkillCatalog = (
 	messages: ModelMessage[],
 	systemAddendum: string,

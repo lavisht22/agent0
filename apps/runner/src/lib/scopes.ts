@@ -4,18 +4,12 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 type WorkspaceRole = Database["public"]["Enums"]["workspace_user_role"];
 
 /**
- * Effective scopes granted to a personal access token, derived from the
- * holder's `workspace_user.role` at the time of the request.
- *
+ * Scopes for a role, resolved per-request (not snapshotted onto the PAT row) so
+ * promote/demote take effect immediately.
  *   admin  → full access
- *   writer → reads of everything + writes/runs on content the user manages
- *            (agents, agent versions via `agents:write`, tags). NOT mcps,
+ *   writer → reads everything + writes/runs agents, versions, tags. NOT mcps,
  *            providers, or api_keys — those are admin-managed.
- *   reader → reads of everything + ability to trigger runs (matches the
- *            dashboard test endpoint, which is open to any workspace member).
- *
- * Resolved per-request rather than snapshotted onto the PAT row so that role
- * changes (promote / demote) take effect immediately.
+ *   reader → reads everything + trigger runs.
  */
 export function scopesForRole(role: WorkspaceRole): string[] {
 	switch (role) {
@@ -29,17 +23,8 @@ export function scopesForRole(role: WorkspaceRole): string[] {
 }
 
 /**
- * Match a required scope against a granted scope. Both must have exactly three
- * segments separated by `:`. Each segment of the granted scope must equal the
- * required segment OR be the wildcard `*`. No prefix matching, no nested
- * wildcards — keep it dumb on purpose.
- *
- * Examples:
- *   matches("agents:run:*",       "agents:run:abc") → true
- *   matches("*:*:*",              "agents:run:abc") → true
- *   matches("agents:run:abc",     "agents:run:abc") → true
- *   matches("agents:run:abc",     "agents:run:xyz") → false
- *   matches("agents:read:*",      "agents:run:abc") → false
+ * Three colon-segments; each granted segment must equal the required one or be
+ * `*`. No prefix matching, no nested wildcards — deliberately dumb.
  */
 function scopeMatches(granted: string, required: string): boolean {
 	const g = granted.split(":");
@@ -51,19 +36,11 @@ function scopeMatches(granted: string, required: string): boolean {
 	return true;
 }
 
-/**
- * Returns true if any of the granted scopes satisfies the required scope.
- */
 export function hasScope(granted: string[], required: string): boolean {
 	return granted.some((g) => scopeMatches(g, required));
 }
 
-/**
- * preHandler factory. Use when the required scope is statically known
- * (i.e. doesn't depend on the request body/params).
- *
- *   { preHandler: requireScope("runs:read:*") }
- */
+/** preHandler factory for a statically-known required scope. */
 export function requireScope(required: string) {
 	return async (request: FastifyRequest, reply: FastifyReply) => {
 		if (!hasScope(request.principal?.scopes ?? [], required)) {
@@ -75,9 +52,8 @@ export function requireScope(required: string) {
 }
 
 /**
- * Inline check for routes where the required scope depends on request data
- * (e.g. agent_id from the body or params). Returns true if allowed; if not,
- * sends a 403 and returns false — caller should `return` immediately.
+ * Inline check for routes where the required scope depends on request data.
+ * Returns true if allowed; otherwise sends a 403 and returns false.
  */
 export function checkScope(
 	request: FastifyRequest,
@@ -89,13 +65,7 @@ export function checkScope(
 	return false;
 }
 
-/**
- * preHandler that 403s when the request is authenticated by an API key rather
- * than a personal access token. Used to gate write endpoints — API keys are
- * read/run-only; only PATs (with a known user identity) can mutate state.
- *
- *   { preHandler: [requireScope("agents:write:*"), requireUserId] }
- */
+/** Gates write endpoints: API keys are read/run-only, only PATs can mutate. */
 export async function requireUserId(
 	request: FastifyRequest,
 	reply: FastifyReply,

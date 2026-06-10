@@ -24,7 +24,6 @@ export const Route = createFileRoute(
 	component: RouteComponent,
 });
 
-// Validate JSON helper
 function validateJsonField(value: string) {
 	if (!value || value.trim() === "") {
 		return "Configuration is required";
@@ -224,7 +223,6 @@ function RouteComponent() {
 						}}
 						className="space-y-4"
 					>
-						{/* Name Field */}
 						<form.Field
 							name="name"
 							validators={{
@@ -256,7 +254,6 @@ function RouteComponent() {
 							)}
 						</form.Field>
 
-						{/* Custom Headers Field */}
 						<form.Field name="custom_headers">
 							{(field) => (
 								<TextField name="custom_headers">
@@ -274,7 +271,6 @@ function RouteComponent() {
 							)}
 						</form.Field>
 
-						{/* Per-environment toggle */}
 						<div className="flex items-start justify-between rounded-lg border border-border p-4">
 							<div className="pr-4">
 								<p className="text-sm font-medium text-foreground">
@@ -296,7 +292,6 @@ function RouteComponent() {
 							</Switch>
 						</div>
 
-						{/* Production Config */}
 						<ConfigSection
 							title={
 								usePerEnvConfig ? "Production Configuration" : "Configuration"
@@ -335,7 +330,6 @@ function RouteComponent() {
 							</form.Field>
 						</ConfigSection>
 
-						{/* Staging Config */}
 						{usePerEnvConfig && (
 							<ConfigSection
 								title="Staging Configuration"

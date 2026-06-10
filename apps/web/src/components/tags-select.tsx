@@ -16,7 +16,6 @@ import { useEffect, useState } from "react";
 import { createTag, tagsQuery } from "@/lib/queries";
 import { TagChip } from "./tag-chip";
 
-// Predefined color palette for tags
 const TAG_COLORS = [
 	"#ef4444", // red
 	"#f97316", // orange
@@ -36,7 +35,6 @@ const TAG_COLORS = [
 	"#64748b", // slate
 ];
 
-// Helper function to get a random color
 const getRandomColor = () =>
 	TAG_COLORS[Math.floor(Math.random() * TAG_COLORS.length)];
 
@@ -58,18 +56,15 @@ export function TagsSelect({
 	const { data: tags } = useQuery(tagsQuery(workspaceId));
 	const state = useOverlayState();
 
-	// State for new tag creation
 	const [newTagName, setNewTagName] = useState("");
 	const [selectedColor, setSelectedColor] = useState(getRandomColor);
 
-	// Pre-select a random color when modal opens
 	useEffect(() => {
 		if (state.isOpen) {
 			setSelectedColor(getRandomColor());
 		}
 	}, [state.isOpen]);
 
-	// Create new tag mutation
 	const createTagMutation = useMutation({
 		mutationFn: ({ name, color }: { name: string; color: string }) =>
 			createTag(workspaceId, { name, color }),
@@ -129,7 +124,6 @@ export function TagsSelect({
 				</Select.Popover>
 			</Select>
 
-			{/* Create new tag modal - only rendered if allowCreate is true */}
 			{allowCreate && (
 				<Modal state={state}>
 					<Modal.Backdrop>

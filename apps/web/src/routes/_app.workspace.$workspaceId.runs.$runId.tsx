@@ -121,7 +121,6 @@ function RouteComponent() {
 	const { data: run, isLoading: isRunLoading } = useQuery(
 		runQuery(workspaceId, runId),
 	);
-	// The run-log blob is now returned inline by the run detail endpoint.
 	const runData = run?.run_data ?? null;
 
 	// Parent/child run lineage (agent-as-tool). Both enable only once their id
@@ -134,7 +133,6 @@ function RouteComponent() {
 	const handleReplay = () => {
 		if (!runData?.request) return;
 
-		// Navigate to the new agent page with replay data in router state
 		navigate({
 			to: "/workspace/$workspaceId/agents/$agentId",
 			params: { workspaceId, agentId: "new" },
@@ -192,7 +190,6 @@ function RouteComponent() {
 
 			<div className="flex-1 overflow-y-auto p-6">
 				<div className="max-w-5xl mx-auto space-y-6">
-					{/* Metadata Strip */}
 					<div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
 						{run.is_error ? (
 							<Chip variant="soft" color="danger" size="sm">
@@ -225,7 +222,6 @@ function RouteComponent() {
 						</Link>
 					</div>
 
-					{/* Run lineage (agent-as-tool) */}
 					{(parentRun || (childRuns && childRuns.length > 0)) && (
 						<Card>
 							<Card.Content className="space-y-3 text-sm">
@@ -257,7 +253,6 @@ function RouteComponent() {
 						</Card>
 					)}
 
-					{/* Metrics Row */}
 					<div className="flex flex-row items-center gap-4">
 						<MetricCard
 							label="Cost"
@@ -317,7 +312,6 @@ function RouteComponent() {
 						</Alert>
 					) : (
 						<>
-							{/* Error Display */}
 							{runData.error && (
 								<Alert status="danger">
 									<Alert.Indicator />
@@ -330,7 +324,6 @@ function RouteComponent() {
 								</Alert>
 							)}
 
-							{/* Request & Response Sections */}
 							<Accordion
 								allowsMultipleExpanded
 								defaultExpandedKeys={["response", "usage"]}
@@ -355,9 +348,7 @@ function RouteComponent() {
 									<Accordion.Panel>
 										<Accordion.Body>
 											<div className="p-4 pt-0 space-y-4">
-												{/* Configuration Details */}
 												<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-													{/* Model */}
 													<Card className="text-default-foreground">
 														<Card.Content>
 															<span className="text-xs text-muted block mb-1">
@@ -373,7 +364,6 @@ function RouteComponent() {
 														</Card.Content>
 													</Card>
 
-													{/* Parameters */}
 													<Card className="text-default-foreground">
 														<Card.Content>
 															<span className="text-xs text-muted block mb-1">
@@ -415,7 +405,6 @@ function RouteComponent() {
 														</Card.Content>
 													</Card>
 
-													{/* Tools */}
 													<Card className="text-default-foreground">
 														<Card.Content>
 															<span className="text-xs text-muted block mb-1">
@@ -459,7 +448,6 @@ function RouteComponent() {
 													</Card>
 												</div>
 
-												{/* Messages */}
 												{runData.request?.messages &&
 												runData.request.messages.length > 0 ? (
 													<Messages
@@ -532,7 +520,6 @@ function RouteComponent() {
 											<div className="p-4 pt-0">
 												{runData.totalUsage ? (
 													<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-														{/* Input Tokens */}
 														<Card className="text-default-foreground">
 															<Card.Content className="space-y-2">
 																<div className="flex justify-between items-center">
@@ -571,7 +558,6 @@ function RouteComponent() {
 															</Card.Content>
 														</Card>
 
-														{/* Output Tokens */}
 														<Card className="text-default-foreground">
 															<Card.Content className="space-y-3">
 																<div className="flex justify-between items-center">

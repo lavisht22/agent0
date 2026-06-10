@@ -26,7 +26,6 @@ interface VariablesDrawerProps {
 	values: Record<string, string>;
 	onValuesChange: (values: Record<string, string>) => void;
 	onRun?: () => void;
-	// MCP custom headers
 	mcps?: MCP[];
 	tools?: ToolValue[];
 	mcpHeaderValues: Record<string, Record<string, string>>;
@@ -72,11 +71,9 @@ export function VariablesDrawer({
 		return Array.from(vars);
 	}, [messages]);
 
-	// Derive which MCPs are in use and have custom_headers defined
 	const mcpHeaders = useMemo(() => {
 		if (!mcps || !tools) return [];
 
-		// Get unique MCP IDs from the agent's tools
 		const usedMcpIds = new Set<string>();
 		for (const tool of tools) {
 			if (tool.mcp_id) {
@@ -84,7 +81,6 @@ export function VariablesDrawer({
 			}
 		}
 
-		// For each used MCP with custom_headers, parse the comma-separated list
 		return mcps
 			.filter((mcp) => usedMcpIds.has(mcp.id) && mcp.custom_headers)
 			.map((mcp) => ({
@@ -109,7 +105,6 @@ export function VariablesDrawer({
 						</Drawer.Header>
 						<Drawer.Body>
 							<div className="flex flex-col gap-4">
-								{/* Prompt Variables Section */}
 								{variables.length === 0 && mcpHeaders.length === 0 && (
 									<p className="text-muted text-sm">
 										No variables or MCP headers found.

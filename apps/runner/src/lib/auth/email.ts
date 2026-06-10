@@ -1,9 +1,8 @@
 import { Resend } from "resend";
 
 /**
- * Transactional email via Resend (Phase 2 of the Supabase migration). Currently
- * only the sign-in OTP; better-auth's emailOTP plugin calls `sendSignInOtp`
- * from its `sendVerificationOTP` hook.
+ * Transactional email via Resend. Currently only the sign-in OTP; better-auth's
+ * emailOTP plugin calls `sendSignInOtp` from its `sendVerificationOTP` hook.
  */
 const resend = new Resend(process.env.RESEND_API_KEY);
 

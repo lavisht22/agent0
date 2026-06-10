@@ -6,18 +6,12 @@ import {
 } from "@aws-sdk/client-s3";
 
 /**
- * Run-log object store (Phase 5 of the Supabase -> self-contained migration).
+ * Run-log object store.
  *
  * Run logs (steps, request, error details, usage) are stored as one JSON object
- * per run, keyed by run id. This replaces the Supabase Storage `runs-data`
- * bucket with an S3-compatible backend (D4): MinIO for self-hosting, any
- * S3-compatible store in general.
- *
- * Transition: during the migration the same `runs-data` bucket is reached via
- * Supabase Storage's S3-compatible gateway (`S3_ENDPOINT` =
- * `https://<project>.supabase.co/storage/v1/s3`), so existing blobs are read
- * in place with no data move. Phase 4 swaps `S3_ENDPOINT` to MinIO and mirrors
- * the bucket across.
+ * per run, keyed by run id, on an S3-compatible backend (MinIO for self-hosting,
+ * or any S3-compatible store). The endpoint and bucket are configured via the
+ * `S3_*` env vars.
  */
 export interface RunLogStore {
 	/** Persist a run's log payload, keyed by run id. */
@@ -49,7 +43,7 @@ class S3RunLogStore implements RunLogStore {
 				accessKeyId: requireEnv("S3_ACCESS_KEY_ID"),
 				secretAccessKey: requireEnv("S3_SECRET_ACCESS_KEY"),
 			},
-			// Required for MinIO and Supabase's S3 gateway (no virtual-host buckets).
+			// Required for MinIO (no virtual-host-style buckets).
 			forcePathStyle: process.env.S3_FORCE_PATH_STYLE !== "false",
 		});
 	}

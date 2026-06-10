@@ -6,9 +6,7 @@ const pkg = JSON.parse(
 ) as { version: string };
 
 export async function registerVersionRoute(fastify: FastifyInstance) {
-	// Unauthenticated. Lets the CLI distinguish "wrong URL" (404, non-JSON,
-	// or missing `name: "agent0"`) from "wrong token" (401 on a subsequent
-	// authed call) during `agent0 login`.
+	// Unauthenticated, so the CLI can distinguish a wrong URL from a wrong token.
 	fastify.get("/api/v1/version", {
 		schema: {
 			tags: ["Discovery"],

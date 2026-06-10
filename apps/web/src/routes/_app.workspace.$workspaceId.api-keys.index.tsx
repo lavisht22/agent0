@@ -27,18 +27,15 @@ function RouteComponent() {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 
-	// Delete confirmation modal state
 	const deleteState = useOverlayState();
 	const [keyToDelete, setKeyToDelete] = useState<{
 		id: string;
 		name: string;
 	} | null>(null);
 
-	// Fetch API Keys
 	const { data: apiKeys, isLoading } = useQuery(apiKeysQuery(workspaceId));
 	const { data: members } = useQuery(membersQuery(workspaceId));
 
-	// Delete mutation
 	const deleteMutation = useMutation({
 		mutationFn: (keyId: string) => deleteApiKey(workspaceId, keyId),
 		onSuccess: () => {

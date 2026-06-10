@@ -140,14 +140,12 @@ function RouteComponent() {
 	const navigate = useNavigate({ from: Route.fullPath });
 	const queryClient = useQueryClient();
 
-	// Delete confirmation modal state
 	const deleteState = useOverlayState();
 	const [agentToDelete, setAgentToDelete] = useState<{
 		id: string;
 		name: string;
 	} | null>(null);
 
-	// Fetch Agents with tag filter
 	const { data: agents } = useQuery(
 		agentsQuery(workspaceId, page, searchQuery, selectedTags),
 	);
@@ -156,7 +154,6 @@ function RouteComponent() {
 	// for icon + status lookup in the Model column).
 	const { data: providers } = useQuery(providersQuery(workspaceId));
 
-	// Local state for search input with debounce
 	const [localSearch, setLocalSearch] = useState(searchQuery || "");
 
 	// Sync local state when URL search changes (e.g., browser back/forward)
@@ -169,7 +166,6 @@ function RouteComponent() {
 		const trimmed = localSearch.trim();
 		const currentSearch = searchQuery || "";
 
-		// Don't update if the values are the same
 		if (trimmed === currentSearch) return;
 
 		const timer = setTimeout(() => {
@@ -185,7 +181,6 @@ function RouteComponent() {
 		return () => clearTimeout(timer);
 	}, [localSearch, searchQuery, navigate, selectedTags]);
 
-	// Delete mutation
 	const deleteMutation = useMutation({
 		mutationFn: (agentId: string) => deleteAgent(workspaceId, agentId),
 		onSuccess: () => {

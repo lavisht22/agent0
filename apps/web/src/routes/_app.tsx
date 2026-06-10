@@ -15,7 +15,6 @@ export const Route = createFileRoute("/_app")({
 			throw redirect({ to: "/auth" });
 		}
 
-		// If user is at the root of the app, redirect to last accessed or first workspace
 		if (location.pathname === "/") {
 			const lastAccessedWorkspace = localStorage.getItem(
 				"lastAccessedWorkspace",
@@ -28,14 +27,12 @@ export const Route = createFileRoute("/_app")({
 				});
 			}
 
-			// Fetch workspaces (runner returns them oldest-first, matching the old
-			// `order(created_at asc).limit(1)`).
+			// Runner returns workspaces oldest-first.
 			const { data: workspaces } = await api.get<{
 				data: WorkspaceListItem[];
 			}>("/api/v1/workspaces");
 
 			if (workspaces.length === 0) {
-				// No workspaces exist, redirect to create workspace
 				throw redirect({ to: "/create-workspace" });
 			}
 

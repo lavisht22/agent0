@@ -1,19 +1,14 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
 /**
- * Symmetric secret encryption (Phase 6 of the Supabase -> self-contained
- * migration). Provider/MCP config blobs are stored reversibly encrypted at rest
- * (the runner needs the plaintext to call providers), so a DB dump / dashboard
- * access / RLS slip is useless without this key.
+ * Symmetric secret encryption. Provider/MCP config blobs are stored reversibly
+ * encrypted at rest (the runner needs the plaintext to call providers), so a DB
+ * dump or dashboard access is useless without this key. The runner is the sole
+ * encryptor and decryptor, so a single symmetric key (AES-256-GCM,
+ * authenticated) is sufficient.
  *
- * This replaces the old asymmetric PGP scheme (`openpgp.js`), which only existed
- * because the *untrusted browser* used to write secrets straight into the DB. Now
- * that every write goes through the trusted runner, the runner is the sole
- * encryptor *and* decryptor, so a single symmetric key (AES-256-GCM, authenticated)
- * is both simpler and sufficient. See decision D13.
- *
- * Stored format: a self-describing string so we can detect it (vs. legacy PGP
- * armor) during the transition and evolve the scheme later:
+ * Stored format is a self-describing string so the scheme can be detected and
+ * evolved later:
  *
  *     aes-256-gcm:<base64( iv(12) ‖ authTag(16) ‖ ciphertext )>
  */
@@ -23,8 +18,8 @@ const IV_BYTES = 12; // GCM standard nonce length
 const TAG_BYTES = 16; // GCM auth tag length
 
 // 32-byte key from CONFIG_ENCRYPTION_KEY, accepted as base64 (e.g.
-// `openssl rand -base64 32`) or 64-char hex. Validated eagerly at module load,
-// like pg.ts / storage.ts, so a misconfigured runner fails fast at boot.
+// `openssl rand -base64 32`) or 64-char hex. Validated eagerly at module load
+// so a misconfigured runner fails fast at boot.
 const parseKey = (): Buffer => {
 	// Tolerate whitespace/newlines and surrounding quotes that some env/secret
 	// stores wrap values in — those would otherwise corrupt the decode and
@@ -63,13 +58,12 @@ export const encryptSecret = (plaintext: string): string => {
 	return PREFIX + Buffer.concat([iv, tag, ciphertext]).toString("base64");
 };
 
-/** True if `blob` is in our AES format (vs. legacy PGP armor). */
+/** True if `blob` is in our AES format. */
 export const isAesSecret = (blob: string): boolean => blob.startsWith(PREFIX);
 
 /**
  * Decrypt a blob produced by `encryptSecret`. Throws on a non-AES blob, a wrong
- * key, or tampering (GCM tag mismatch). The runtime is AES-only; legacy PGP rows
- * are converted ahead of cutover by scripts/reencrypt-configs.ts, not here.
+ * key, or tampering (GCM tag mismatch).
  */
 export const decryptSecret = (blob: string): string => {
 	if (!isAesSecret(blob)) {

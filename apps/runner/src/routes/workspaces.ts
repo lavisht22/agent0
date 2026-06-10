@@ -111,9 +111,7 @@ async function requireAdminOrOwner(
 }
 
 export async function registerWorkspacesRoute(fastify: FastifyInstance) {
-	// Lists every workspace the calling user is a member of. PAT-only —
-	// API keys are workspace-pinned and have no business enumerating others.
-	// Powers `agent0 login`'s workspace-picker prompt and `agent0 workspaces list`.
+	// PAT-only — API keys are workspace-pinned and can't enumerate others.
 	fastify.get("/api/v1/workspaces", {
 		preHandler: requireUserId,
 		schema: {
@@ -175,10 +173,8 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 		},
 	});
 
-	// Create a workspace. Any authenticated user may create one. The
-	// `workspace_assign_owner_admin` trigger seeds the creator's admin membership
-	// in `workspace_user`, so we only insert the workspace row, setting `user_id`
-	// to the caller as the owner.
+	// The `workspace_assign_owner_admin` trigger seeds the creator's admin
+	// membership, so we only insert the workspace row (owner = caller).
 	fastify.post("/api/v1/workspaces", {
 		preHandler: requireUserId,
 		schema: {
@@ -230,7 +226,6 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 		},
 	});
 
-	// Rename a workspace. Admin or owner only.
 	fastify.patch("/api/v1/workspaces/:workspaceId", {
 		preHandler: requireUserId,
 		schema: {
@@ -302,7 +297,7 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 		},
 	});
 
-	// Delete a workspace (cascades to its data via FKs). Admin or owner only.
+	// Cascades to workspace data via FKs.
 	fastify.delete("/api/v1/workspaces/:workspaceId", {
 		preHandler: requireUserId,
 		schema: {
@@ -348,8 +343,7 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 		},
 	});
 
-	// List members of a workspace. Any member can see the roster, so this reads at
-	// `members:read:*` (held by every role). `requireUserId` keeps member PII
+	// `members:read:*` is held by every role; `requireUserId` keeps member PII
 	// (names) out of reach of machine API keys.
 	fastify.get("/api/v1/workspaces/:workspaceId/members", {
 		preHandler: [requireScope("members:read:*"), requireUserId],
@@ -396,9 +390,7 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 		},
 	});
 
-	// Change a member's role. Admin only: letting a member change their own role
-	// would be a privilege-escalation path (a reader could promote themselves to
-	// admin).
+	// Admin only: self-service role changes would be a privilege-escalation path.
 	fastify.patch("/api/v1/workspaces/:workspaceId/members/:userId", {
 		preHandler: [requireScope("workspaces:write:*"), requireUserId],
 		schema: {
@@ -483,8 +475,6 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 		},
 	});
 
-	// Remove a member (or leave the workspace). An admin can remove anyone; any
-	// member can remove themselves.
 	fastify.delete("/api/v1/workspaces/:workspaceId/members/:userId", {
 		preHandler: requireUserId,
 		schema: {

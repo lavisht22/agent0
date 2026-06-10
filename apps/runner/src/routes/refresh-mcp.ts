@@ -35,8 +35,7 @@ export async function fetchToolsForEnv(
 
 export async function registerRefreshMCPRoute(fastify: FastifyInstance) {
 	fastify.post("/internal/refresh-mcp", async (request, reply) => {
-		// Validate the better-auth session (bearer token on the Authorization
-		// header). Registered outside `addAuth`, so it authenticates inline.
+		// Registered outside `addAuth`, so it validates the session inline.
 		const session = await auth.api.getSession({
 			headers: toWebHeaders(request.headers),
 		});
@@ -53,7 +52,6 @@ export async function registerRefreshMCPRoute(fastify: FastifyInstance) {
 			return reply.code(400).send({ message: "mcp_id is required" });
 		}
 
-		// Get the MCP server and check workspace access
 		const [mcp] = await db
 			.select({
 				workspace_id: mcps.workspace_id,
@@ -69,7 +67,6 @@ export async function registerRefreshMCPRoute(fastify: FastifyInstance) {
 			return reply.code(404).send({ message: "MCP server not found" });
 		}
 
-		// The MCP exists; confirm the caller belongs to its workspace.
 		const [membership] = await db
 			.select({ user_id: workspaceUser.user_id })
 			.from(workspaceUser)
@@ -85,8 +82,7 @@ export async function registerRefreshMCPRoute(fastify: FastifyInstance) {
 			return reply.code(403).send({ message: "Access denied" });
 		}
 
-		// Refresh every environment that has a config. Production always exists;
-		// staging only when the user has enabled per-env config.
+		// Production config always exists; staging only with per-env config enabled.
 		const envsToRefresh: { env: Environment; encrypted: string }[] = [
 			{ env: "production", encrypted: mcp.encrypted_data_production as string },
 		];
@@ -101,8 +97,7 @@ export async function registerRefreshMCPRoute(fastify: FastifyInstance) {
 			envsToRefresh.map(({ encrypted }) => fetchToolsForEnv(encrypted)),
 		);
 
-		// Start from existing tools so a per-env failure preserves the prior
-		// tools list for that env instead of wiping it.
+		// Start from existing tools so a per-env failure preserves that env's list.
 		const previous = (mcp.tools as ToolsByEnv | null) ?? {};
 		const newTools: ToolsByEnv = { ...previous };
 
@@ -125,8 +120,7 @@ export async function registerRefreshMCPRoute(fastify: FastifyInstance) {
 			}
 		});
 
-		// Staging config was removed — drop the staging tools entry so it
-		// doesn't show up in the UI as a stale list.
+		// No staging config — drop its tools entry so the UI shows no stale list.
 		if (!mcp.encrypted_data_staging) {
 			newTools.staging = null;
 		}

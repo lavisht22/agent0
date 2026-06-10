@@ -33,40 +33,17 @@ import type {
 	VersionData,
 } from "./types.js";
 
-/**
- * Maximum length of the agent call chain (the top-level agent counts as 1).
- * Bounds runaway fan-out/recursion when agents are exposed as tools.
- */
 const MAX_AGENT_DEPTH = 5;
 
-/**
- * Build AI-SDK tools for any agents exposed as tools on a version. Each tool's
- * `execute` runs the referenced agent in-process via `runAgent`, passing the
- * model's free-form `prompt` as the sub-agent's input.
- *
- * `activeChain` is the list of agent IDs currently on the execution stack,
- * INCLUDING the agent that owns these tools. It guards two ways:
- *   - cycle: refuse to call an agent already in the chain (A → B → A);
- *   - depth: refuse once the chain reaches MAX_AGENT_DEPTH.
- * Guard failures are returned to the model as an error string rather than
- * thrown, so the calling agent can recover or report it.
- *
- * `abortSignal` from each tool call (forwarded by the SDK from the parent run)
- * is threaded into the sub-agent so cancelling the parent cancels children.
- */
 export const buildAgentTools = (
 	agentTools: AgentTool[],
 	workspaceId: string,
+	// Agent IDs currently on the execution stack, including the agent that owns
+	// these tools. Guards cycles (A → B → A) and bounds depth.
 	activeChain: string[],
 	parentRunId: string,
 	environment: Environment,
 	isTest: boolean,
-	/**
-	 * Per-MCP-server runtime options (e.g. custom headers) supplied to the parent
-	 * run. Forwarded to sub-agents so they reach shared MCP servers with the same
-	 * headers; `prepareMCPServers` only applies entries whose key matches an MCP
-	 * server the sub-agent actually uses.
-	 */
 	mcpOptions?: Record<string, MCPOptions>,
 ): ToolSet => {
 	const toolSet: ToolSet = {};
@@ -98,7 +75,6 @@ export const buildAgentTools = (
 					const result = await runAgent({
 						workspaceId,
 						agentId: agentTool.agent_id,
-						// Sub-agents run in the same environment as the parent run.
 						environment,
 						extraMessages: [
 							{ role: "user", content: [{ type: "text", text: prompt }] },
@@ -106,11 +82,7 @@ export const buildAgentTools = (
 						abortSignal,
 						callStack: activeChain,
 						parentRunId,
-						// Inherit the parent's test flag so a test run's sub-agents are
-						// also logged as test runs.
 						isTest,
-						// Forward runtime MCP options (e.g. custom headers) so sub-agents
-						// reach shared MCP servers with the same headers as the parent.
 						mcpOptions,
 					});
 					return result.text;
@@ -128,10 +100,6 @@ export const buildAgentTools = (
 	return toolSet;
 };
 
-/**
- * Error thrown by `prepareRun` when an agent/version can't be resolved. Carries
- * an HTTP status code so the route handler can map it to a response.
- */
 export class RunPrepError extends Error {
 	code: number;
 	constructor(code: number, message: string) {
@@ -152,23 +120,13 @@ export type PrepareRunOptions = {
 	agentId: string;
 	environment: Environment;
 	startTime: number;
-	/**
-	 * The id this run will be recorded under. Known up front so agents exposed
-	 * as tools can link their sub-runs back to it as `parent_run_id`.
-	 */
 	runId: string;
 	variables?: Record<string, string>;
 	overrides?: RunOverrides;
 	extraMessages?: ModelMessage[];
 	extraTools?: ExtraTool[];
 	mcpOptions?: Record<string, MCPOptions>;
-	/**
-	 * Agent IDs already on the execution stack (ancestors of this run), NOT
-	 * including `agentId` itself. Empty/undefined for a top-level run. Used to
-	 * guard agent-as-tool recursion; see buildAgentTools.
-	 */
 	callStack?: string[];
-	/** Whether this run (and its own sub-agents) should be logged as test runs. */
 	isTest?: boolean;
 };
 
@@ -185,13 +143,8 @@ export type PreparedRun = {
 };
 
 /**
- * Shared preprocessing for a run: resolve the agent's deployed version for the
- * environment, apply overrides, substitute variables, load the provider model,
- * MCP tools, and skills, and assemble the final message list + tool set.
- *
- * Throws `RunPrepError` (with an HTTP code) when the agent or version can't be
- * resolved. On success the caller owns `closeAll()` — it MUST be invoked once
- * the run finishes to release MCP clients.
+ * On success the caller owns `closeAll()` — it MUST be invoked once the run
+ * finishes to release MCP clients.
  */
 export const prepareRun = async (
 	opts: PrepareRunOptions,
@@ -211,11 +164,9 @@ export const prepareRun = async (
 		isTest = false,
 	} = opts;
 
-	// Get agent with its deployed version IDs, scoped to the authenticated
-	// workspace.
 	const agent = await cachedQuery(
 		`agent:${agentId}:${workspaceId}`,
-		30_000, // 30s TTL — short to pick up new deploys quickly
+		30_000, // short TTL to pick up new deploys quickly
 		async () => {
 			const [row] = await db
 				.select({
@@ -248,7 +199,6 @@ export const prepareRun = async (
 		);
 	}
 
-	// Fetch the version data (versions are immutable, cache aggressively)
 	const version = await cachedQuery(
 		`version:${versionId}`,
 		600_000, // 10 min TTL — versions are immutable once created
@@ -271,7 +221,6 @@ export const prepareRun = async (
 
 	const data = JSON.parse(JSON.stringify(version.data)) as VersionData;
 
-	// Apply runtime overrides if provided
 	if (overrides) {
 		if (overrides.model?.provider_id)
 			data.model.provider_id = overrides.model.provider_id;
@@ -289,7 +238,6 @@ export const prepareRun = async (
 			};
 	}
 
-	// Merge extra_tools with existing tools
 	if (extraTools && extraTools.length > 0) {
 		const customTools = extraTools.map((tool) => ({
 			type: "custom" as const,
@@ -312,7 +260,6 @@ export const prepareRun = async (
 		isTest,
 	});
 
-	// Record the overrides alongside the request for observability.
 	if (overrides && assembled.runData.request) {
 		assembled.runData.request.overrides = overrides;
 	}
@@ -328,21 +275,11 @@ export type AssembleRunOptions = {
 	workspaceId: string;
 	environment: Environment;
 	runId: string;
-	/**
-	 * The id of the agent that owns this run, if known. Appended to the active
-	 * chain so a sub-agent can detect a cycle back to it. Omitted for unsaved
-	 * drafts (depth still bounds runaway fan-out).
-	 */
 	agentId?: string;
 	variables?: Record<string, string>;
 	extraMessages?: ModelMessage[];
 	mcpOptions?: Record<string, MCPOptions>;
-	/**
-	 * Agent IDs already on the execution stack (ancestors), NOT including this
-	 * run's own agent. Used to guard agent-as-tool recursion.
-	 */
 	callStack?: string[];
-	/** Whether this is a test run — inherited by any sub-agents invoked as tools. */
 	isTest?: boolean;
 };
 
@@ -357,14 +294,9 @@ export type AssembledRun = {
 };
 
 /**
- * Assemble the runnable pieces from a resolved `VersionData`: substitute
- * variables, load the provider model, MCP tools, skills, and agent-as-tool
- * tools, and build the final message list + tool set. Pure of any DB lookup of
- * the agent/version, so it's shared by both the saved-version path (prepareRun)
- * and the editor test path (which runs unsaved draft data directly).
- *
- * The caller owns `closeAll()` — it MUST be invoked once the run finishes to
- * release MCP clients.
+ * Pure of any DB lookup of the agent/version, so it's shared by both the
+ * saved-version path (prepareRun) and the editor test path (unsaved draft data).
+ * The caller owns `closeAll()` — it MUST be invoked once the run finishes.
  */
 export const assembleRun = async (
 	data: VersionData,
@@ -390,21 +322,18 @@ export const assembleRun = async (
 			prepareSkills(data),
 		]);
 
-	// Inject the skills catalog into the system message (no-op when no skills
-	// are attached) before appending any extra messages.
 	const messagesWithSkills = applySkillCatalog(
 		processedMessages,
 		systemAddendum,
 	);
 
-	// Append extra messages if provided (used as-is, no variable substitution)
+	// extra messages are appended as-is (no variable substitution)
 	const finalMessages = extraMessages
 		? [...messagesWithSkills, ...extraMessages]
 		: messagesWithSkills;
 
-	// Build tools for any agents exposed as tools. The active chain includes this
-	// run's own agent (when known) so a sub-agent can detect a cycle back to it
-	// (and to bound depth). prepareMCPServers ignores "agent" tools.
+	// Include this run's own agent in the active chain so a sub-agent can detect
+	// a cycle back to it.
 	const activeChain = agentId ? [...callStack, agentId] : [...callStack];
 	const agentToolDefs = (data.tools ?? []).filter(
 		(t): t is AgentTool => "type" in t && t.type === "agent",
@@ -452,21 +381,10 @@ export type RecordRunOptions = {
 	modelId: string;
 	usage?: LanguageModelUsage;
 	runData: RunData;
-	/**
-	 * Pre-generated run id. Supply this when the id must be known before the run
-	 * finishes (so sub-runs can reference it as their parent). Defaults to a
-	 * fresh id.
-	 */
 	id?: string;
-	/** Id of the run that invoked this one (agent-as-tool). Null for top-level. */
 	parentRunId?: string | null;
 };
 
-/**
- * Persist a run row and upload its full run data. `tokens`/`cost` are only
- * written when `usage` is provided (errors without any completed step omit
- * them, matching the previous inline behavior). Returns the run id.
- */
 export const recordRun = async (opts: RecordRunOptions): Promise<string> => {
 	const id = opts.id ?? nanoid();
 	// `numeric` columns are string-typed in the schema (see D12); stringify the
@@ -503,16 +421,9 @@ export type RunAgentOptions = {
 	overrides?: RunOverrides;
 	abortSignal?: AbortSignal;
 	startTime?: number;
-	/**
-	 * Agent IDs already on the execution stack (ancestors), NOT including
-	 * `agentId`. Threaded through to bound agent-as-tool recursion.
-	 */
 	callStack?: string[];
-	/** Id of the run that invoked this one; recorded as parent_run_id. */
 	parentRunId?: string | null;
-	/** Whether this run (and its own sub-agents) should be logged as test runs. */
 	isTest?: boolean;
-	/** Per-MCP-server runtime options (e.g. custom headers) to apply to this run. */
 	mcpOptions?: Record<string, MCPOptions>;
 };
 
@@ -525,13 +436,9 @@ export type RunAgentResult = {
 };
 
 /**
- * Run an agent to completion (non-streaming) and persist the run. This is the
- * reusable in-process entry point — used by internal callers such as the
- * agent-as-tool executor. The HTTP route keeps its own streaming/abort-aware
- * pipeline but shares `prepareRun` and `recordRun`.
- *
- * Propagate `abortSignal` from a parent run so cancelling the parent cancels
- * nested sub-agent calls. Errors are recorded then rethrown.
+ * Run an agent to completion (non-streaming) and persist the run. The in-process
+ * entry point used by the agent-as-tool executor; the HTTP route keeps its own
+ * streaming/abort-aware pipeline but shares `prepareRun` and `recordRun`.
  */
 export const runAgent = async (
 	opts: RunAgentOptions,

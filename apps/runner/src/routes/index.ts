@@ -17,21 +17,20 @@ import { registerVersionRoute } from "./version.js";
 import { registerWorkspacesRoute } from "./workspaces.js";
 
 export async function registerRoutes(fastify: FastifyInstance) {
-	// Internal routes — JWT-authenticated, called by the frontend
+	// /internal routes authenticate the browser session inline, so they register
+	// outside `addAuth`.
 	await registerTestRoute(fastify);
 	await registerRefreshMCPRoute(fastify);
 
-	// Unauthenticated discovery — must be registered outside `addAuth`.
+	// Unauthenticated discovery — registered outside `addAuth`.
 	await registerVersionRoute(fastify);
 
-	// better-auth handler (/api/auth/*) — the browser-session auth surface
-	// (OTP send/verify, session, sign-out). Outside `addAuth` by design: it
-	// issues credentials, so it can't require one. PATs/API keys are unaffected.
+	// better-auth (/api/auth/*) issues credentials, so it can't require one;
+	// registered outside `addAuth`.
 	await registerBetterAuthRoutes(fastify);
 
-	// Public API routes — authenticated by `addAuth` (PAT first, then x-api-key).
-	// PATs/sessions yield a user-kind principal; API keys yield apiKey-kind. Routes
-	// that mutate state should chain `requireUserId` to block API keys.
+	// Everything below goes through `addAuth`; state-mutating routes additionally
+	// chain `requireUserId` to block machine API keys.
 	await fastify.register(async (scoped) => {
 		addAuth(scoped);
 

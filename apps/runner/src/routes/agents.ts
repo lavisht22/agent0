@@ -15,8 +15,6 @@ const TagSchema = {
 	},
 };
 
-// A lightweight model reference derived from a deployed version's prompt data,
-// so the agents list can show the model per row without shipping the full blob.
 const ModelSummarySchema = {
 	type: "object" as const,
 	nullable: true,
@@ -41,8 +39,7 @@ const AgentSchema = {
 	},
 };
 
-// Pull `{ provider_id, name }` out of a version's opaque prompt data. Mirrors the
-// web's `extractModel`, so the list's model column renders identically.
+// Mirrors the web's `extractModel` so the list's model column renders identically.
 function extractModel(
 	data: unknown,
 ): { provider_id: string; name: string } | null {
@@ -58,8 +55,6 @@ function extractModel(
 	return { provider_id, name };
 }
 
-// Base agent columns shared by every read path. The model summaries and tags are
-// hydrated separately (see `hydrateAgents`) since they live in joined tables.
 const agentColumns = {
 	id: agents.id,
 	name: agents.name,
@@ -80,9 +75,8 @@ type AgentRow = {
 
 type Tag = { id: string; name: string; color: string };
 
-// Attach each agent's tags and deployed-version model summaries. Batches the two
-// lookups across all rows (one tag query, one version query) to avoid N+1, then
-// stitches the results back together in memory.
+// Attach tags and deployed-version model summaries, batching both lookups across
+// all rows (one tag query, one version query) to avoid N+1.
 async function hydrateAgents(rows: AgentRow[]) {
 	if (rows.length === 0) return [];
 
@@ -287,7 +281,6 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			const offset = (pageNum - 1) * limitNum;
 
 			try {
-				// If tag_ids provided, filter agents that have ALL specified tags
 				let matchingAgentIds: string[] | null = null;
 
 				if (tag_ids) {
@@ -299,7 +292,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 							.from(agentTags)
 							.where(inArray(agentTags.tag_id, tagIdList));
 
-						// Only include agents that have ALL selected tags
+						// Keep only agents linked to ALL selected tags.
 						const agentIdCounts = links.reduce(
 							(acc, { agent_id }) => {
 								acc[agent_id] = (acc[agent_id] || 0) + 1;
@@ -431,7 +424,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 							})),
 						);
 					} catch {
-						// Roll back the agent so the caller doesn't end up with a half-created record.
+						// Roll back the agent so the caller isn't left with a half-created record.
 						await db.delete(agents).where(eq(agents.id, agentId));
 						return reply.code(500).send({ message: "Failed to attach tags" });
 					}
@@ -445,7 +438,6 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 		},
 	});
 
-	// List versions for an agent (excludes version data/content for lighter response)
 	fastify.get("/agents/:agentId/versions", {
 		preHandler: async (request, reply) => {
 			const { agentId } = request.params as { agentId: string };
@@ -508,7 +500,6 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			const offset = (pageNum - 1) * limitNum;
 
 			try {
-				// Verify agent belongs to workspace
 				const [agent] = await db
 					.select({ id: agents.id })
 					.from(agents)
@@ -547,7 +538,6 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 		},
 	});
 
-	// Get a single version with full content
 	fastify.get("/agents/:agentId/versions/:versionId", {
 		preHandler: async (request, reply) => {
 			const { agentId } = request.params as { agentId: string };
@@ -583,7 +573,6 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			};
 
 			try {
-				// Verify agent belongs to workspace
 				const [agent] = await db
 					.select({ id: agents.id })
 					.from(agents)
@@ -703,7 +692,6 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			}
 
 			try {
-				// Verify agent belongs to workspace
 				const [agent] = await db
 					.select({ id: agents.id })
 					.from(agents)
@@ -716,7 +704,6 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 					return reply.code(404).send({ message: "Agent not found" });
 				}
 
-				// Validate versions if provided
 				const versionIdsToCheck = [
 					staging_version_id,
 					production_version_id,
@@ -765,11 +752,9 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 						.where(eq(agents.id, agentId));
 				}
 
-				// Handle tags
 				if (tag_ids !== undefined) {
 					const uniqueTagIds = Array.from(new Set(tag_ids));
 
-					// Validate tags belong to workspace
 					if (uniqueTagIds.length > 0) {
 						const workspaceTags = await db
 							.select({ id: tags.id })
@@ -790,7 +775,7 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 						}
 					}
 
-					// Replace the tag set: clear existing links, then insert the new set.
+					// Replace the whole tag set: clear existing links, then insert anew.
 					await db.delete(agentTags).where(eq(agentTags.agent_id, agentId));
 
 					if (uniqueTagIds.length > 0) {
@@ -803,7 +788,6 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 					}
 				}
 
-				// Fetch final agent state
 				const [updatedAgent] = await db
 					.select(agentColumns)
 					.from(agents)
@@ -936,7 +920,6 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			const { data } = request.body as { data: Record<string, unknown> };
 
 			try {
-				// Verify agent belongs to workspace
 				const [agent] = await db
 					.select({ id: agents.id })
 					.from(agents)
@@ -952,7 +935,6 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 				const versionId = nanoid();
 				const userId = userPrincipal(request).userId;
 
-				// Start by inserting the new version
 				const [newVersion] = await db
 					.insert(agentVersions)
 					.values({
@@ -968,7 +950,6 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 					return reply.code(500).send({ message: "Failed to create version" });
 				}
 
-				// If deploy is requested, update the agent
 				if (deploy) {
 					const updateField =
 						deploy === "staging"
