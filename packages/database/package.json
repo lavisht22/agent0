@@ -8,21 +8,25 @@
 		".": {
 			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js"
+		},
+		"./migrate": {
+			"types": "./dist/migrate.d.ts",
+			"import": "./dist/migrate.js"
 		}
 	},
-	"files": ["dist"],
+	"files": ["dist", "drizzle"],
 	"scripts": {
 		"build": "tsc",
-		"types": "supabase gen types typescript --linked > database.types.ts",
 		"generate": "drizzle-kit generate",
 		"migrate": "drizzle-kit migrate"
 	},
 	"devDependencies": {
+		"@types/node": "^22.19.1",
 		"drizzle-kit": "^0.31.10",
-		"supabase": "^2.76.8",
 		"typescript": "^5.0.0"
 	},
 	"dependencies": {
-		"drizzle-orm": "^0.45.2"
+		"drizzle-orm": "^0.45.2",
+		"postgres": "^3.4.9"
 	}
 }

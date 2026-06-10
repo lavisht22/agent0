@@ -5,6 +5,7 @@ import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
+import { runMigrations } from "@repo/database/migrate";
 import Fastify from "fastify";
 import { registerRoutes } from "./routes/index.js";
 
@@ -121,6 +122,11 @@ await registerRoutes(fastify);
 
 const start = async () => {
 	try {
+		// Apply any pending DB migrations before serving. Idempotent and gated on
+		// the `__drizzle_migrations` table, so it's a no-op once up to date.
+		await runMigrations();
+		fastify.log.info("database migrations up to date");
+
 		await fastify.listen({
 			port: Number(process.env.PORT || 2223),
 			host: "0.0.0.0",

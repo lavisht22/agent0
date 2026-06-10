@@ -1,7 +1,7 @@
-import type { Database } from "@repo/database";
+import type { workspaceUserRole } from "@repo/database";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
-type WorkspaceRole = Database["public"]["Enums"]["workspace_user_role"];
+type WorkspaceRole = (typeof workspaceUserRole.enumValues)[number];
 
 /**
  * Scopes for a role, resolved per-request (not snapshotted onto the PAT row) so

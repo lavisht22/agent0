@@ -27,6 +27,18 @@ import {
  * timestamps.
  */
 
+/**
+ * JSON value type for `jsonb` columns. Drizzle infers `jsonb` as `unknown`;
+ * this gives consumers a structured type to assert against at the boundary.
+ */
+export type Json =
+	| string
+	| number
+	| boolean
+	| null
+	| { [key: string]: Json | undefined }
+	| Json[];
+
 export const workspaceUserRole = pgEnum("workspace_user_role", [
 	"admin",
 	"writer",
