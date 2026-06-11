@@ -47,6 +47,49 @@ npx skills add lavisht22/agent0
 
 The CLI can also be installed manually: `npm install -g agent0-cli`.
 
+## Self-Hosting
+
+agent0 ships as a single Docker image (web UI + API together) published to GitHub
+Container Registry. The server applies pending database migrations on startup, so
+there is no separate migrate step.
+
+You bring your own **Postgres** and **S3-compatible object store** (AWS S3, MinIO,
+Cloudflare R2, …); everything else is configured through environment variables.
+
+```bash
+# 1. Grab the deploy files
+curl -O https://raw.githubusercontent.com/lavisht22/agent0/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/lavisht22/agent0/main/.env.example
+
+# 2. Configure
+cp .env.example .env
+#    Fill in DATABASE_URL, the S3_* values, and the secrets. Generate the two
+#    32-byte secrets with:
+openssl rand -base64 32   # CONFIG_ENCRYPTION_KEY
+openssl rand -base64 32   # BETTER_AUTH_SECRET
+
+# 3. Run
+docker compose up -d
+```
+
+The app listens on port `8080`. See [`.env.example`](.env.example) for the full,
+documented list of variables.
+
+> ⚠️ **Back up `CONFIG_ENCRYPTION_KEY`.** It encrypts every stored provider
+> credential — lose it and those credentials are unrecoverable.
+
+### Deploying on Coolify
+
+Create a **Docker Compose** resource pointing at `docker-compose.yml`. Coolify
+provides the reverse proxy and TLS, so set `APP_URL` to your public `https` URL and
+let Coolify proxy to port `8080`. The compose file is intentionally
+profile-free so it works with Coolify's compose handling.
+
+### Image versions
+
+Images are tagged by SemVer release: `:2.1.0`, `:2.1`, `:2`, and `:latest`. Pin a
+specific tag in `docker-compose.yml` for reproducible deploys.
+
 ## Getting Started
 
 ### Prerequisites
@@ -80,7 +123,7 @@ This command will start both the web application and the runner in development m
 
 ## Database Setup
 
-The project uses PostgreSQL. The schema lives in `packages/database/schema.ts` (Drizzle, the single source of truth); SQL migrations are generated from it with `pnpm --filter @repo/database generate` and applied with `pnpm --filter @repo/database migrate` against `DATABASE_URL`.
+The project uses PostgreSQL. The schema lives in `packages/database/schema.ts` (Drizzle, the single source of truth); SQL migrations are generated from it with `pnpm --filter @repo/database generate`. Pending migrations are applied automatically when the server boots; you can also apply them manually with `pnpm --filter @repo/database migrate` against `DATABASE_URL`.
 
 ## License
 

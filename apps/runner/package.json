@@ -1,6 +1,6 @@
 {
 	"name": "runner",
-	"version": "2.0.0",
+	"private": true,
 	"type": "module",
 	"scripts": {
 		"predev": "pnpm --filter @repo/models --filter @repo/database build",

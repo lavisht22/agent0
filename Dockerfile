@@ -18,6 +18,12 @@ COPY --from=build /prod/runner /app
 COPY --from=build /usr/src/app/apps/runner/dist /app/dist
 COPY --from=build /usr/src/app/apps/web/dist /app/public
 
+# Version reported by GET /api/v1/version. The publish workflow passes the git
+# tag here; any other build (local) keeps "dev" — an untagged build genuinely
+# isn't a release, so it shouldn't claim a version.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
+
 ENV PORT=8080
 EXPOSE 8080
 CMD [ "node", "dist/index.js" ]

@@ -1,0 +1,23 @@
+# agent0 — app-only deployment.
+#
+# Runs just the agent0 server (web UI + API in a single image) and expects you to
+# bring your own Postgres and S3-compatible object store. Copy `.env.example` to
+# `.env`, fill it in, then:
+#
+#   docker compose up -d
+#
+# The server applies any pending database migrations on startup — no separate
+# migrate step.
+#
+# Coolify: point a Docker Compose resource at this file as-is. Coolify supplies
+# the reverse proxy and TLS, so set APP_URL to your public https URL; the 8080
+# port below is what Coolify proxies to.
+services:
+  agent0:
+    # Pin to a released tag (e.g. :2.1.0) for reproducible deploys; :latest tracks
+    # the newest release.
+    image: ghcr.io/lavisht22/agent0:latest
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8080:8080"

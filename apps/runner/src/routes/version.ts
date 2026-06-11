@@ -1,9 +1,9 @@
-import { readFileSync } from "node:fs";
 import type { FastifyInstance } from "fastify";
 
-const pkg = JSON.parse(
-	readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
-) as { version: string };
+// The deployable's version is the git tag, injected at image-build time via the
+// APP_VERSION build arg (see the GHCR publish workflow). Falls back to "dev" for
+// local or untagged builds — there is no hand-maintained package.json version.
+const VERSION = process.env.APP_VERSION ?? "dev";
 
 export async function registerVersionRoute(fastify: FastifyInstance) {
 	// Unauthenticated, so the CLI can distinguish a wrong URL from a wrong token.
@@ -25,7 +25,7 @@ export async function registerVersionRoute(fastify: FastifyInstance) {
 		handler: async (_request, reply) => {
 			return reply.send({
 				name: "agent0",
-				version: pkg.version,
+				version: VERSION,
 				api: "v1",
 			});
 		},
