@@ -209,6 +209,16 @@ export async function deleteMcp(workspaceId: string, mcpId: string) {
 	await api.delete(`/api/v1/workspaces/${workspaceId}/mcps/${mcpId}`);
 }
 
+// Connects to the MCP server(s) and re-reads their tool lists into `tools`.
+export async function refreshMcp(workspaceId: string, mcpId: string) {
+	const { tools } = await api.post<{
+		tools: Json;
+		errors?: { env: string; message: string }[];
+	}>(`/api/v1/workspaces/${workspaceId}/mcps/${mcpId}/refresh`);
+
+	return tools;
+}
+
 // Model summaries are derived server-side; the list omits the full prompt blob.
 export type Agent = {
 	id: string;

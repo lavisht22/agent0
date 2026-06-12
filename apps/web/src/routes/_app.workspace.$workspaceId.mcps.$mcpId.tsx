@@ -16,7 +16,7 @@ import { Pencil, ShieldAlert } from "lucide-react";
 import { useState } from "react";
 import { MonacoJsonField } from "@/components/monaco-json-field";
 import { PageHeader } from "@/components/page-header";
-import { createMcp, mcpsQuery, updateMcp } from "@/lib/queries";
+import { createMcp, mcpsQuery, refreshMcp, updateMcp } from "@/lib/queries";
 
 export const Route = createFileRoute(
 	"/_app/workspace/$workspaceId/mcps/$mcpId",
@@ -47,17 +47,6 @@ const DEFAULT_CONFIG = JSON.stringify(
 	null,
 	2,
 );
-
-async function refreshMcpTools(mcpId: string) {
-	await fetch("/internal/refresh-mcp", {
-		method: "POST",
-		credentials: "include",
-		body: JSON.stringify({ mcp_id: mcpId }),
-		headers: {
-			"Content-Type": "application/json",
-		},
-	});
-}
 
 function RouteComponent() {
 	const { workspaceId, mcpId } = Route.useParams();
@@ -111,7 +100,7 @@ function RouteComponent() {
 				params: { workspaceId },
 			});
 
-			await refreshMcpTools(id);
+			await refreshMcp(workspaceId, id);
 
 			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });
 		},
@@ -164,7 +153,7 @@ function RouteComponent() {
 				params: { workspaceId },
 			});
 
-			await refreshMcpTools(mcpId);
+			await refreshMcp(workspaceId, mcpId);
 
 			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });
 		},
