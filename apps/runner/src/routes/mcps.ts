@@ -1,15 +1,37 @@
+import { experimental_createMCPClient as createMCPClient } from "@ai-sdk/mcp";
 import { mcps } from "@repo/database";
 import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
-import { encryptSecret } from "../lib/crypto.js";
+import { decryptSecret, encryptSecret } from "../lib/crypto.js";
 import { db } from "../lib/pg.js";
 import { requireScope, requireUserId } from "../lib/scopes.js";
-import {
-	type Environment,
-	fetchToolsForEnv,
-	type ToolsByEnv,
-} from "./refresh-mcp.js";
+import type { MCPConfig } from "../lib/types.js";
+
+type Environment = "production" | "staging";
+type ToolEntry = { name: string; description: string | undefined };
+type ToolsByEnv = {
+	production?: ToolEntry[];
+	staging?: ToolEntry[] | null;
+};
+
+// Connects to one MCP env's config and lists its tools. The client is always
+// closed, even when `tools()` throws.
+async function fetchToolsForEnv(encrypted: string): Promise<ToolEntry[]> {
+	const decrypted = decryptSecret(encrypted);
+	const config: MCPConfig = JSON.parse(decrypted);
+
+	const client = await createMCPClient(config);
+	try {
+		const tools = await client.tools();
+		return Object.entries(tools).map(([name, tool]) => ({
+			name,
+			description: tool.description,
+		}));
+	} finally {
+		await client.close();
+	}
+}
 
 // `encrypted_data_production` is never selected (write-only); `tools` is
 // populated only by the refresh endpoint, never on create/update.

@@ -9,7 +9,6 @@ import { registerEmbedRoutes } from "./embed.js";
 import { registerMcpsRoutes } from "./mcps.js";
 import { registerPersonalAccessTokensRoutes } from "./personal-access-tokens.js";
 import { registerProvidersRoutes } from "./providers.js";
-import { registerRefreshMCPRoute } from "./refresh-mcp.js";
 import { registerRunsRoutes } from "./runs.js";
 import { registerTagsRoutes } from "./tags.js";
 import { registerTestRoute } from "./test.js";
@@ -20,7 +19,6 @@ export async function registerRoutes(fastify: FastifyInstance) {
 	// /internal routes authenticate the browser session inline, so they register
 	// outside `addAuth`.
 	await registerTestRoute(fastify);
-	await registerRefreshMCPRoute(fastify);
 
 	// Unauthenticated discovery — registered outside `addAuth`.
 	await registerVersionRoute(fastify);

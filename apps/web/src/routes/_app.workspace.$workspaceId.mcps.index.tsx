@@ -14,7 +14,12 @@ import { useState } from "react";
 import { ConfirmationModal } from "@/components/confirmation-modal";
 import IDCopy from "@/components/id-copy";
 import { PageHeader } from "@/components/page-header";
-import { deleteMcp, mcpsQuery, workspaceUserQuery } from "@/lib/queries";
+import {
+	deleteMcp,
+	mcpsQuery,
+	refreshMcp,
+	workspaceUserQuery,
+} from "@/lib/queries";
 
 export const Route = createFileRoute("/_app/workspace/$workspaceId/mcps/")({
 	component: RouteComponent,
@@ -50,20 +55,7 @@ function RouteComponent() {
 	});
 
 	const refreshMcpMutation = useMutation({
-		mutationFn: async (mcp_id: string) => {
-			const response = await fetch("/internal/refresh-mcp", {
-				method: "POST",
-				credentials: "include",
-				body: JSON.stringify({ mcp_id }),
-				headers: {
-					"Content-Type": "application/json",
-				},
-			});
-
-			if (!response.ok) {
-				throw new Error("Failed to refresh MCP");
-			}
-		},
+		mutationFn: (mcpId: string) => refreshMcp(workspaceId, mcpId),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["mcps", workspaceId] });
 			toast.success("MCP server tools refreshed successfully.");
