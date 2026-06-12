@@ -496,6 +496,7 @@ export async function revokePersonalAccessToken(tokenId: string) {
 export type RunListItem = {
 	id: string;
 	version_id: string | null;
+	environment: "staging" | "production";
 	parent_run_id: string | null;
 	is_error: boolean;
 	is_test: boolean;
@@ -520,6 +521,7 @@ export const runsQuery = (
 	dateFilter: DateRangeValue,
 	agentId?: string,
 	status?: "success" | "failed",
+	environment?: "staging" | "production",
 ) =>
 	queryOptions({
 		// Keying on the preset (not resolved dates) keeps the key stable as time passes.
@@ -532,6 +534,7 @@ export const runsQuery = (
 				: { from: dateFilter.startDate, to: dateFilter.endDate },
 			agentId,
 			status,
+			environment,
 		],
 		queryFn: async () => {
 			// Resolve presets at query time so they always use fresh dates.
@@ -550,6 +553,7 @@ export const runsQuery = (
 						limit: 20,
 						agent_id: agentId,
 						status,
+						environment,
 						start_date: dateRange?.from,
 						end_date: dateRange?.to,
 					},

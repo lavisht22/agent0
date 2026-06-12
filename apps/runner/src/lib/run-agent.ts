@@ -371,6 +371,7 @@ export const assembleRun = async (
 export type RecordRunOptions = {
 	workspaceId: string;
 	versionId: string | null;
+	environment: Environment;
 	startTime: number;
 	preProcessingTime: number;
 	firstTokenTime: number;
@@ -393,6 +394,7 @@ export const recordRun = async (opts: RecordRunOptions): Promise<string> => {
 		id,
 		workspace_id: opts.workspaceId,
 		version_id: opts.versionId,
+		environment: opts.environment,
 		parent_run_id: opts.parentRunId ?? null,
 		created_at: new Date(opts.startTime).toISOString(),
 		is_error: opts.isError,
@@ -500,6 +502,7 @@ export const runAgent = async (
 			parentRunId: opts.parentRunId,
 			workspaceId: opts.workspaceId,
 			versionId,
+			environment: opts.environment,
 			startTime,
 			preProcessingTime,
 			firstTokenTime: Date.now() - preProcessingTime - startTime,
@@ -543,6 +546,7 @@ export const runAgent = async (
 			parentRunId: opts.parentRunId,
 			workspaceId: opts.workspaceId,
 			versionId,
+			environment: opts.environment,
 			startTime,
 			preProcessingTime,
 			firstTokenTime: Date.now() - preProcessingTime - startTime,

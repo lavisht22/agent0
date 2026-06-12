@@ -443,6 +443,7 @@ export const runs = pgTable(
 			.notNull(),
 		is_error: boolean().default(false).notNull(),
 		is_test: boolean().default(false).notNull(),
+		environment: text().default("production").notNull(),
 		pre_processing_time: numeric().notNull(),
 		first_token_time: numeric().notNull(),
 		response_time: numeric().notNull(),
@@ -463,6 +464,11 @@ export const runs = pgTable(
 		index("runs_workspace_id_idx").using(
 			"btree",
 			table.workspace_id.asc().nullsLast().op("text_ops"),
+		),
+		index("runs_workspace_environment_idx").using(
+			"btree",
+			table.workspace_id.asc().nullsLast().op("text_ops"),
+			table.environment.asc().nullsLast().op("text_ops"),
 		),
 		foreignKey({
 			columns: [table.version_id],

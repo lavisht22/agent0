@@ -1,0 +1,2 @@
+ALTER TABLE "runs" ADD COLUMN "environment" text DEFAULT 'production' NOT NULL;--> statement-breakpoint
+CREATE INDEX "runs_workspace_environment_idx" ON "runs" USING btree ("workspace_id" text_ops,"environment" text_ops);

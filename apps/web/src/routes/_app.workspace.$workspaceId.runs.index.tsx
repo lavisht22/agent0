@@ -17,6 +17,10 @@ import {
 } from "lucide-react";
 import { AgentFilter } from "@/components/agent-filter";
 import { DateRangePicker } from "@/components/date-range-picker";
+import {
+	EnvironmentFilter,
+	type EnvironmentFilterValue,
+} from "@/components/environment-filter";
 import IDCopy from "@/components/id-copy";
 import { PageHeader } from "@/components/page-header";
 import {
@@ -45,6 +49,7 @@ export const Route = createFileRoute("/_app/workspace/$workspaceId/runs/")({
 		datePreset?: string;
 		agentId?: string;
 		status?: StatusFilterValue;
+		environment?: EnvironmentFilterValue;
 	} => {
 		let dateValues:
 			| { datePreset: string }
@@ -69,6 +74,7 @@ export const Route = createFileRoute("/_app/workspace/$workspaceId/runs/")({
 			page: Number(search?.page ?? 1),
 			agentId: search.agentId as string | undefined,
 			status: search.status as StatusFilterValue,
+			environment: search.environment as EnvironmentFilterValue,
 			...dateValues,
 		};
 	},
@@ -76,7 +82,8 @@ export const Route = createFileRoute("/_app/workspace/$workspaceId/runs/")({
 
 function RouteComponent() {
 	const { workspaceId } = Route.useParams();
-	const { page, agentId, status, ...dateValues } = Route.useSearch();
+	const { page, agentId, status, environment, ...dateValues } =
+		Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 	const router = useRouter();
 
@@ -93,7 +100,9 @@ function RouteComponent() {
 		data: runs,
 		isFetching,
 		refetch,
-	} = useQuery(runsQuery(workspaceId, page, dateValues, agentId, status));
+	} = useQuery(
+		runsQuery(workspaceId, page, dateValues, agentId, status, environment),
+	);
 
 	return (
 		<div className="h-screen overflow-hidden flex flex-col">
@@ -110,6 +119,7 @@ function RouteComponent() {
 										...value,
 										agentId,
 										status,
+										environment,
 										page: 1,
 									},
 								})
@@ -124,6 +134,7 @@ function RouteComponent() {
 										...dateValues,
 										agentId: newAgentId,
 										status,
+										environment,
 										page: 1,
 									},
 								})
@@ -137,6 +148,21 @@ function RouteComponent() {
 										...dateValues,
 										agentId,
 										status: newStatus,
+										environment,
+										page: 1,
+									},
+								})
+							}
+						/>
+						<EnvironmentFilter
+							value={environment}
+							onValueChange={(newEnvironment) =>
+								navigate({
+									search: {
+										...dateValues,
+										agentId,
+										status,
+										environment: newEnvironment,
 										page: 1,
 									},
 								})
@@ -173,6 +199,7 @@ function RouteComponent() {
 												...dateValues,
 												agentId,
 												status,
+												environment,
 												page: page - 1,
 											},
 										})
@@ -196,6 +223,7 @@ function RouteComponent() {
 												...dateValues,
 												agentId,
 												status,
+												environment,
 												page: page + 1,
 											},
 										})
@@ -215,6 +243,7 @@ function RouteComponent() {
 							<Table.Header className="sticky top-0 z-10">
 								<Table.Column>Created At</Table.Column>
 								<Table.Column>Status</Table.Column>
+								<Table.Column className="w-12 text-center">Env</Table.Column>
 								<Table.Column>Time</Table.Column>
 								<Table.Column>Cost</Table.Column>
 								<Table.Column>Agent</Table.Column>
@@ -257,6 +286,25 @@ function RouteComponent() {
 													</Chip>
 												)}
 											</div>
+										</Table.Cell>
+
+										<Table.Cell className="text-center">
+											<Tooltip delay={0}>
+												<Tooltip.Trigger>
+													{item.environment === "staging" ? (
+														<Chip size="sm" color="warning" variant="primary">
+															S
+														</Chip>
+													) : (
+														<Chip size="sm" color="success" variant="primary">
+															P
+														</Chip>
+													)}
+												</Tooltip.Trigger>
+												<Tooltip.Content className="capitalize">
+													{item.environment}
+												</Tooltip.Content>
+											</Tooltip>
 										</Table.Cell>
 
 										<Table.Cell>

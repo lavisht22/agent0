@@ -24,6 +24,7 @@ import type { RunOverrides } from "../lib/types.js";
 const runSelectColumns = {
 	id: runs.id,
 	version_id: runs.version_id,
+	environment: runs.environment,
 	parent_run_id: runs.parent_run_id,
 	is_error: runs.is_error,
 	is_test: runs.is_test,
@@ -88,6 +89,7 @@ const RunSummarySchema = {
 	properties: {
 		id: { type: "string" as const },
 		version_id: { type: "string" as const, nullable: true },
+		environment: { type: "string" as const, enum: ["staging", "production"] },
 		parent_run_id: {
 			type: "string" as const,
 			nullable: true,
@@ -156,6 +158,11 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						enum: ["success", "failed"],
 						description: "Filter by run status",
 					},
+					environment: {
+						type: "string" as const,
+						enum: ["staging", "production"],
+						description: "Filter by the environment the run was created in",
+					},
 					is_test: {
 						type: "string" as const,
 						enum: ["true", "false"],
@@ -204,6 +211,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				version_id,
 				parent_run_id,
 				status,
+				environment,
 				is_test,
 				start_date,
 				end_date,
@@ -214,6 +222,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				version_id?: string;
 				parent_run_id?: string;
 				status?: string;
+				environment?: string;
 				is_test?: string;
 				start_date?: string;
 				end_date?: string;
@@ -242,6 +251,9 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				conditions.push(eq(runs.is_error, false));
 			} else if (status === "failed") {
 				conditions.push(eq(runs.is_error, true));
+			}
+			if (environment === "staging" || environment === "production") {
+				conditions.push(eq(runs.environment, environment));
 			}
 			if (is_test === "true") {
 				conditions.push(eq(runs.is_test, true));
@@ -572,6 +584,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 								id: runId,
 								parentRunId: null,
 								versionId: preparedVersionId,
+								environment,
 								startTime,
 								preProcessingTime,
 								firstTokenTime: firstTokenTime as number,
@@ -613,6 +626,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 								id: runId,
 								parentRunId: null,
 								versionId: preparedVersionId,
+								environment,
 								startTime,
 								preProcessingTime,
 								firstTokenTime,
@@ -650,6 +664,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 								id: runId,
 								parentRunId: null,
 								versionId: preparedVersionId,
+								environment,
 								startTime,
 								preProcessingTime,
 								firstTokenTime,
@@ -731,6 +746,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						id: runId,
 						parentRunId: null,
 						versionId: preparedVersionId,
+						environment,
 						startTime,
 						preProcessingTime,
 						firstTokenTime: Date.now() - preProcessingTime - startTime,
@@ -766,6 +782,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 							id: runId,
 							parentRunId: null,
 							versionId: preparedVersionId,
+							environment,
 							startTime,
 							preProcessingTime,
 							firstTokenTime: Date.now() - preProcessingTime - startTime,
@@ -794,6 +811,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						id: runId,
 						parentRunId: null,
 						versionId: preparedVersionId,
+						environment,
 						startTime,
 						preProcessingTime,
 						firstTokenTime: Date.now() - preProcessingTime - startTime,
