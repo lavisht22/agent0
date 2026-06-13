@@ -15,7 +15,7 @@ import {
 	today,
 } from "@internationalized/date";
 import { format } from "date-fns";
-import { LucideCalendar } from "lucide-react";
+import { LucideCalendar, LucideChevronDown } from "lucide-react";
 import { useState } from "react";
 
 const DATE_PRESETS = [
@@ -233,10 +233,15 @@ export function DateRangePicker({
 			isOpen={isOpen}
 			onOpenChange={(next) => (next ? open() : setIsOpen(false))}
 		>
-			<Button size="sm" variant="tertiary" className="min-w-0">
+			<Popover.Trigger className="relative isolate inline-flex min-h-9 max-w-72 cursor-pointer items-center gap-2 rounded-field border border-[var(--color-field-border)] bg-field py-2 pl-3 pr-8 text-sm text-field-foreground shadow-field outline-none transition hover:bg-field-hover">
 				<LucideCalendar className="size-3.5 shrink-0 text-muted" />
 				<span className="truncate">{getTriggerLabel(value)}</span>
-			</Button>
+				<LucideChevronDown
+					className={`absolute right-2 size-4 text-field-placeholder transition ${
+						isOpen ? "rotate-180" : ""
+					}`}
+				/>
+			</Popover.Trigger>
 
 			<Popover.Content placement="bottom start">
 				<Popover.Dialog className="p-0 flex flex-col">
@@ -283,7 +288,7 @@ export function DateRangePicker({
 										value={datePart(draftStart)}
 										onChange={(d) => d && editStart(withDate(draftStart, d))}
 									>
-										<DateField.Group>
+										<DateField.Group variant="secondary">
 											<DateField.InputContainer>
 												<DateField.Input>
 													{(segment) => <DateField.Segment segment={segment} />}
@@ -296,7 +301,7 @@ export function DateRangePicker({
 										value={timePart(draftStart)}
 										onChange={(t) => t && editStart(withTime(draftStart, t))}
 									>
-										<TimeField.Group>
+										<TimeField.Group variant="secondary">
 											<TimeField.InputContainer>
 												<TimeField.Input>
 													{(segment) => <TimeField.Segment segment={segment} />}
@@ -317,7 +322,7 @@ export function DateRangePicker({
 										value={datePart(draftEnd)}
 										onChange={(d) => d && editEnd(withDate(draftEnd, d))}
 									>
-										<DateField.Group>
+										<DateField.Group variant="secondary">
 											<DateField.InputContainer>
 												<DateField.Input>
 													{(segment) => <DateField.Segment segment={segment} />}
@@ -330,7 +335,7 @@ export function DateRangePicker({
 										value={timePart(draftEnd)}
 										onChange={(t) => t && editEnd(withTime(draftEnd, t))}
 									>
-										<TimeField.Group>
+										<TimeField.Group variant="secondary">
 											<TimeField.InputContainer>
 												<TimeField.Input>
 													{(segment) => <TimeField.Segment segment={segment} />}
