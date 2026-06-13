@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { z } from "zod";
 import { MonacoJsonEditor } from "./monaco-json-editor";
+import { ToolCallView } from "./tool-part";
 import { Variables } from "./variables";
 
 export const assistantMessageSchema = z.object({
@@ -93,6 +94,10 @@ function AssistantMessagePart({
 	}
 
 	if (value.type === "tool-call") {
+		if (isReadOnly) {
+			return <ToolCallView value={value} />;
+		}
+
 		return (
 			<div className="w-full space-y-2 rounded-[14px] border border-border overflow-hidden">
 				<MonacoJsonEditor

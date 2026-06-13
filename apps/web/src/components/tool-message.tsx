@@ -4,6 +4,7 @@ import { LucideGripVertical, LucideX } from "lucide-react";
 import { useMemo } from "react";
 import { z } from "zod";
 import { MonacoJsonEditor } from "./monaco-json-editor";
+import { ToolResultView } from "./tool-part";
 import { Variables } from "./variables";
 
 export const toolMessageSchema = z.object({
@@ -34,6 +35,10 @@ function ToolMessagePart({
 	onValueChange: (value: ToolMessageContent[number]) => void;
 }) {
 	if (value.type === "tool-result") {
+		if (isReadOnly) {
+			return <ToolResultView value={value} />;
+		}
+
 		return (
 			<div
 				className={cn(
