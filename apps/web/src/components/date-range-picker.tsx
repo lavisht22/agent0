@@ -1,45 +1,30 @@
 import {
 	Button,
 	DateField,
-	DateRangePicker as HeroDateRangePicker,
+	Label,
 	ListBox,
+	Popover,
 	RangeCalendar,
-	Select,
+	TimeField,
 } from "@heroui/react";
-import { getLocalTimeZone, parseDate, today } from "@internationalized/date";
+import {
+	CalendarDate,
+	CalendarDateTime,
+	getLocalTimeZone,
+	Time,
+	today,
+} from "@internationalized/date";
 import { format } from "date-fns";
-import { LucideArrowLeft, LucideClock } from "lucide-react";
-import { useMemo, useState } from "react";
+import { LucideCalendar } from "lucide-react";
+import { useState } from "react";
 
 const DATE_PRESETS = [
-	{
-		key: "15min",
-		label: "Last 15 Minutes",
-	},
-	{
-		key: "1hr",
-		label: "Last Hour",
-	},
-	{
-		key: "24hr",
-		label: "Last 24 Hours",
-	},
-	{
-		key: "yesterday",
-		label: "Yesterday",
-	},
-	{
-		key: "3days",
-		label: "Last 3 Days",
-	},
-	{
-		key: "7days",
-		label: "Last 7 Days",
-	},
-	{
-		key: "custom",
-		label: "Custom...",
-	},
+	{ key: "15min", label: "Last 15 Minutes" },
+	{ key: "1hr", label: "Last Hour" },
+	{ key: "24hr", label: "Last 24 Hours" },
+	{ key: "yesterday", label: "Yesterday" },
+	{ key: "3days", label: "Last 3 Days" },
+	{ key: "7days", label: "Last 7 Days" },
 ];
 
 export type DateRangeValue = {
@@ -98,164 +83,313 @@ export function computeDateRangeFromPreset(
 	};
 }
 
-function getCustomDateLabel(value: DateRangeValue): string {
+// --- CalendarDateTime helpers (all in the user's local timezone) ---
+
+// Build a local-zone CalendarDateTime from a UTC ISO string so the date + time
+// render in the user's timezone.
+function isoToLocalDateTime(iso: string): CalendarDateTime {
+	const d = new Date(iso);
+	return new CalendarDateTime(
+		d.getFullYear(),
+		d.getMonth() + 1,
+		d.getDate(),
+		d.getHours(),
+		d.getMinutes(),
+		d.getSeconds(),
+	);
+}
+
+function dateTimeToIso(dt: CalendarDateTime): string {
+	return dt.toDate(getLocalTimeZone()).toISOString();
+}
+
+function datePart(dt: CalendarDateTime): CalendarDate {
+	return new CalendarDate(dt.year, dt.month, dt.day);
+}
+
+function timePart(dt: CalendarDateTime): Time {
+	return new Time(dt.hour, dt.minute, dt.second);
+}
+
+function withDate(dt: CalendarDateTime, d: CalendarDate): CalendarDateTime {
+	return new CalendarDateTime(
+		d.year,
+		d.month,
+		d.day,
+		dt.hour,
+		dt.minute,
+		dt.second,
+	);
+}
+
+function withTime(dt: CalendarDateTime, t: Time): CalendarDateTime {
+	return new CalendarDateTime(
+		dt.year,
+		dt.month,
+		dt.day,
+		t.hour,
+		t.minute,
+		t.second,
+	);
+}
+
+function getTriggerLabel(value: DateRangeValue): string {
+	if (value.datePreset) {
+		return (
+			DATE_PRESETS.find((p) => p.key === value.datePreset)?.label ??
+			"Select Date"
+		);
+	}
 	if (value.startDate && value.endDate) {
 		const start = new Date(value.startDate);
 		const end = new Date(value.endDate);
-		return `${format(start, "MMM d")} - ${format(end, "MMM d")}`;
+		const sameDay = start.toDateString() === end.toDateString();
+		const startLabel = format(start, "MMM d, h:mm a");
+		const endLabel = format(end, sameDay ? "h:mm a" : "MMM d, h:mm a");
+		return `${startLabel} - ${endLabel}`;
 	}
-	return "Custom...";
+	return "Select Date";
+}
+
+// Seed the editable draft from the committed value (preset → computed range).
+function seedDraft(value: DateRangeValue): {
+	start: CalendarDateTime;
+	end: CalendarDateTime;
+	preset: string | null;
+} {
+	if (value.startDate && value.endDate && !value.datePreset) {
+		return {
+			start: isoToLocalDateTime(value.startDate),
+			end: isoToLocalDateTime(value.endDate),
+			preset: null,
+		};
+	}
+
+	const presetKey = value.datePreset ?? "1hr";
+	const range = computeDateRangeFromPreset(presetKey) ?? {
+		from: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+		to: new Date().toISOString(),
+	};
+	return {
+		start: isoToLocalDateTime(range.from),
+		end: isoToLocalDateTime(range.to),
+		preset: value.datePreset ?? null,
+	};
 }
 
 export function DateRangePicker({
 	value,
 	onValueChange,
 }: DateRangePickerProps) {
-	const [showCustom, setShowCustom] = useState(
-		!!(value.startDate && value.endDate && !value.datePreset),
-	);
-	const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+	const [isOpen, setIsOpen] = useState(false);
+	const initial = seedDraft(value);
+	const [draftStart, setDraftStart] = useState<CalendarDateTime>(initial.start);
+	const [draftEnd, setDraftEnd] = useState<CalendarDateTime>(initial.end);
+	const [draftPreset, setDraftPreset] = useState<string | null>(initial.preset);
 
-	// Convert custom date strings to CalendarDate for HeroDateRangePicker
-	const customDateValue = useMemo(() => {
-		if (value.startDate && value.endDate) {
-			try {
-				const startStr = value.startDate.split("T")[0];
-				const endStr = value.endDate.split("T")[0];
-				return {
-					start: parseDate(startStr),
-					end: parseDate(endStr),
-				};
-			} catch {
-				return null;
-			}
+	const maxDate = today(getLocalTimeZone());
+	const isInvalid = draftStart.compare(draftEnd) > 0;
+
+	const open = () => {
+		const next = seedDraft(value);
+		setDraftStart(next.start);
+		setDraftEnd(next.end);
+		setDraftPreset(next.preset);
+		setIsOpen(true);
+	};
+
+	const applyPreset = (key: string) => {
+		const range = computeDateRangeFromPreset(key);
+		if (!range) return;
+		setDraftStart(isoToLocalDateTime(range.from));
+		setDraftEnd(isoToLocalDateTime(range.to));
+		setDraftPreset(key);
+	};
+
+	// Editing the calendar or time fields turns the selection into a custom range.
+	const editStart = (next: CalendarDateTime) => {
+		setDraftStart(next);
+		setDraftPreset(null);
+	};
+	const editEnd = (next: CalendarDateTime) => {
+		setDraftEnd(next);
+		setDraftPreset(null);
+	};
+
+	const update = () => {
+		if (draftPreset) {
+			onValueChange({ datePreset: draftPreset });
+		} else {
+			onValueChange({
+				startDate: dateTimeToIso(draftStart),
+				endDate: dateTimeToIso(draftEnd),
+			});
 		}
-		return null;
-	}, [value.startDate, value.endDate]);
-
-	const selectedKey = value.datePreset || (showCustom ? "custom" : undefined);
-
-	const displayLabel =
-		selectedKey === "custom" && value.startDate && value.endDate
-			? getCustomDateLabel(value)
-			: selectedKey
-				? DATE_PRESETS.find((p) => p.key === selectedKey)?.label ||
-					"Select Date"
-				: "Select Date";
-
-	if (showCustom) {
-		return (
-			<HeroDateRangePicker
-				className="w-64"
-				aria-label="Select date range"
-				value={customDateValue}
-				maxValue={today(getLocalTimeZone())}
-				isOpen={isCalendarOpen}
-				onOpenChange={setIsCalendarOpen}
-				onChange={(range) => {
-					if (range) {
-						const startDate = range.start.toDate(getLocalTimeZone());
-						startDate.setHours(0, 0, 0, 0);
-
-						const endDate = range.end.toDate(getLocalTimeZone());
-						endDate.setHours(23, 59, 59, 999);
-
-						onValueChange({
-							startDate: startDate.toISOString(),
-							endDate: endDate.toISOString(),
-						});
-					}
-				}}
-			>
-				<DateField.Group>
-					<DateField.InputContainer>
-						<DateField.Input slot="start">
-							{(segment) => <DateField.Segment segment={segment} />}
-						</DateField.Input>
-						<HeroDateRangePicker.RangeSeparator />
-						<DateField.Input slot="end">
-							{(segment) => <DateField.Segment segment={segment} />}
-						</DateField.Input>
-					</DateField.InputContainer>
-					<DateField.Suffix>
-						<HeroDateRangePicker.Trigger>
-							<HeroDateRangePicker.TriggerIndicator />
-						</HeroDateRangePicker.Trigger>
-					</DateField.Suffix>
-				</DateField.Group>
-				<HeroDateRangePicker.Popover>
-					<div className="p-2">
-						<Button
-							className="w-full"
-							variant="tertiary"
-							size="sm"
-							onPress={() => {
-								setShowCustom(false);
-								setIsCalendarOpen(false);
-								onValueChange({
-									datePreset: "1hr",
-								});
-							}}
-						>
-							<LucideArrowLeft className="size-3.5" />
-							Back to Presets
-						</Button>
-					</div>
-					<RangeCalendar aria-label="Choose date range">
-						<RangeCalendar.Header>
-							<RangeCalendar.Heading />
-							<RangeCalendar.NavButton slot="previous" />
-							<RangeCalendar.NavButton slot="next" />
-						</RangeCalendar.Header>
-						<RangeCalendar.Grid>
-							<RangeCalendar.GridHeader>
-								{(day) => (
-									<RangeCalendar.HeaderCell>{day}</RangeCalendar.HeaderCell>
-								)}
-							</RangeCalendar.GridHeader>
-							<RangeCalendar.GridBody>
-								{(date) => <RangeCalendar.Cell date={date} />}
-							</RangeCalendar.GridBody>
-						</RangeCalendar.Grid>
-					</RangeCalendar>
-				</HeroDateRangePicker.Popover>
-			</HeroDateRangePicker>
-		);
-	}
+		setIsOpen(false);
+	};
 
 	return (
-		<Select
-			aria-label="Filter by date range"
-			placeholder="Select Date"
-			className="w-44"
-			value={selectedKey ?? null}
-			onChange={(key) => {
-				const stringKey = key as string | null;
-				if (stringKey === "custom") {
-					setShowCustom(true);
-					setIsCalendarOpen(true);
-				} else if (stringKey) {
-					onValueChange({
-						datePreset: stringKey,
-					});
-				}
-			}}
+		<Popover
+			isOpen={isOpen}
+			onOpenChange={(next) => (next ? open() : setIsOpen(false))}
 		>
-			<Select.Trigger className="flex items-center gap-2">
-				<LucideClock className="size-3.5 text-muted" />
-				<Select.Value>{displayLabel}</Select.Value>
-				<Select.Indicator />
-			</Select.Trigger>
-			<Select.Popover className="w-[200px]">
-				<ListBox items={DATE_PRESETS}>
-					{(preset) => (
-						<ListBox.Item id={preset.key} textValue={preset.label}>
-							{preset.label}
-							<ListBox.ItemIndicator />
-						</ListBox.Item>
-					)}
-				</ListBox>
-			</Select.Popover>
-		</Select>
+			<Button size="sm" variant="tertiary" className="min-w-0">
+				<LucideCalendar className="size-3.5 shrink-0 text-muted" />
+				<span className="truncate">{getTriggerLabel(value)}</span>
+			</Button>
+
+			<Popover.Content placement="bottom start">
+				<Popover.Dialog className="p-0 flex flex-col">
+					<div className="flex items-stretch">
+						{/* Calendar + time fields */}
+						<div className="p-4 flex flex-col gap-4 w-[300px]">
+							<RangeCalendar
+								aria-label="Choose date range"
+								maxValue={maxDate}
+								value={{ start: draftStart, end: draftEnd }}
+								onChange={(range) => {
+									if (range) {
+										editStart(withDate(draftStart, datePart(range.start)));
+										editEnd(withDate(draftEnd, datePart(range.end)));
+									}
+								}}
+							>
+								<RangeCalendar.Header>
+									<RangeCalendar.NavButton slot="previous" />
+									<RangeCalendar.Heading />
+									<RangeCalendar.NavButton slot="next" />
+								</RangeCalendar.Header>
+								<RangeCalendar.Grid weekdayStyle="short">
+									<RangeCalendar.GridHeader>
+										{(day) => (
+											<RangeCalendar.HeaderCell>{day}</RangeCalendar.HeaderCell>
+										)}
+									</RangeCalendar.GridHeader>
+									<RangeCalendar.GridBody>
+										{(date) => <RangeCalendar.Cell date={date} />}
+									</RangeCalendar.GridBody>
+								</RangeCalendar.Grid>
+							</RangeCalendar>
+
+							<div className="flex flex-col gap-2 border-t border-default-200 pt-3">
+								<div className="flex items-center gap-2">
+									<Label className="w-10 shrink-0 text-xs text-muted">
+										Start
+									</Label>
+									<DateField
+										aria-label="Start date"
+										granularity="day"
+										maxValue={maxDate}
+										value={datePart(draftStart)}
+										onChange={(d) => d && editStart(withDate(draftStart, d))}
+									>
+										<DateField.Group>
+											<DateField.InputContainer>
+												<DateField.Input>
+													{(segment) => <DateField.Segment segment={segment} />}
+												</DateField.Input>
+											</DateField.InputContainer>
+										</DateField.Group>
+									</DateField>
+									<TimeField
+										aria-label="Start time"
+										value={timePart(draftStart)}
+										onChange={(t) => t && editStart(withTime(draftStart, t))}
+									>
+										<TimeField.Group>
+											<TimeField.InputContainer>
+												<TimeField.Input>
+													{(segment) => <TimeField.Segment segment={segment} />}
+												</TimeField.Input>
+											</TimeField.InputContainer>
+										</TimeField.Group>
+									</TimeField>
+								</div>
+
+								<div className="flex items-center gap-2">
+									<Label className="w-10 shrink-0 text-xs text-muted">
+										End
+									</Label>
+									<DateField
+										aria-label="End date"
+										granularity="day"
+										maxValue={maxDate}
+										value={datePart(draftEnd)}
+										onChange={(d) => d && editEnd(withDate(draftEnd, d))}
+									>
+										<DateField.Group>
+											<DateField.InputContainer>
+												<DateField.Input>
+													{(segment) => <DateField.Segment segment={segment} />}
+												</DateField.Input>
+											</DateField.InputContainer>
+										</DateField.Group>
+									</DateField>
+									<TimeField
+										aria-label="End time"
+										value={timePart(draftEnd)}
+										onChange={(t) => t && editEnd(withTime(draftEnd, t))}
+									>
+										<TimeField.Group>
+											<TimeField.InputContainer>
+												<TimeField.Input>
+													{(segment) => <TimeField.Segment segment={segment} />}
+												</TimeField.Input>
+											</TimeField.InputContainer>
+										</TimeField.Group>
+									</TimeField>
+								</div>
+							</div>
+						</div>
+
+						{/* Presets */}
+						<div className="border-l border-default-200 p-2 w-44 shrink-0">
+							<p className="px-2 pt-1 pb-2 text-xs font-medium text-muted">
+								Presets
+							</p>
+							<ListBox
+								aria-label="Date range presets"
+								selectionMode="single"
+								selectedKeys={draftPreset ? [draftPreset] : []}
+								onSelectionChange={(keys) => {
+									const key = Array.from(keys)[0] as string | undefined;
+									if (key) applyPreset(key);
+								}}
+							>
+								{DATE_PRESETS.map((preset) => (
+									<ListBox.Item
+										key={preset.key}
+										id={preset.key}
+										textValue={preset.label}
+									>
+										{preset.label}
+										<ListBox.ItemIndicator />
+									</ListBox.Item>
+								))}
+							</ListBox>
+						</div>
+					</div>
+
+					{/* Footer */}
+					<div className="flex items-center justify-end gap-2 border-t border-default-200 p-3">
+						<Button
+							size="sm"
+							variant="tertiary"
+							onPress={() => setIsOpen(false)}
+						>
+							Cancel
+						</Button>
+						<Button
+							size="sm"
+							variant="primary"
+							isDisabled={isInvalid}
+							onPress={update}
+						>
+							Update
+						</Button>
+					</div>
+				</Popover.Dialog>
+			</Popover.Content>
+		</Popover>
 	);
 }
