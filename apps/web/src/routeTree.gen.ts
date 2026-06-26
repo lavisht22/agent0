@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as AppCreateWorkspaceRouteImport } from './routes/_app.create-workspace'
 import { Route as AppAccountRouteImport } from './routes/_app.account'
 import { Route as AppWorkspaceWorkspaceIdRouteImport } from './routes/_app.workspace.$workspaceId'
@@ -43,6 +44,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppRoute,
+} as any)
+const InviteTokenRoute = InviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AppCreateWorkspaceRoute = AppCreateWorkspaceRouteImport.update({
   id: '/create-workspace',
@@ -148,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/account': typeof AppAccountRouteWithChildren
   '/create-workspace': typeof AppCreateWorkspaceRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/': typeof AppIndexRoute
   '/workspace/$workspaceId': typeof AppWorkspaceWorkspaceIdRouteWithChildren
   '/account/personal-access-tokens/$tokenId': typeof AppAccountPersonalAccessTokensTokenIdRoute
@@ -169,6 +176,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/account': typeof AppAccountRouteWithChildren
   '/create-workspace': typeof AppCreateWorkspaceRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/': typeof AppIndexRoute
   '/account/personal-access-tokens/$tokenId': typeof AppAccountPersonalAccessTokensTokenIdRoute
   '/workspace/$workspaceId/settings': typeof AppWorkspaceWorkspaceIdSettingsRoute
@@ -191,6 +199,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_app/account': typeof AppAccountRouteWithChildren
   '/_app/create-workspace': typeof AppCreateWorkspaceRoute
+  '/invite/$token': typeof InviteTokenRoute
   '/_app/': typeof AppIndexRoute
   '/_app/workspace/$workspaceId': typeof AppWorkspaceWorkspaceIdRouteWithChildren
   '/_app/account/personal-access-tokens/$tokenId': typeof AppAccountPersonalAccessTokensTokenIdRoute
@@ -214,6 +223,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/account'
     | '/create-workspace'
+    | '/invite/$token'
     | '/'
     | '/workspace/$workspaceId'
     | '/account/personal-access-tokens/$tokenId'
@@ -235,6 +245,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/account'
     | '/create-workspace'
+    | '/invite/$token'
     | '/'
     | '/account/personal-access-tokens/$tokenId'
     | '/workspace/$workspaceId/settings'
@@ -256,6 +267,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_app/account'
     | '/_app/create-workspace'
+    | '/invite/$token'
     | '/_app/'
     | '/_app/workspace/$workspaceId'
     | '/_app/account/personal-access-tokens/$tokenId'
@@ -277,6 +289,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   AuthRoute: typeof AuthRoute
+  InviteTokenRoute: typeof InviteTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -301,6 +314,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/invite/$token': {
+      id: '/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/invite/$token'
+      preLoaderRoute: typeof InviteTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_app/create-workspace': {
       id: '/_app/create-workspace'
@@ -505,6 +525,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   AuthRoute: AuthRoute,
+  InviteTokenRoute: InviteTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

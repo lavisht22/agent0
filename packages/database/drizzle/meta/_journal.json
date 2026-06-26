@@ -15,6 +15,27 @@
       "when": 1781267813596,
       "tag": "0001_dazzling_talisman",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782469349004,
+      "tag": "0002_blushing_blade",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1782470678708,
+      "tag": "0003_volatile_doomsday",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1782471294444,
+      "tag": "0004_drop_users_auth_users_fkey",
+      "breakpoints": true
     }
   ]
 }

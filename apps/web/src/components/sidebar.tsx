@@ -290,7 +290,7 @@ export function Sidebar({ workspaceId }: SidebarProps) {
 								onAction={async () => {
 									await authClient.signOut();
 									invalidateSession();
-									navigate({ to: "/auth" });
+									navigate({ to: "/auth", search: { redirect: undefined } });
 								}}
 							>
 								<LucideLogOut className="size-4" />
