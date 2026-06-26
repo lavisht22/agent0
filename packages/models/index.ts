@@ -262,6 +262,34 @@ export const MODELS: Model[] = [
 	},
 
 	{
+		id: "global.anthropic.claude-opus-4-8",
+		providers: ["bedrock"],
+		status: "active",
+		cost: { noCacheInput: 5, cacheInput: 0.5, output: 25 },
+		releaseDate: "2026-05-28",
+	},
+	{
+		id: "global.anthropic.claude-opus-4-7",
+		providers: ["bedrock"],
+		status: "active",
+		cost: { noCacheInput: 5, cacheInput: 0.5, output: 25 },
+		releaseDate: "2026-04-16",
+	},
+	{
+		id: "global.anthropic.claude-sonnet-4-6",
+		providers: ["bedrock"],
+		status: "active",
+		cost: { noCacheInput: 3, cacheInput: 0.3, output: 15 },
+		releaseDate: "2026-02-17",
+	},
+	{
+		id: "global.anthropic.claude-opus-4-6-v1",
+		providers: ["bedrock"],
+		status: "active",
+		cost: { noCacheInput: 5, cacheInput: 0.5, output: 25 },
+		releaseDate: "2026-02-05",
+	},
+	{
 		id: "global.anthropic.claude-opus-4-5-20251101-v1:0",
 		providers: ["bedrock"],
 		status: "active",
