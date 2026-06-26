@@ -12,7 +12,7 @@ export const Route = createFileRoute("/_app")({
 		// the app lifetime). No session → back to login.
 		const session = await getCachedSession();
 		if (!session) {
-			throw redirect({ to: "/auth" });
+			throw redirect({ to: "/auth", search: { redirect: undefined } });
 		}
 
 		if (location.pathname === "/") {

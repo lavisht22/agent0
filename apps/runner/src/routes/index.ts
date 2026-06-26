@@ -6,6 +6,7 @@ import { registerAuthRoutes } from "./auth.js";
 import { registerBetterAuthRoutes } from "./better-auth.js";
 import { registerDashboardRoutes } from "./dashboard.js";
 import { registerEmbedRoutes } from "./embed.js";
+import { registerInvitationsRoutes } from "./invitations.js";
 import { registerMcpsRoutes } from "./mcps.js";
 import { registerPersonalAccessTokensRoutes } from "./personal-access-tokens.js";
 import { registerProvidersRoutes } from "./providers.js";
@@ -48,6 +49,7 @@ export async function registerRoutes(fastify: FastifyInstance) {
 
 		await registerAuthRoutes(scoped);
 		await registerWorkspacesRoute(scoped);
+		await registerInvitationsRoutes(scoped);
 		await registerPersonalAccessTokensRoutes(scoped);
 	});
 }

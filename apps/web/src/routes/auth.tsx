@@ -16,24 +16,33 @@ import {
 	invalidateSession,
 } from "../lib/auth-client";
 
+// `redirect` lets flows that require auth (e.g. an invite link) bounce through
+// login and land back where they started. Defaults to the app root.
 export const Route = createFileRoute("/auth")({
 	component: RouteComponent,
-	beforeLoad: async () => {
+	validateSearch: (search: Record<string, unknown>) => ({
+		redirect: typeof search.redirect === "string" ? search.redirect : undefined,
+	}),
+	beforeLoad: async ({ search }) => {
 		// Already authenticated (valid session cookie) → skip the login screen.
 		const session = await getCachedSession();
 		if (session) {
-			throw redirect({ to: "/" });
+			throw redirect({ to: search.redirect ?? "/" });
 		}
 	},
 });
 
 function RouteComponent() {
+	const { redirect: redirectTo } = Route.useSearch();
 	const [email, setEmail] = useState("");
 	const [otp, setOtp] = useState("");
+	const [name, setName] = useState("");
 	const [loading, setLoading] = useState(false);
-	const [step, setStep] = useState<"email" | "otp">("email");
+	const [step, setStep] = useState<"email" | "otp" | "name">("email");
 
 	const navigate = useNavigate();
+
+	const finish = () => navigate({ to: redirectTo ?? "/" });
 
 	const handleSendCode = async (e: React.FormEvent) => {
 		e.preventDefault();
@@ -74,7 +83,16 @@ function RouteComponent() {
 			// Sign-in set the session cookie; drop the cached "logged out" answer so
 			// the destination route's guard re-reads it.
 			invalidateSession();
-			navigate({ to: "/" });
+
+			// OTP sign-up never collects a name, so first-time users (including
+			// invitees) land here without one. Prompt for it before continuing.
+			const session = await getCachedSession(true);
+			if (!session?.user?.name) {
+				setStep("name");
+				return;
+			}
+
+			finish();
 		} catch (error) {
 			toast.danger(
 				error instanceof Error
@@ -86,17 +104,46 @@ function RouteComponent() {
 		}
 	};
 
+	const handleSaveName = async (e: React.FormEvent) => {
+		e.preventDefault();
+		setLoading(true);
+
+		try {
+			const { error } = await authClient.updateUser({ name: name.trim() });
+
+			if (error) throw new Error(error.message);
+
+			// Refresh the cached session so the new name is reflected app-wide.
+			invalidateSession();
+			finish();
+		} catch (error) {
+			toast.danger(
+				error instanceof Error
+					? error.message
+					: "Unable to save your name at the moment.",
+			);
+		} finally {
+			setLoading(false);
+		}
+	};
+
 	return (
 		<div className="min-h-screen flex flex-col items-center justify-center p-4">
 			<div className="w-full max-w-sm space-y-8">
 				<div className="text-center space-y-2">
 					<h1 className="text-3xl font-medium tracking-tight">
-						{step === "email" ? "Welcome back" : "Check your email"}
+						{step === "email"
+							? "Welcome back"
+							: step === "otp"
+								? "Check your email"
+								: "One last thing"}
 					</h1>
 					<p className="text-muted">
 						{step === "email"
 							? "Enter your email to sign in to your account"
-							: `We've sent a code to ${email}`}
+							: step === "otp"
+								? `We've sent a code to ${email}`
+								: "What should we call you?"}
 					</p>
 				</div>
 				{step === "email" ? (
@@ -125,7 +172,7 @@ function RouteComponent() {
 							)}
 						</Button>
 					</Form>
-				) : (
+				) : step === "otp" ? (
 					<Form
 						onSubmit={handleVerifyCode}
 						className="flex flex-col gap-4 items-center"
@@ -167,6 +214,33 @@ function RouteComponent() {
 							className="w-full"
 						>
 							Back to Email
+						</Button>
+					</Form>
+				) : (
+					<Form onSubmit={handleSaveName} className="flex flex-col gap-4">
+						<TextField name="name" isRequired className="w-full">
+							<Label>Name</Label>
+							<Input
+								autoFocus
+								placeholder="Jane Doe"
+								value={name}
+								onChange={(e) => setName(e.target.value)}
+							/>
+						</TextField>
+						<Button
+							type="submit"
+							variant="primary"
+							size="lg"
+							isPending={loading}
+							isDisabled={name.trim().length === 0}
+							className="w-full"
+						>
+							{({ isPending }) => (
+								<>
+									{isPending && <Spinner color="current" size="sm" />}
+									Continue
+								</>
+							)}
 						</Button>
 					</Form>
 				)}

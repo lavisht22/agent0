@@ -45,6 +45,12 @@ export const workspaceUserRole = pgEnum("workspace_user_role", [
 	"reader",
 ]);
 
+export const invitationStatus = pgEnum("invitation_status", [
+	"pending",
+	"accepted",
+	"revoked",
+]);
+
 // ---------------------------------------------------------------------------
 // better-auth-owned tables (camelCase fields, Date-mode timestamps)
 // ---------------------------------------------------------------------------
@@ -52,7 +58,11 @@ export const workspaceUserRole = pgEnum("workspace_user_role", [
 export const users = pgTable(
 	"users",
 	{
-		id: uuid().primaryKey().notNull(),
+		// better-auth inserts new users with `id = default`, deferring id generation
+		// to Postgres (same as sessions/accounts/verifications). Without the DB
+		// default the insert sends NULL and fails — so first-time sign-ups (e.g.
+		// accepting a workspace invite) 500. defaultRandom() supplies the uuid.
+		id: uuid().defaultRandom().primaryKey().notNull(),
 		name: text(),
 		email: text().notNull(),
 		emailVerified: boolean("email_verified").default(false).notNull(),
@@ -550,5 +560,61 @@ export const personalAccessTokens = pgTable(
 			.onUpdate("cascade")
 			.onDelete("cascade"),
 		unique("personal_access_tokens_token_hash_key").on(table.token_hash),
+	],
+);
+
+/**
+ * Pending invitations to join a workspace. An admin creates a row with the
+ * invitee's email + target role; the raw token is emailed (only its sha256 hash
+ * is stored) and exchanged for membership at accept time. Existing users are
+ * added to `workspace_user` directly and never get a row here — invitations only
+ * exist for emails that haven't signed in yet. `status` moves pending → accepted
+ * or pending → revoked and is never reused.
+ */
+export const invitations = pgTable(
+	"invitations",
+	{
+		id: text().primaryKey().notNull(),
+		workspace_id: text().notNull(),
+		email: text().notNull(),
+		role: workspaceUserRole().default("reader").notNull(),
+		token_hash: text().notNull(),
+		status: invitationStatus().default("pending").notNull(),
+		// Null until the inviter's row is deleted (FK set-null), preserving the
+		// invite for audit even if the admin who sent it leaves.
+		invited_by: uuid(),
+		expires_at: timestamp({ withTimezone: true, mode: "string" }).notNull(),
+		accepted_at: timestamp({ withTimezone: true, mode: "string" }),
+		created_at: timestamp({ withTimezone: true, mode: "string" })
+			.defaultNow()
+			.notNull(),
+		updated_at: timestamp({ withTimezone: true, mode: "string" })
+			.defaultNow()
+			.notNull(),
+	},
+	(table) => [
+		index("invitations_workspace_id_idx").using(
+			"btree",
+			table.workspace_id.asc().nullsLast().op("text_ops"),
+		),
+		index("invitations_email_idx").using(
+			"btree",
+			table.email.asc().nullsLast().op("text_ops"),
+		),
+		foreignKey({
+			columns: [table.workspace_id],
+			foreignColumns: [workspaces.id],
+			name: "invitations_workspace_id_fkey",
+		})
+			.onUpdate("cascade")
+			.onDelete("cascade"),
+		foreignKey({
+			columns: [table.invited_by],
+			foreignColumns: [users.id],
+			name: "invitations_invited_by_fkey",
+		})
+			.onUpdate("cascade")
+			.onDelete("set null"),
+		unique("invitations_token_hash_key").on(table.token_hash),
 	],
 );

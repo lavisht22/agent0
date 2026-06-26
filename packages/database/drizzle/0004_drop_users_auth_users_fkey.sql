@@ -1,0 +1,11 @@
+-- Drop the leftover `public.users.id -> auth.users(id)` foreign key.
+--
+-- This constraint is a relic of a Supabase-Auth-based design. The app now uses
+-- better-auth, which inserts directly into `public.users` and never creates
+-- `auth.users` rows, so the FK makes every new-user sign-up (e.g. accepting a
+-- workspace invite) fail with a 23503 violation.
+--
+-- The constraint is not part of the Drizzle schema and only exists on databases
+-- that were originally provisioned with Supabase Auth, so `IF EXISTS` keeps this
+-- a no-op on any database built purely from these migrations.
+ALTER TABLE "users" DROP CONSTRAINT IF EXISTS "users_id_fkey";

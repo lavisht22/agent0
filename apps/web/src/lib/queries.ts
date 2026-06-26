@@ -80,6 +80,87 @@ export async function removeWorkspaceMember(
 	await api.delete(`/api/v1/workspaces/${workspaceId}/members/${userId}`);
 }
 
+export type WorkspaceRole = "admin" | "writer" | "reader";
+
+export type PendingInvitation = {
+	id: string;
+	email: string;
+	role: WorkspaceRole;
+	invited_by_name: string | null;
+	expires_at: string;
+	created_at: string;
+};
+
+export const invitationsQuery = (workspaceId: string) =>
+	queryOptions({
+		queryKey: ["workspace-invitations", workspaceId],
+		queryFn: async () => {
+			const { data } = await api.get<{ data: PendingInvitation[] }>(
+				`/api/v1/workspaces/${workspaceId}/invitations`,
+			);
+
+			return data;
+		},
+		enabled: !!workspaceId,
+	});
+
+// `outcome` distinguishes an existing user added on the spot from a brand-new
+// person who was emailed an invitation link.
+export type InviteOutcome = "member_added" | "invitation_sent";
+
+export async function inviteWorkspaceMember(
+	workspaceId: string,
+	email: string,
+	role: WorkspaceRole,
+) {
+	const { data } = await api.post<{
+		data: { outcome: InviteOutcome; email: string };
+	}>(`/api/v1/workspaces/${workspaceId}/invitations`, { email, role });
+
+	return data;
+}
+
+export async function revokeInvitation(
+	workspaceId: string,
+	invitationId: string,
+) {
+	await api.delete(
+		`/api/v1/workspaces/${workspaceId}/invitations/${invitationId}`,
+	);
+}
+
+// Token-scoped (no workspace in the path): the caller may not be a member yet.
+export type InvitationDetails = {
+	workspace_id: string;
+	workspace_name: string;
+	email: string;
+	role: WorkspaceRole;
+	status: "pending" | "accepted" | "revoked" | "expired";
+	email_matches: boolean;
+};
+
+export const invitationQuery = (token: string) =>
+	queryOptions({
+		queryKey: ["invitation", token],
+		queryFn: async () => {
+			const { data } = await api.get<{ data: InvitationDetails }>(
+				`/api/v1/invitations/${token}`,
+			);
+
+			return data;
+		},
+		enabled: !!token,
+		retry: false,
+	});
+
+export async function acceptInvitation(token: string) {
+	const { data } = await api.post<{ data: { workspace_id: string } }>(
+		`/api/v1/invitations/${token}/accept`,
+	);
+
+	return data;
+}
+
 // `has_staging_config` is derived server-side; the encrypted blobs are never returned.
 export type Provider = {
 	id: string;
