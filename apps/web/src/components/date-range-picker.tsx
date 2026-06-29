@@ -25,6 +25,8 @@ const DATE_PRESETS = [
 	{ key: "yesterday", label: "Yesterday" },
 	{ key: "3days", label: "Last 3 Days" },
 	{ key: "7days", label: "Last 7 Days" },
+	{ key: "30days", label: "Last 30 Days" },
+	{ key: "90days", label: "Last 90 Days" },
 ];
 
 export type DateRangeValue = {
@@ -72,6 +74,12 @@ export function computeDateRangeFromPreset(
 			break;
 		case "7days":
 			fromDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+			break;
+		case "30days":
+			fromDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+			break;
+		case "90days":
+			fromDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 			break;
 		default:
 			return null;
