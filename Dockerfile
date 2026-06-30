@@ -3,7 +3,17 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 
-FROM base AS build
+# Pinned to the native build platform so the heavy compile (pnpm install, vite,
+# tsc) runs ONCE on the runner's own arch instead of once per target platform
+# under QEMU emulation. The output is pure JS / arch-independent prod deps, so
+# both the amd64 and arm64 runtime images below COPY the same build result.
+# NOTE: this derives from the external node image directly, not `base`. The
+# --platform pin is only honored against an external image; `FROM base` would
+# inherit the per-target platform and silently run the build twice.
+FROM --platform=$BUILDPLATFORM node:20-slim AS build
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 COPY . /usr/src/app
 WORKDIR /usr/src/app
 ENV CI=true

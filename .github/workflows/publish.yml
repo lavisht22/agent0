@@ -18,9 +18,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
+      # No QEMU: the build stage is pinned to $BUILDPLATFORM (runs natively) and
+      # the per-arch runner stage only COPYs files + sets metadata — it never
+      # executes target-arch binaries, so nothing needs emulation.
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
