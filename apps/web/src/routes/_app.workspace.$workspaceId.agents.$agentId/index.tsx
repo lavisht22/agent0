@@ -27,11 +27,14 @@ import {
 	LucideSettings2,
 	LucideSquare,
 } from "lucide-react";
-import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import useDb from "use-db";
 
-import { Messages, type MessageT } from "@/components/messages";
+import {
+	Messages,
+	type MessageT,
+	normalizeMessages,
+} from "@/components/messages";
 import { PageHeader } from "@/components/page-header";
 import { TagsSelect } from "@/components/tags-select";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -202,11 +205,10 @@ function RouteComponent() {
 
 		const data = version.data as AgentFormValues;
 
-		// Ensure all messages have IDs (for backward compatibility with old data)
-		const messagesWithIds = (data.messages || []).map((msg) => ({
-			...msg,
-			id: msg.id || nanoid(),
-		})) as MessageT[];
+		// normalizeMessages backfills missing ids and wraps any bare-string
+		// user/assistant content in a text part so the message editors (which
+		// assume an array of parts) don't crash on older/string-content data.
+		const messagesWithIds = normalizeMessages(data.messages || []);
 
 		form.reset(
 			{
@@ -233,17 +235,31 @@ function RouteComponent() {
 
 		if (!state?.replayData) return;
 
-		// Ensure all messages have IDs (for backward compatibility)
-		const replayDataWithIds = {
-			...state.replayData,
-			messages: state.replayData.messages.map((msg) => ({
-				...msg,
-				id: msg.id || nanoid(),
-			})),
+		const data = state.replayData;
+
+		// A run's stored request only carries the fields that were actually sent,
+		// so optional ones (notably `skills`) can be missing. Default every field
+		// the same way the version-edit reset does — otherwise the form ends up
+		// with `undefined` for, e.g., `skills`, and SkillsSection crashes on
+		// `value.length`/`value.map`, blanking the whole editor.
+		//
+		// normalizeMessages also wraps any bare-string user/assistant content in a
+		// text part (the AI SDK stores plain replies as strings) so the message
+		// editors, which assume an array of parts, don't crash.
+		const replayValues = {
+			model: data.model || { provider_id: "", name: "" },
+			maxOutputTokens: data.maxOutputTokens || 2048,
+			outputFormat: data.outputFormat || "text",
+			temperature: data.temperature ?? 0.7,
+			maxStepCount: data.maxStepCount || 10,
+			messages: normalizeMessages(data.messages || []),
+			tools: data.tools || [],
+			skills: data.skills || [],
+			providerOptions: data.providerOptions || {},
 		};
 
 		setTimeout(() => {
-			form.reset(replayDataWithIds, { keepDefaultValues: true });
+			form.reset(replayValues, { keepDefaultValues: true });
 		}, 200);
 	}, [isNewAgent, location.state, form]);
 
