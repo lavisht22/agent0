@@ -81,6 +81,35 @@ function SettingsPage() {
 		if (workspace) setName(workspace.name);
 	}, [workspace]);
 
+	const isAdmin = workspace?.role === "admin";
+
+	// Retention windows as strings ("" = keep forever). Parsed to nullable ints.
+	const [logsDays, setLogsDays] = useState("");
+	const [metricsDays, setMetricsDays] = useState("");
+
+	useEffect(() => {
+		if (workspace) {
+			setLogsDays(workspace.run_logs_retention_days?.toString() ?? "");
+			setMetricsDays(workspace.run_metrics_retention_days?.toString() ?? "");
+		}
+	}, [workspace]);
+
+	const parseDays = (v: string): number | null => {
+		const t = v.trim();
+		if (t === "") return null;
+		const n = Math.floor(Number(t));
+		return Number.isFinite(n) ? n : null;
+	};
+	const logsVal = parseDays(logsDays);
+	const metricsVal = parseDays(metricsDays);
+	const retentionInvalid =
+		(logsDays.trim() !== "" && (logsVal === null || logsVal < 1)) ||
+		(metricsDays.trim() !== "" && (metricsVal === null || metricsVal < 1)) ||
+		(logsVal !== null && metricsVal !== null && logsVal > metricsVal);
+	const retentionDirty =
+		logsVal !== (workspace?.run_logs_retention_days ?? null) ||
+		metricsVal !== (workspace?.run_metrics_retention_days ?? null);
+
 	const deleteWorkspaceState = useOverlayState();
 	const removeMemberState = useOverlayState();
 	const addMemberState = useOverlayState();
@@ -95,10 +124,25 @@ function SettingsPage() {
 	const revokeInvitationState = useOverlayState();
 
 	const updateWorkspaceNameMutation = useMutation({
-		mutationFn: (name: string) => updateWorkspace(workspaceId, name),
+		mutationFn: (name: string) => updateWorkspace(workspaceId, { name }),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["workspaces"] });
 			toast.success("Workspace name updated successfully.");
+		},
+		onError: (error) => {
+			toast.danger(error.message);
+		},
+	});
+
+	const updateRetentionMutation = useMutation({
+		mutationFn: () =>
+			updateWorkspace(workspaceId, {
+				run_logs_retention_days: logsVal,
+				run_metrics_retention_days: metricsVal,
+			}),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+			toast.success("Run retention settings updated.");
 		},
 		onError: (error) => {
 			toast.danger(error.message);
@@ -205,6 +249,76 @@ function SettingsPage() {
 							</Button>
 						)}
 					</div>
+
+					{isAdmin && (
+						<div className="space-y-2">
+							<div>
+								<h3 className="text-sm font-medium">Run Retention</h3>
+								<p className="text-sm text-muted">
+									Old runs eligible for cleanup once past these windows. Logs
+									are the full JSON stored in object storage; metrics are the
+									row kept in the database. Leave blank to keep forever. Logs
+									must be cleared no later than metrics.
+								</p>
+							</div>
+							<div className="flex gap-4 items-end">
+								<TextField
+									name="logsRetention"
+									className="w-full"
+									isInvalid={
+										logsDays.trim() !== "" && (logsVal === null || logsVal < 1)
+									}
+								>
+									<Label>Log retention (days)</Label>
+									<Input
+										type="number"
+										min={1}
+										placeholder="Keep forever"
+										value={logsDays}
+										onChange={(e) => setLogsDays(e.target.value)}
+									/>
+								</TextField>
+								<TextField
+									name="metricsRetention"
+									className="w-full"
+									isInvalid={
+										metricsDays.trim() !== "" &&
+										(metricsVal === null || metricsVal < 1)
+									}
+								>
+									<Label>Metrics retention (days)</Label>
+									<Input
+										type="number"
+										min={1}
+										placeholder="Keep forever"
+										value={metricsDays}
+										onChange={(e) => setMetricsDays(e.target.value)}
+									/>
+								</TextField>
+								{retentionDirty && (
+									<Button
+										variant="primary"
+										isDisabled={retentionInvalid}
+										isPending={updateRetentionMutation.isPending}
+										onPress={() => updateRetentionMutation.mutate()}
+									>
+										{({ isPending }) => (
+											<>
+												{isPending && <Spinner color="current" size="sm" />}
+												Save
+											</>
+										)}
+									</Button>
+								)}
+							</div>
+							{retentionInvalid && (
+								<p className="text-xs text-danger">
+									Each window must be at least 1 day, and log retention must be
+									less than or equal to metrics retention.
+								</p>
+							)}
+						</div>
+					)}
 
 					<div className="space-y-2">
 						<div className="flex justify-between items-end">

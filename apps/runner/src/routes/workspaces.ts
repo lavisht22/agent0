@@ -1,10 +1,11 @@
 import { users, workspaces, workspaceUser } from "@repo/database";
 import { and, asc, eq } from "drizzle-orm";
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
 import { userPrincipal } from "../lib/auth.js";
 import { db } from "../lib/pg.js";
-import { hasScope, requireScope, requireUserId } from "../lib/scopes.js";
+import { requireScope, requireUserId } from "../lib/scopes.js";
+import { isAdmin, requireAdminOrOwner } from "../lib/workspace-access.js";
 
 const ErrorSchema = {
 	type: "object" as const,
@@ -19,6 +20,8 @@ const workspaceColumns = {
 	user_id: workspaces.user_id,
 	created_at: workspaces.created_at,
 	updated_at: workspaces.updated_at,
+	run_logs_retention_days: workspaces.run_logs_retention_days,
+	run_metrics_retention_days: workspaces.run_metrics_retention_days,
 };
 
 function toWorkspace(row: {
@@ -27,6 +30,8 @@ function toWorkspace(row: {
 	user_id: string;
 	created_at: string;
 	updated_at: string;
+	run_logs_retention_days: number | null;
+	run_metrics_retention_days: number | null;
 }) {
 	return {
 		...row,
@@ -57,6 +62,8 @@ const WorkspaceSchema = {
 		user_id: { type: "string" as const },
 		created_at: { type: "string" as const, format: "date-time" },
 		updated_at: { type: "string" as const, format: "date-time" },
+		run_logs_retention_days: { type: "integer" as const, nullable: true },
+		run_metrics_retention_days: { type: "integer" as const, nullable: true },
 	},
 };
 
@@ -80,35 +87,6 @@ const MemberSchema = {
 		},
 	},
 };
-
-// Admin ⟺ the resolved scopes include `*:*:*` (only admins get it).
-function isAdmin(request: FastifyRequest): boolean {
-	return hasScope(request.principal?.scopes ?? [], "workspaces:write:*");
-}
-
-// Workspace management is allowed for admins OR the workspace owner. The owner
-// check is an escape hatch so the creator can never lock themselves out (e.g.
-// after being demoted). Only consulted when the caller isn't already an admin.
-async function isOwner(workspaceId: string, userId: string): Promise<boolean> {
-	const [row] = await db
-		.select({ user_id: workspaces.user_id })
-		.from(workspaces)
-		.where(eq(workspaces.id, workspaceId))
-		.limit(1);
-	return !!row && row.user_id === userId;
-}
-
-async function requireAdminOrOwner(
-	request: FastifyRequest,
-	reply: FastifyReply,
-	workspaceId: string,
-	userId: string,
-): Promise<boolean> {
-	if (isAdmin(request)) return true;
-	if (await isOwner(workspaceId, userId)) return true;
-	reply.code(403).send({ message: "Admin or workspace owner required" });
-	return false;
-}
 
 export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 	// PAT-only — API keys are workspace-pinned and can't enumerate others.
@@ -136,6 +114,14 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 										type: "string" as const,
 										format: "date-time",
 									},
+									run_logs_retention_days: {
+										type: "integer" as const,
+										nullable: true,
+									},
+									run_metrics_retention_days: {
+										type: "integer" as const,
+										nullable: true,
+									},
 								},
 							},
 						},
@@ -155,6 +141,8 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 						name: workspaces.name,
 						role: workspaceUser.role,
 						created_at: workspaces.created_at,
+						run_logs_retention_days: workspaces.run_logs_retention_days,
+						run_metrics_retention_days: workspaces.run_metrics_retention_days,
 					})
 					.from(workspaceUser)
 					.innerJoin(workspaces, eq(workspaceUser.workspace_id, workspaces.id))
@@ -240,6 +228,17 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 				type: "object" as const,
 				properties: {
 					name: { type: "string" as const, minLength: 1 },
+					// Run-retention windows in days. Null clears (keep forever).
+					run_logs_retention_days: {
+						type: "integer" as const,
+						minimum: 1,
+						nullable: true,
+					},
+					run_metrics_retention_days: {
+						type: "integer" as const,
+						minimum: 1,
+						nullable: true,
+					},
 				},
 				additionalProperties: false,
 			},
@@ -257,18 +256,68 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 		handler: async (request, reply) => {
 			const userId = userPrincipal(request).userId;
 			const { workspaceId } = request.params as { workspaceId: string };
-			const body = request.body as { name?: string };
+			const body = request.body as {
+				name?: string;
+				run_logs_retention_days?: number | null;
+				run_metrics_retention_days?: number | null;
+			};
 
 			if (!(await requireAdminOrOwner(request, reply, workspaceId, userId))) {
 				return;
 			}
 
-			if (body.name === undefined) {
+			const updates: {
+				name?: string;
+				run_logs_retention_days?: number | null;
+				run_metrics_retention_days?: number | null;
+				updated_at: string;
+			} = { updated_at: new Date().toISOString() };
+
+			if (body.name !== undefined) {
+				const trimmedName = body.name.trim();
+				if (trimmedName.length === 0) {
+					return reply.code(400).send({ message: "name must not be empty" });
+				}
+				updates.name = trimmedName;
+			}
+
+			const patchesLogs = "run_logs_retention_days" in body;
+			const patchesMetrics = "run_metrics_retention_days" in body;
+			if (patchesLogs)
+				updates.run_logs_retention_days = body.run_logs_retention_days;
+			if (patchesMetrics) {
+				updates.run_metrics_retention_days = body.run_metrics_retention_days;
+			}
+
+			if (body.name === undefined && !patchesLogs && !patchesMetrics) {
 				return reply.code(400).send({ message: "No updates provided" });
 			}
-			const trimmedName = body.name.trim();
-			if (trimmedName.length === 0) {
-				return reply.code(400).send({ message: "name must not be empty" });
+
+			// Enforce logs <= metrics on the *effective* windows (a run's log is
+			// unreachable once its metrics row is gone). Fall back to current values
+			// for any window this request doesn't touch.
+			if (patchesLogs || patchesMetrics) {
+				const [current] = await db
+					.select({
+						logs: workspaces.run_logs_retention_days,
+						metrics: workspaces.run_metrics_retention_days,
+					})
+					.from(workspaces)
+					.where(eq(workspaces.id, workspaceId))
+					.limit(1);
+				if (!current) {
+					return reply.code(404).send({ message: "Workspace not found" });
+				}
+				const logs = patchesLogs ? body.run_logs_retention_days : current.logs;
+				const metrics = patchesMetrics
+					? body.run_metrics_retention_days
+					: current.metrics;
+				if (logs != null && metrics != null && logs > metrics) {
+					return reply.code(400).send({
+						message:
+							"Logs retention must be less than or equal to metrics retention",
+					});
+				}
 			}
 
 			let data:
@@ -278,12 +327,14 @@ export async function registerWorkspacesRoute(fastify: FastifyInstance) {
 						user_id: string;
 						created_at: string;
 						updated_at: string;
+						run_logs_retention_days: number | null;
+						run_metrics_retention_days: number | null;
 				  }
 				| undefined;
 			try {
 				[data] = await db
 					.update(workspaces)
-					.set({ name: trimmedName, updated_at: new Date().toISOString() })
+					.set(updates)
 					.where(eq(workspaces.id, workspaceId))
 					.returning(workspaceColumns);
 			} catch {

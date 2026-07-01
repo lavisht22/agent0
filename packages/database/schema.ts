@@ -4,6 +4,7 @@ import {
 	boolean,
 	foreignKey,
 	index,
+	integer,
 	jsonb,
 	numeric,
 	pgEnum,
@@ -179,6 +180,11 @@ export const workspaces = pgTable(
 		updated_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
+		// Run-retention windows, in days. Null = keep forever. When both are set,
+		// logs must be <= metrics (enforced at the API): a run's log is unreachable
+		// once its metrics row is gone, so keeping logs longer would strand orphans.
+		run_logs_retention_days: integer(),
+		run_metrics_retention_days: integer(),
 	},
 	(table) => [
 		foreignKey({
@@ -461,6 +467,10 @@ export const runs = pgTable(
 		tokens: numeric(),
 		cost: numeric(),
 		parent_run_id: text(),
+		// Set when the run's S3 log object has been purged (retention/cleanup) while
+		// the metrics row is retained. Non-null ⇒ the object is gone; the detail
+		// endpoint skips the S3 fetch and returns run_data: null.
+		log_deleted_at: timestamp({ withTimezone: true, mode: "string" }),
 	},
 	(table) => [
 		index("runs_created_at_idx").using(

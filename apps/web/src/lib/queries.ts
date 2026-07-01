@@ -1,10 +1,11 @@
 import type { Json, tags } from "@repo/database";
 import { queryOptions } from "@tanstack/react-query";
+import { events } from "fetch-event-stream";
 import {
 	computeDateRangeFromPreset,
 	type DateRangeValue,
 } from "@/components/date-range-picker";
-import { api } from "./api-client";
+import { ApiError, api } from "./api-client";
 import { getCachedSession } from "./auth-client";
 import type { RunData } from "./types";
 
@@ -20,6 +21,8 @@ export type Workspace = {
 	name: string;
 	role: "admin" | "writer" | "reader";
 	created_at: string;
+	run_logs_retention_days: number | null;
+	run_metrics_retention_days: number | null;
 };
 
 export type WorkspaceMember = {
@@ -60,10 +63,19 @@ export async function createWorkspace(name: string) {
 	return data;
 }
 
-export async function updateWorkspace(workspaceId: string, name: string) {
+export type WorkspaceUpdate = {
+	name?: string;
+	run_logs_retention_days?: number | null;
+	run_metrics_retention_days?: number | null;
+};
+
+export async function updateWorkspace(
+	workspaceId: string,
+	updates: WorkspaceUpdate,
+) {
 	const { data } = await api.patch<{ data: Workspace }>(
 		`/api/v1/workspaces/${workspaceId}`,
-		{ name },
+		updates,
 	);
 
 	return data;
@@ -677,6 +689,78 @@ export const childRunsQuery = (
 		},
 		enabled: !!workspaceId && !!parentRunId,
 	});
+
+// ---------------------------------------------------------------------------
+// Run retention cleanup
+// ---------------------------------------------------------------------------
+
+export type CleanupPreview = {
+	logs_eligible: number;
+	runs_eligible: number;
+};
+
+export type CleanupEvent =
+	| {
+			type: "progress";
+			phase: "logs" | "runs";
+			processed: number;
+			total: number;
+	  }
+	| { type: "done"; logs_deleted: number; runs_deleted: number }
+	| { type: "error"; message: string };
+
+// How many runs are eligible for cleanup under the workspace's retention
+// windows. Admin/owner only (403 otherwise). Not cached aggressively — the
+// dialog wants a fresh count each time it opens.
+export const cleanupPreviewQuery = (workspaceId: string, enabled = true) =>
+	queryOptions({
+		queryKey: ["runs-cleanup-preview", workspaceId],
+		queryFn: async () => {
+			const { data } = await api.get<{ data: CleanupPreview }>(
+				`/api/v1/workspaces/${workspaceId}/runs/cleanup/preview`,
+			);
+			return data;
+		},
+		enabled: !!workspaceId && enabled,
+		staleTime: 0,
+	});
+
+/**
+ * Trigger retention cleanup and consume the SSE progress stream. Reads the
+ * windows from workspace settings server-side; the caller only gets progress.
+ * Resolves when the stream ends; pass a signal to abort (server stops between
+ * batches). `onEvent` receives each progress/done/error event.
+ */
+export async function runCleanup(
+	workspaceId: string,
+	onEvent: (event: CleanupEvent) => void,
+	signal?: AbortSignal,
+): Promise<void> {
+	const response = await fetch(
+		`/api/v1/workspaces/${workspaceId}/runs/cleanup`,
+		{
+			method: "POST",
+			credentials: "include",
+			signal,
+		},
+	);
+
+	if (!response.ok) {
+		let message = response.statusText || `Request failed (${response.status})`;
+		try {
+			const json = (await response.json()) as { message?: string };
+			if (json.message) message = json.message;
+		} catch {
+			// Non-JSON error body; keep the fallback.
+		}
+		throw new ApiError(message, response.status);
+	}
+
+	for await (const chunk of events(response, signal)) {
+		if (!chunk.data) continue;
+		onEvent(JSON.parse(chunk.data) as CleanupEvent);
+	}
+}
 
 export const workspaceUserQuery = (workspaceId: string) =>
 	queryOptions({

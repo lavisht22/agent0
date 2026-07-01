@@ -36,6 +36,13 @@
       "when": 1782471294444,
       "tag": "0004_drop_users_auth_users_fkey",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1782925249103,
+      "tag": "0005_loose_wraith",
+      "breakpoints": true
     }
   ]
 }

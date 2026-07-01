@@ -16,6 +16,7 @@ import {
 	RefreshCw,
 } from "lucide-react";
 import { AgentFilter } from "@/components/agent-filter";
+import { CleanupRunsButton } from "@/components/cleanup-runs-button";
 import { DateRangePicker } from "@/components/date-range-picker";
 import {
 	EnvironmentFilter,
@@ -170,6 +171,7 @@ function RouteComponent() {
 						/>
 					</div>
 					<div className="flex gap-2">
+						<CleanupRunsButton workspaceId={workspaceId} />
 						<Tooltip delay={0}>
 							<Tooltip.Trigger>
 								<Button

@@ -1,5 +1,6 @@
 import {
 	DeleteObjectCommand,
+	DeleteObjectsCommand,
 	GetObjectCommand,
 	PutObjectCommand,
 	S3Client,
@@ -20,7 +21,15 @@ export interface RunLogStore {
 	get(id: string): Promise<unknown | null>;
 	/** Delete a run's log payload (no-op if already gone). */
 	delete(id: string): Promise<void>;
+	/**
+	 * Delete many run-log payloads in one round-trip (no-op for ids already gone).
+	 * Used by retention cleanup to avoid one request per run.
+	 */
+	deleteMany(ids: string[]): Promise<void>;
 }
+
+// S3 DeleteObjects accepts at most 1000 keys per request.
+const S3_DELETE_BATCH = 1000;
 
 const requireEnv = (name: string): string => {
 	const value = process.env[name];
@@ -78,6 +87,23 @@ class S3RunLogStore implements RunLogStore {
 		await this.client.send(
 			new DeleteObjectCommand({ Bucket: this.bucket, Key: id }),
 		);
+	}
+
+	async deleteMany(ids: string[]): Promise<void> {
+		for (let i = 0; i < ids.length; i += S3_DELETE_BATCH) {
+			const chunk = ids.slice(i, i + S3_DELETE_BATCH);
+			if (chunk.length === 0) continue;
+			await this.client.send(
+				new DeleteObjectsCommand({
+					Bucket: this.bucket,
+					Delete: {
+						Objects: chunk.map((id) => ({ Key: id })),
+						// Skip the per-key result list we don't use; deletes are idempotent.
+						Quiet: true,
+					},
+				}),
+			);
+		}
 	}
 }
 

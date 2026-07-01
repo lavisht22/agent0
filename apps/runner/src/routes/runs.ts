@@ -11,13 +11,20 @@ import {
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
+import { userPrincipal } from "../lib/auth.js";
 import { sumUsage } from "../lib/cost.js";
 import { createSSEStream } from "../lib/helpers.js";
 import { db } from "../lib/pg.js";
 import { prepareRun, RunPrepError, recordRun } from "../lib/run-agent.js";
-import { hasScope, requireScope } from "../lib/scopes.js";
+import {
+	getRetentionSettings,
+	previewCleanup,
+	runCleanup,
+} from "../lib/run-cleanup.js";
+import { hasScope, requireScope, requireUserId } from "../lib/scopes.js";
 import { runLogStore } from "../lib/storage.js";
 import type { RunOverrides } from "../lib/types.js";
+import { requireAdminOrOwner } from "../lib/workspace-access.js";
 
 // `agent_*` columns come from agent_versions → agents and are folded into a
 // nested `agent` object by shapeRun.
@@ -319,7 +326,11 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 			};
 
 			const [run] = await db
-				.select({ ...runSelectColumns, workspace_id: runs.workspace_id })
+				.select({
+					...runSelectColumns,
+					workspace_id: runs.workspace_id,
+					log_deleted_at: runs.log_deleted_at,
+				})
 				.from(runs)
 				.leftJoin(agentVersions, eq(runs.version_id, agentVersions.id))
 				.leftJoin(agents, eq(agentVersions.agent_id, agents.id))
@@ -330,8 +341,9 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				return reply.code(404).send({ message: "Run not found" });
 			}
 
-			// Null if the run log has been cleaned up from storage.
-			const runData = await runLogStore.get(runId);
+			// Skip the S3 round-trip when the log has been purged by retention
+			// cleanup; otherwise null means it was never stored / already gone.
+			const runData = run.log_deleted_at ? null : await runLogStore.get(runId);
 
 			return reply.send({
 				data: {
@@ -339,6 +351,146 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 					run_data: runData,
 				},
 			});
+		},
+	});
+
+	// How many runs the workspace's retention windows currently make eligible for
+	// cleanup. Drives the "Clean up" button's visibility and the confirm dialog.
+	fastify.get("/runs/cleanup/preview", {
+		preHandler: requireUserId,
+		schema: {
+			tags: ["Runs"],
+			summary: "Preview retention cleanup",
+			description:
+				"Counts of runs eligible for cleanup under the workspace's retention windows. Admin/owner only.",
+			params: {
+				type: "object" as const,
+				properties: { workspaceId: { type: "string" as const } },
+				required: ["workspaceId"],
+			},
+			response: {
+				200: {
+					type: "object" as const,
+					properties: {
+						data: {
+							type: "object" as const,
+							properties: {
+								logs_eligible: { type: "number" as const },
+								runs_eligible: { type: "number" as const },
+							},
+						},
+					},
+				},
+				403: ErrorSchema,
+				404: ErrorSchema,
+			},
+		},
+		handler: async (request, reply) => {
+			const { workspaceId } = request.params as { workspaceId: string };
+			const userId = userPrincipal(request).userId;
+
+			if (!(await requireAdminOrOwner(request, reply, workspaceId, userId))) {
+				return;
+			}
+
+			const settings = await getRetentionSettings(workspaceId);
+			if (!settings) {
+				return reply.code(404).send({ message: "Workspace not found" });
+			}
+
+			const preview = await previewCleanup(workspaceId, settings);
+			return reply.send({ data: preview });
+		},
+	});
+
+	// Run retention cleanup, streaming progress as SSE. Reads the windows from
+	// workspace settings (never the request body). Admin/owner only.
+	fastify.post("/runs/cleanup", {
+		preHandler: requireUserId,
+		schema: {
+			tags: ["Runs"],
+			summary: "Run retention cleanup (SSE)",
+			description:
+				"Deletes runs past the workspace's retention windows, streaming progress events. Admin/owner only.",
+			params: {
+				type: "object" as const,
+				properties: { workspaceId: { type: "string" as const } },
+				required: ["workspaceId"],
+			},
+		},
+		handler: async (request, reply) => {
+			const { workspaceId } = request.params as { workspaceId: string };
+			const userId = userPrincipal(request).userId;
+
+			if (!(await requireAdminOrOwner(request, reply, workspaceId, userId))) {
+				return;
+			}
+
+			const settings = await getRetentionSettings(workspaceId);
+			if (!settings) {
+				return reply.code(404).send({ message: "Workspace not found" });
+			}
+
+			// Stop the cleanup loop (between batches) when the client goes away, so
+			// we don't keep deleting for a browser that's no longer listening. Work
+			// is resumable, so the user can re-trigger to continue.
+			const controller = new AbortController();
+			let finished = false;
+			const handleClientClose = () => {
+				if (!finished) controller.abort();
+			};
+			reply.raw.on("close", handleClientClose);
+			request.raw.on("close", handleClientClose);
+
+			const encoder = new TextEncoder();
+			const PING_INTERVAL_MS = 5000;
+			const stream = new ReadableStream({
+				async start(streamController) {
+					const ping = setInterval(() => {
+						try {
+							streamController.enqueue(encoder.encode(": ping\r\n\r\n"));
+						} catch {
+							// Controller may be closed.
+						}
+					}, PING_INTERVAL_MS);
+					try {
+						for await (const event of runCleanup(
+							workspaceId,
+							settings,
+							controller.signal,
+						)) {
+							streamController.enqueue(
+								encoder.encode(`data: ${JSON.stringify(event)}\r\n\r\n`),
+							);
+						}
+					} catch (err) {
+						console.error("Cleanup streaming error", err);
+						try {
+							streamController.enqueue(
+								encoder.encode(
+									`data: ${JSON.stringify({ type: "error", message: "Cleanup failed" })}\r\n\r\n`,
+								),
+							);
+						} catch {
+							// Already closed.
+						}
+					} finally {
+						finished = true;
+						clearInterval(ping);
+						try {
+							streamController.close();
+						} catch {
+							// Already closed.
+						}
+					}
+				},
+			});
+
+			reply.headers({
+				"Content-Type": "text/event-stream",
+				"Cache-Control": "no-cache",
+			});
+			return reply.send(stream);
 		},
 	});
 
