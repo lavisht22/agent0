@@ -36,4 +36,12 @@ ENV APP_VERSION=$APP_VERSION
 
 ENV PORT=8080
 EXPOSE 8080
+
+# Self-describing health so orchestrators (Coolify/Docker) can verify the server
+# is actually serving, not just running. /api/v1/version is unauthenticated and
+# returns 200. Uses node's built-in fetch to avoid depending on curl/wget in the
+# slim image.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+	CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8080)+'/api/v1/version').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
 CMD [ "node", "dist/index.js" ]
