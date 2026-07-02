@@ -1,6 +1,7 @@
-import { requireProfile, type ResolveOpts } from "../lib/config.js";
+import { type ResolveOpts, requireProfile } from "../lib/config.js";
 import { extractErrorMessage, fail, getStatus } from "../lib/errors.js";
 import { createClient } from "../lib/http.js";
+import { buildMetadata } from "../lib/meta.js";
 import { printJson } from "../lib/output.js";
 
 interface AgentRef {
@@ -21,6 +22,7 @@ interface RunSummary {
 	first_token_time: number | null;
 	pre_processing_time: number | null;
 	created_at: string;
+	metadata: Record<string, string> | null;
 	agent: AgentRef | null;
 }
 
@@ -39,6 +41,7 @@ export interface RunsListOpts extends CommonOpts {
 	status?: string;
 	from?: string;
 	to?: string;
+	meta?: string | string[];
 	page?: string | number;
 	limit?: string | number;
 }
@@ -53,18 +56,26 @@ function formatCost(cost: number | null): string {
 }
 
 export async function runsListCommand(opts: RunsListOpts): Promise<void> {
-	if (opts.status !== undefined && opts.status !== "success" && opts.status !== "failed") {
+	if (
+		opts.status !== undefined &&
+		opts.status !== "success" &&
+		opts.status !== "failed"
+	) {
 		fail(`--status must be "success" or "failed" (got "${opts.status}").`);
 	}
 
 	const profile = await requireProfile(opts);
 	const client = createClient(profile);
 
+	const metadataFilter = buildMetadata(opts.meta);
+
 	const query: Record<string, string> = {};
 	if (opts.agent) query.agent_id = opts.agent;
 	if (opts.status) query.status = opts.status;
 	if (opts.from) query.start_date = opts.from;
 	if (opts.to) query.end_date = opts.to;
+	// The list endpoint takes metadata as a JSON object of pairs to match.
+	if (metadataFilter) query.metadata = JSON.stringify(metadataFilter);
 	if (opts.page !== undefined) query.page = String(opts.page);
 	if (opts.limit !== undefined) query.limit = String(opts.limit);
 
@@ -91,8 +102,14 @@ export async function runsListCommand(opts: RunsListOpts): Promise<void> {
 		// Mark sub-runs (invoked by another agent via agent-as-tool) with their
 		// parent run id, so it can be inspected with `runs get <parentId>`.
 		const lineage = r.parent_run_id ? `  ↳ child of ${r.parent_run_id}` : "";
+		const meta =
+			r.metadata && Object.keys(r.metadata).length > 0
+				? `  {${Object.entries(r.metadata)
+						.map(([k, v]) => `${k}=${v}`)
+						.join(", ")}}`
+				: "";
 		console.log(
-			`${r.id}  ${r.created_at}  ${status}  ${agentName}  ${formatCost(r.cost)}${lineage}`,
+			`${r.id}  ${r.created_at}  ${status}  ${agentName}  ${formatCost(r.cost)}${meta}${lineage}`,
 		);
 	}
 }

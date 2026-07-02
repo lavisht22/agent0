@@ -202,10 +202,17 @@ cli
 		"--input <text>",
 		"Sets the `input` variable (shorthand for --var input=...)",
 	)
-	.option("--env <env>", "Environment: staging or production (default: production)")
+	.option(
+		"--env <env>",
+		"Environment: staging or production (default: production)",
+	)
 	.option(
 		"--var <pair>",
 		"Set a variable as key=value; repeatable for multiple variables.",
+	)
+	.option(
+		"--meta <pair>",
+		"Attach run metadata as key=value; repeatable (max 10, each side <128 chars).",
 	)
 	.action((agentId: string | undefined, opts) => {
 		if (!agentId) fail("Usage: agent0 run <agentId> --input '...'");
@@ -221,6 +228,10 @@ cli
 	.option("--status <status>", "Filter by status: success or failed (list)")
 	.option("--from <iso>", "Only runs created on or after this ISO date (list)")
 	.option("--to <iso>", "Only runs created on or before this ISO date (list)")
+	.option(
+		"--meta <pair>",
+		"Filter by run metadata as key=value; repeatable (matches all, list)",
+	)
 	.option("--page <n>", "Page number (list)", { default: "1" })
 	.option("--limit <n>", "Items per page, max 100 (list)", { default: "20" })
 	.action((action: string | undefined, target: string | undefined, opts) => {
@@ -235,9 +246,7 @@ cli
 				if (!target) fail("Usage: agent0 runs get <runId>");
 				return run(() => runsGetCommand(target, opts));
 			default:
-				fail(
-					`Unknown runs action: "${action}". Try: list, get <runId>.`,
-				);
+				fail(`Unknown runs action: "${action}". Try: list, get <runId>.`);
 		}
 	});
 
@@ -271,10 +280,7 @@ cli
 	});
 
 cli
-	.command(
-		"providers [action]",
-		"Inspect providers — actions: list | ls",
-	)
+	.command("providers [action]", "Inspect providers — actions: list | ls")
 	.action((action: string | undefined, opts) => {
 		switch (action) {
 			case undefined:
@@ -305,9 +311,7 @@ cli
 				if (!target) fail("Usage: agent0 mcps refresh <id>");
 				return run(() => mcpsRefreshCommand(target, opts));
 			default:
-				fail(
-					`Unknown mcps action: "${action}". Try: list, refresh <id>.`,
-				);
+				fail(`Unknown mcps action: "${action}". Try: list, refresh <id>.`);
 		}
 	});
 

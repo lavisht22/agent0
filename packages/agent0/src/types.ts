@@ -87,6 +87,12 @@ export interface RunOptions {
 		headers?: Record<string, string>;
 	}>;
 	/**
+	 * Arbitrary string key-value labels stored on the run for later filtering
+	 * (e.g. `{ userId: "u_123" }`). Max 10 keys; each key and value must be under
+	 * 128 characters. Inherited by any agent-as-tool sub-runs this run spawns.
+	 */
+	metadata?: Record<string, string>;
+	/**
 	 * Abort signal to cancel the request. When aborted, the underlying fetch is
 	 * cancelled, the server detects the disconnect, and the in-flight agent run
 	 * is killed. Pass `ctx.signal` from a trigger.dev task or any other host

@@ -95,3 +95,10 @@ export type MCPOptions = {
 };
 
 export type Environment = "staging" | "production";
+
+/**
+ * Arbitrary caller-supplied labels attached to a run for later filtering
+ * (e.g. `{ user_id: "u_123" }`). String→string only; validated/capped by
+ * `parseRunMetadata` in lib/metadata.ts before it reaches the DB.
+ */
+export type RunMetadata = Record<string, string>;

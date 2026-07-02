@@ -1,6 +1,7 @@
-import { requireProfile, type ResolveOpts } from "../lib/config.js";
+import { type ResolveOpts, requireProfile } from "../lib/config.js";
 import { extractErrorMessage, fail, getStatus } from "../lib/errors.js";
 import { createClient } from "../lib/http.js";
+import { buildMetadata } from "../lib/meta.js";
 import { printJson } from "../lib/output.js";
 
 interface RunResponse {
@@ -13,6 +14,7 @@ export interface RunOpts extends ResolveOpts {
 	input?: string;
 	env?: string;
 	var?: string | string[];
+	meta?: string | string[];
 }
 
 function parseEnv(value: string | undefined): "staging" | "production" {
@@ -55,6 +57,7 @@ export async function runCommand(
 ): Promise<void> {
 	const environment = parseEnv(opts.env);
 	const variables = buildVariables(opts);
+	const metadata = buildMetadata(opts.meta);
 
 	const profile = await requireProfile(opts);
 	const client = createClient(profile);
@@ -67,6 +70,7 @@ export async function runCommand(
 				agent_id: agentId,
 				environment,
 				variables,
+				metadata,
 				stream: false,
 			},
 		});
@@ -76,7 +80,9 @@ export async function runCommand(
 			fail(extractErrorMessage(err));
 		}
 		if (status === 404) {
-			fail(`Agent "${agentId}" not found, or no ${environment} version deployed.`);
+			fail(
+				`Agent "${agentId}" not found, or no ${environment} version deployed.`,
+			);
 		}
 		fail(extractErrorMessage(err));
 	}

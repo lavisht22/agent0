@@ -8,12 +8,13 @@ import {
 	streamText,
 	type ToolSet,
 } from "ai";
-import { and, desc, eq, gte, lte } from "drizzle-orm";
+import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
 import { userPrincipal } from "../lib/auth.js";
 import { sumUsage } from "../lib/cost.js";
 import { createSSEStream } from "../lib/helpers.js";
+import { MetadataError, parseRunMetadata } from "../lib/metadata.js";
 import { db } from "../lib/pg.js";
 import { prepareRun, RunPrepError, recordRun } from "../lib/run-agent.js";
 import {
@@ -42,6 +43,7 @@ const runSelectColumns = {
 	first_token_time: runs.first_token_time,
 	pre_processing_time: runs.pre_processing_time,
 	created_at: runs.created_at,
+	metadata: runs.metadata,
 	agent_id: agents.id,
 	agent_name: agents.name,
 };
@@ -112,6 +114,13 @@ const RunSummarySchema = {
 		first_token_time: { type: "number" as const },
 		pre_processing_time: { type: "number" as const },
 		created_at: { type: "string" as const, format: "date-time" },
+		metadata: {
+			type: "object" as const,
+			nullable: true,
+			additionalProperties: { type: "string" as const },
+			description:
+				"Arbitrary string key-value labels attached at run time for filtering. Null when none supplied.",
+		},
 		agent: { ...AgentRefSchema, nullable: true },
 	},
 };
@@ -186,6 +195,11 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						description:
 							"Filter runs created on or before this date (ISO 8601)",
 					},
+					metadata: {
+						type: "string" as const,
+						description:
+							'JSON object of metadata key-values to match, e.g. {"user_id":"u_123"}. Matches runs whose metadata contains all given pairs (exact match, AND across keys).',
+					},
 					page: {
 						type: "string" as const,
 						default: "1",
@@ -207,6 +221,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						limit: { type: "number" as const },
 					},
 				},
+				400: ErrorSchema,
 				500: ErrorSchema,
 			},
 		},
@@ -222,6 +237,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				is_test,
 				start_date,
 				end_date,
+				metadata,
 				page = "1",
 				limit = "20",
 			} = request.query as {
@@ -233,9 +249,32 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				is_test?: string;
 				start_date?: string;
 				end_date?: string;
+				metadata?: string;
 				page?: string;
 				limit?: string;
 			};
+
+			// Parse the metadata filter up front so a malformed value is a clear 400
+			// rather than a 500 from the query builder.
+			let metadataFilter: Record<string, string> | undefined;
+			if (metadata) {
+				let parsed: unknown;
+				try {
+					parsed = JSON.parse(metadata);
+				} catch {
+					return reply
+						.code(400)
+						.send({ message: "metadata must be a valid JSON object" });
+				}
+				try {
+					metadataFilter = parseRunMetadata(parsed);
+				} catch (err) {
+					if (err instanceof MetadataError) {
+						return reply.code(400).send({ message: err.message });
+					}
+					throw err;
+				}
+			}
 
 			const pageNum = Math.max(1, Number.parseInt(page, 10) || 1);
 			const limitNum = Math.min(
@@ -269,6 +308,13 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 			}
 			if (start_date) conditions.push(gte(runs.created_at, start_date));
 			if (end_date) conditions.push(lte(runs.created_at, end_date));
+			// jsonb containment: matches rows whose metadata holds all given pairs.
+			// Served by the partial GIN index on runs.metadata.
+			if (metadataFilter) {
+				conditions.push(
+					sql`${runs.metadata} @> ${JSON.stringify(metadataFilter)}::jsonb`,
+				);
+			}
 
 			try {
 				const base = db.select(runSelectColumns).from(runs);
@@ -572,6 +618,12 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						additionalProperties: true,
 						description: "Per-MCP-server options (e.g. custom headers)",
 					},
+					metadata: {
+						type: "object" as const,
+						additionalProperties: { type: "string" as const },
+						description:
+							"Arbitrary string key-value labels stored on the run for later filtering (e.g. user_id). Max 10 keys; each key and value must be under 128 characters. Inherited by agent-as-tool sub-runs.",
+					},
 				},
 			},
 			response: {
@@ -619,6 +671,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				extra_messages,
 				extra_tools,
 				mcp_options,
+				metadata: rawMetadata,
 			} = request.body as {
 				agent_id: string;
 				environment?: "staging" | "production";
@@ -632,10 +685,21 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 					inputSchema?: Record<string, unknown>;
 				}[];
 				mcp_options?: Record<string, { headers?: Record<string, string> }>;
+				metadata?: Record<string, string>;
 			};
 
 			if (!agent_id) {
 				return reply.code(400).send({ message: "agent_id is required" });
+			}
+
+			let metadata: Record<string, string> | undefined;
+			try {
+				metadata = parseRunMetadata(rawMetadata);
+			} catch (err) {
+				if (err instanceof MetadataError) {
+					return reply.code(400).send({ message: err.message });
+				}
+				throw err;
 			}
 
 			// Inline scope check since the required scope depends on body.agent_id.
@@ -662,6 +726,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 					extraMessages: extra_messages,
 					extraTools: extra_tools,
 					mcpOptions: mcp_options,
+					metadata,
 				});
 			} catch (err) {
 				if (err instanceof RunPrepError) {
@@ -735,6 +800,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 								workspaceId,
 								id: runId,
 								parentRunId: null,
+								metadata,
 								versionId: preparedVersionId,
 								environment,
 								startTime,
@@ -777,6 +843,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 								workspaceId,
 								id: runId,
 								parentRunId: null,
+								metadata,
 								versionId: preparedVersionId,
 								environment,
 								startTime,
@@ -815,6 +882,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 								workspaceId,
 								id: runId,
 								parentRunId: null,
+								metadata,
 								versionId: preparedVersionId,
 								environment,
 								startTime,
@@ -897,6 +965,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						workspaceId,
 						id: runId,
 						parentRunId: null,
+						metadata,
 						versionId: preparedVersionId,
 						environment,
 						startTime,
@@ -933,6 +1002,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 							workspaceId,
 							id: runId,
 							parentRunId: null,
+							metadata,
 							versionId: preparedVersionId,
 							environment,
 							startTime,
@@ -962,6 +1032,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						workspaceId,
 						id: runId,
 						parentRunId: null,
+						metadata,
 						versionId: preparedVersionId,
 						environment,
 						startTime,

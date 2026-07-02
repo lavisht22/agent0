@@ -600,6 +600,7 @@ export type RunListItem = {
 	first_token_time: number;
 	pre_processing_time: number;
 	created_at: string;
+	metadata: Record<string, string> | null;
 	agent: { id: string; name: string | null } | null;
 };
 
@@ -615,6 +616,7 @@ export const runsQuery = (
 	agentId?: string,
 	status?: "success" | "failed",
 	environment?: "staging" | "production",
+	metadata?: Record<string, string>,
 ) =>
 	queryOptions({
 		// Keying on the preset (not resolved dates) keeps the key stable as time passes.
@@ -628,6 +630,7 @@ export const runsQuery = (
 			agentId,
 			status,
 			environment,
+			metadata,
 		],
 		queryFn: async () => {
 			// Resolve presets at query time so they always use fresh dates.
@@ -649,6 +652,10 @@ export const runsQuery = (
 						environment,
 						start_date: dateRange?.from,
 						end_date: dateRange?.to,
+						metadata:
+							metadata && Object.keys(metadata).length > 0
+								? JSON.stringify(metadata)
+								: undefined,
 					},
 				},
 			);

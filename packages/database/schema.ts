@@ -471,8 +471,19 @@ export const runs = pgTable(
 		// the metrics row is retained. Non-null ⇒ the object is gone; the detail
 		// endpoint skips the S3 fetch and returns run_data: null.
 		log_deleted_at: timestamp({ withTimezone: true, mode: "string" }),
+		// Arbitrary caller-supplied string→string labels (e.g. user_id, tenant) for
+		// filtering runs. Lives on the metrics row (not the S3 log) so it stays
+		// queryable and survives log purge. Null when none supplied; capped/validated
+		// at the API (see lib/metadata.ts). Filtered with jsonb containment (@>).
+		metadata: jsonb().$type<Record<string, string>>(),
 	},
 	(table) => [
+		// Partial GIN so only runs that actually carry metadata are indexed — the
+		// vast majority of rows are null and stay out of the index. jsonb_path_ops
+		// keeps it small and is all `@>` containment lookups need.
+		index("runs_metadata_idx")
+			.using("gin", table.metadata.op("jsonb_path_ops"))
+			.where(sql`(metadata IS NOT NULL)`),
 		index("runs_created_at_idx").using(
 			"btree",
 			table.created_at.asc().nullsLast().op("timestamptz_ops"),

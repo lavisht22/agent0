@@ -253,6 +253,23 @@ function RouteComponent() {
 						</Card>
 					)}
 
+					{run.metadata && Object.keys(run.metadata).length > 0 && (
+						<Card>
+							<Card.Content className="space-y-2 text-sm">
+								<span className="text-muted">Metadata</span>
+								<div className="flex flex-wrap gap-1.5">
+									{Object.entries(run.metadata).map(([k, v]) => (
+										<Chip key={k} variant="soft" size="sm">
+											<span className="font-medium">{k}</span>
+											<span className="text-muted">=</span>
+											<span>{v}</span>
+										</Chip>
+									))}
+								</div>
+							</Card.Content>
+						</Card>
+					)}
+
 					<div className="flex flex-row items-center gap-4">
 						<MetricCard
 							label="Cost"

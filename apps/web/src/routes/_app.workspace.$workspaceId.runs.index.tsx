@@ -23,6 +23,7 @@ import {
 	type EnvironmentFilterValue,
 } from "@/components/environment-filter";
 import IDCopy from "@/components/id-copy";
+import { MetadataFilter } from "@/components/metadata-filter";
 import { PageHeader } from "@/components/page-header";
 import {
 	StatusFilter,
@@ -51,6 +52,7 @@ export const Route = createFileRoute("/_app/workspace/$workspaceId/runs/")({
 		agentId?: string;
 		status?: StatusFilterValue;
 		environment?: EnvironmentFilterValue;
+		metadata?: Record<string, string>;
 	} => {
 		let dateValues:
 			| { datePreset: string }
@@ -71,11 +73,20 @@ export const Route = createFileRoute("/_app/workspace/$workspaceId/runs/")({
 			};
 		}
 
+		const metadata =
+			search.metadata &&
+			typeof search.metadata === "object" &&
+			!Array.isArray(search.metadata) &&
+			Object.keys(search.metadata).length > 0
+				? (search.metadata as Record<string, string>)
+				: undefined;
+
 		return {
 			page: Number(search?.page ?? 1),
 			agentId: search.agentId as string | undefined,
 			status: search.status as StatusFilterValue,
 			environment: search.environment as EnvironmentFilterValue,
+			metadata,
 			...dateValues,
 		};
 	},
@@ -83,7 +94,7 @@ export const Route = createFileRoute("/_app/workspace/$workspaceId/runs/")({
 
 function RouteComponent() {
 	const { workspaceId } = Route.useParams();
-	const { page, agentId, status, environment, ...dateValues } =
+	const { page, agentId, status, environment, metadata, ...dateValues } =
 		Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 	const router = useRouter();
@@ -102,7 +113,15 @@ function RouteComponent() {
 		isFetching,
 		refetch,
 	} = useQuery(
-		runsQuery(workspaceId, page, dateValues, agentId, status, environment),
+		runsQuery(
+			workspaceId,
+			page,
+			dateValues,
+			agentId,
+			status,
+			environment,
+			metadata,
+		),
 	);
 
 	return (
@@ -118,6 +137,7 @@ function RouteComponent() {
 								navigate({
 									search: {
 										...value,
+										metadata,
 										agentId,
 										status,
 										environment,
@@ -134,6 +154,7 @@ function RouteComponent() {
 									search: {
 										...dateValues,
 										agentId: newAgentId,
+										metadata,
 										status,
 										environment,
 										page: 1,
@@ -149,6 +170,7 @@ function RouteComponent() {
 										...dateValues,
 										agentId,
 										status: newStatus,
+										metadata,
 										environment,
 										page: 1,
 									},
@@ -164,6 +186,25 @@ function RouteComponent() {
 										agentId,
 										status,
 										environment: newEnvironment,
+										metadata,
+										page: 1,
+									},
+								})
+							}
+						/>
+						<MetadataFilter
+							value={metadata ?? {}}
+							onValueChange={(newMetadata) =>
+								navigate({
+									search: {
+										...dateValues,
+										agentId,
+										status,
+										environment,
+										metadata:
+											Object.keys(newMetadata).length > 0
+												? newMetadata
+												: undefined,
 										page: 1,
 									},
 								})
@@ -202,6 +243,7 @@ function RouteComponent() {
 												agentId,
 												status,
 												environment,
+												metadata,
 												page: page - 1,
 											},
 										})
@@ -226,6 +268,7 @@ function RouteComponent() {
 												agentId,
 												status,
 												environment,
+												metadata,
 												page: page + 1,
 											},
 										})

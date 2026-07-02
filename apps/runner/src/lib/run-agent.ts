@@ -29,6 +29,7 @@ import type {
 	Environment,
 	MCPOptions,
 	RunData,
+	RunMetadata,
 	RunOverrides,
 	VersionData,
 } from "./types.js";
@@ -45,6 +46,8 @@ export const buildAgentTools = (
 	environment: Environment,
 	isTest: boolean,
 	mcpOptions?: Record<string, MCPOptions>,
+	// Parent run's metadata, inherited by each sub-run so filters span the tree.
+	metadata?: RunMetadata,
 ): ToolSet => {
 	const toolSet: ToolSet = {};
 
@@ -84,6 +87,7 @@ export const buildAgentTools = (
 						parentRunId,
 						isTest,
 						mcpOptions,
+						metadata,
 					});
 					return result.text;
 				} catch (err) {
@@ -128,6 +132,9 @@ export type PrepareRunOptions = {
 	mcpOptions?: Record<string, MCPOptions>;
 	callStack?: string[];
 	isTest?: boolean;
+	// Propagated to sub-runs (agent-as-tool) so a filter like `user_id=…` matches
+	// the whole call tree, not just the top-level run.
+	metadata?: RunMetadata;
 };
 
 export type PreparedRun = {
@@ -162,6 +169,7 @@ export const prepareRun = async (
 		mcpOptions,
 		callStack = [],
 		isTest = false,
+		metadata,
 	} = opts;
 
 	const agent = await cachedQuery(
@@ -258,6 +266,7 @@ export const prepareRun = async (
 		mcpOptions,
 		callStack,
 		isTest,
+		metadata,
 	});
 
 	if (overrides && assembled.runData.request) {
@@ -281,6 +290,8 @@ export type AssembleRunOptions = {
 	mcpOptions?: Record<string, MCPOptions>;
 	callStack?: string[];
 	isTest?: boolean;
+	// Inherited by any agent-as-tool sub-runs spawned from this run.
+	metadata?: RunMetadata;
 };
 
 export type AssembledRun = {
@@ -312,6 +323,7 @@ export const assembleRun = async (
 		mcpOptions,
 		callStack = [],
 		isTest = false,
+		metadata,
 	} = opts;
 
 	const processedMessages = applyMessageVariables(data, variables);
@@ -346,6 +358,7 @@ export const assembleRun = async (
 		environment,
 		isTest,
 		mcpOptions,
+		metadata,
 	);
 
 	// Skills win on name collision so the catalog's `read_skill` reference always
@@ -384,6 +397,9 @@ export type RecordRunOptions = {
 	runData: RunData;
 	id?: string;
 	parentRunId?: string | null;
+	// Pre-validated by parseRunMetadata; undefined ⇒ store NULL (stays out of the
+	// partial GIN index).
+	metadata?: RunMetadata;
 };
 
 export const recordRun = async (opts: RecordRunOptions): Promise<string> => {
@@ -396,6 +412,7 @@ export const recordRun = async (opts: RecordRunOptions): Promise<string> => {
 		version_id: opts.versionId,
 		environment: opts.environment,
 		parent_run_id: opts.parentRunId ?? null,
+		metadata: opts.metadata ?? null,
 		created_at: new Date(opts.startTime).toISOString(),
 		is_error: opts.isError,
 		is_test: opts.isTest ?? false,
@@ -427,6 +444,8 @@ export type RunAgentOptions = {
 	parentRunId?: string | null;
 	isTest?: boolean;
 	mcpOptions?: Record<string, MCPOptions>;
+	// Inherited from the parent run and stored on this sub-run.
+	metadata?: RunMetadata;
 };
 
 export type RunAgentResult = {
@@ -460,6 +479,7 @@ export const runAgent = async (
 		callStack: opts.callStack,
 		isTest: opts.isTest,
 		mcpOptions: opts.mcpOptions,
+		metadata: opts.metadata,
 	});
 
 	const {
@@ -513,6 +533,7 @@ export const runAgent = async (
 			modelId,
 			usage: totalUsage,
 			runData,
+			metadata: opts.metadata,
 		});
 
 		return {
@@ -557,6 +578,7 @@ export const runAgent = async (
 			modelId,
 			usage: collectedSteps.length > 0 ? totalUsage : undefined,
 			runData,
+			metadata: opts.metadata,
 		});
 
 		throw error;
