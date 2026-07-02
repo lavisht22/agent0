@@ -59,37 +59,45 @@ function AssistantMessagePart({
 }) {
 	if (value.type === "text") {
 		return (
-			<TextareaAutosize
-				className="outline-none w-full resize-none text-sm scrollbar-hide"
-				readOnly={isReadOnly}
-				maxRows={1000000000000}
-				placeholder="Assistant message..."
-				value={value.text}
-				onChange={(e) => {
-					onValueChange({
-						...value,
-						text: e.target.value,
-					});
-				}}
-			/>
+			<div
+				className={`w-full min-w-0${isReadOnly ? " max-h-80 overflow-y-auto scrollbar-thin" : ""}`}
+			>
+				<TextareaAutosize
+					className="outline-none w-full resize-none text-sm scrollbar-hide"
+					readOnly={isReadOnly}
+					maxRows={1000000000000}
+					placeholder="Assistant message..."
+					value={value.text}
+					onChange={(e) => {
+						onValueChange({
+							...value,
+							text: e.target.value,
+						});
+					}}
+				/>
+			</div>
 		);
 	}
 
 	if (value.type === "reasoning") {
 		return (
-			<TextareaAutosize
-				className="outline-none w-full resize-none text-sm scrollbar-hide text-muted italic"
-				readOnly={isReadOnly}
-				maxRows={1000000000000}
-				placeholder="Assistant reasoning..."
-				value={value.text}
-				onChange={(e) => {
-					onValueChange({
-						...value,
-						text: e.target.value,
-					});
-				}}
-			/>
+			<div
+				className={`w-full min-w-0${isReadOnly ? " max-h-80 overflow-y-auto scrollbar-thin" : ""}`}
+			>
+				<TextareaAutosize
+					className="outline-none w-full resize-none text-sm scrollbar-hide text-muted italic"
+					readOnly={isReadOnly}
+					maxRows={1000000000000}
+					placeholder="Assistant reasoning..."
+					value={value.text}
+					onChange={(e) => {
+						onValueChange({
+							...value,
+							text: e.target.value,
+						});
+					}}
+				/>
+			</div>
 		);
 	}
 

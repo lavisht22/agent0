@@ -1,5 +1,4 @@
 import {
-	Accordion,
 	Alert,
 	Button,
 	Card,
@@ -20,6 +19,7 @@ import {
 	LucideInfo,
 	RotateCcw,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import {
 	Messages,
 	type MessageT,
@@ -37,35 +37,72 @@ export const Route = createFileRoute(
 	component: RouteComponent,
 });
 
-function MetricCard({
+// One wrapper for every section on this page so the heading row and the
+// heading→content gap are identical everywhere. `suffix` holds inline chips
+// (e.g. message/step counts) that sit next to the title.
+function Section({
+	title,
+	suffix,
+	children,
+}: {
+	title: string;
+	suffix?: ReactNode;
+	children: ReactNode;
+}) {
+	return (
+		<section>
+			<div className="mb-2 flex h-7 items-center gap-2">
+				<h2 className="font-medium">{title}</h2>
+				{suffix}
+			</div>
+			{children}
+		</section>
+	);
+}
+
+// Compact label/value stat used inside the Timing and Usage & Cost cards.
+function Stat({
 	label,
 	value,
 	unit,
-	tooltipContent,
+	tooltip,
 }: {
 	label: string;
 	value: number | string;
 	unit?: string;
-	tooltipContent: string;
+	tooltip?: string;
 }) {
 	return (
-		<Card className="flex-1 text-default-foreground">
-			<Card.Content>
-				<div className="flex items-center gap-1 text-xs">
-					<span>{label}</span>
+		<div>
+			<div className="flex items-center gap-1 text-xs text-muted">
+				<span>{label}</span>
+				{tooltip && (
 					<Tooltip delay={0}>
 						<Tooltip.Trigger>
 							<LucideInfo className="size-3.5" />
 						</Tooltip.Trigger>
-						<Tooltip.Content>{tooltipContent}</Tooltip.Content>
+						<Tooltip.Content>{tooltip}</Tooltip.Content>
 					</Tooltip>
-				</div>
-				<span className="text-sm font-semibold">
-					{value}
-					{unit && <span className="text-xs ml-0.5">{unit}</span>}
-				</span>
-			</Card.Content>
-		</Card>
+				)}
+			</div>
+			<div className="text-sm font-semibold">
+				{value}
+				{unit && <span className="text-xs ml-0.5">{unit}</span>}
+			</div>
+		</div>
+	);
+}
+
+// Read-only messages. Long text parts cap their own height and scroll inside
+// the card (see the message components); tool calls stay fully visible.
+function ReadOnlyMessages({ messages }: { messages: MessageT[] }) {
+	return (
+		<Messages
+			value={messages}
+			onValueChange={() => {}}
+			isReadOnly
+			onVariablePress={() => {}}
+		/>
 	);
 }
 
@@ -223,88 +260,160 @@ function RouteComponent() {
 						</Link>
 					</div>
 
-					{(parentRun || (childRuns && childRuns.length > 0)) && (
-						<Card>
-							<Card.Content className="space-y-3 text-sm">
-								{parentRun && (
-									<div className="flex flex-col gap-1.5">
-										<span className="text-muted">Called by</span>
-										<ul className="flex flex-col gap-1.5">
-											<RunLink workspaceId={workspaceId} run={parentRun} />
-										</ul>
-									</div>
-								)}
-								{childRuns && childRuns.length > 0 && (
-									<div className="flex flex-col gap-1.5">
-										<span className="text-muted">
-											Sub-runs ({childRuns.length})
-										</span>
-										<ul className="flex flex-col gap-1.5">
-											{childRuns.map((child) => (
-												<RunLink
-													key={child.id}
-													workspaceId={workspaceId}
-													run={child}
-												/>
-											))}
-										</ul>
-									</div>
-								)}
+					{/* Details */}
+					<Section title="Details">
+						<RunMetadataCard
+							workspaceId={workspaceId}
+							runId={run.id}
+							metadata={run.metadata}
+						>
+							{(parentRun || (childRuns && childRuns.length > 0)) && (
+								<div className="space-y-3 border-t border-border pt-4">
+									{parentRun && (
+										<div className="flex flex-col gap-1.5">
+											<span className="text-muted">Called by</span>
+											<ul className="flex flex-col gap-1.5">
+												<RunLink workspaceId={workspaceId} run={parentRun} />
+											</ul>
+										</div>
+									)}
+									{childRuns && childRuns.length > 0 && (
+										<div className="flex flex-col gap-1.5">
+											<span className="text-muted">
+												Sub-runs ({childRuns.length})
+											</span>
+											<ul className="flex flex-col gap-1.5">
+												{childRuns.map((child) => (
+													<RunLink
+														key={child.id}
+														workspaceId={workspaceId}
+														run={child}
+													/>
+												))}
+											</ul>
+										</div>
+									)}
+								</div>
+							)}
+						</RunMetadataCard>
+					</Section>
+
+					{/* Timing */}
+					<Section title="Timing">
+						<Card className="text-default-foreground">
+							<Card.Content>
+								<div className="grid grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] items-center gap-x-4">
+									<Stat
+										label="Pre-processing"
+										value={run.pre_processing_time / 1000}
+										unit="s"
+										tooltip="Time taken to fetch data from database and tools from MCP server."
+									/>
+									<span className="text-muted">+</span>
+									<Stat
+										label="First Token"
+										value={run.first_token_time / 1000}
+										unit="s"
+										tooltip="Time taken to generate the first token."
+									/>
+									<span className="text-muted">+</span>
+									<Stat
+										label="Response Time"
+										value={run.response_time / 1000}
+										unit="s"
+										tooltip="Time taken to generate the entire response."
+									/>
+									<span className="text-muted">=</span>
+									<Stat
+										label="Total Time"
+										value={
+											(run.pre_processing_time +
+												run.first_token_time +
+												run.response_time) /
+											1000
+										}
+										unit="s"
+										tooltip="Total time taken to generate the response."
+									/>
+								</div>
 							</Card.Content>
 						</Card>
-					)}
+					</Section>
 
-					<RunMetadataCard
-						workspaceId={workspaceId}
-						runId={run.id}
-						metadata={run.metadata}
-					/>
-
-					<div className="flex flex-row items-center gap-4">
-						<MetricCard
-							label="Cost"
-							value={`$${(run.cost || 0).toFixed(6)}`}
-							tooltipContent="Total cost of the run."
-						/>
-						<MetricCard
-							label="Total Tokens"
-							value={run.tokens || 0}
-							tooltipContent="Total tokens used in the run."
-						/>
-						<div className="w-px h-12 bg-surface-tertiary" />
-						<MetricCard
-							label="Pre-processing"
-							value={run.pre_processing_time / 1000}
-							unit="s"
-							tooltipContent="Time taken to fetch data from database and tools from MCP server."
-						/>
-						<p>+</p>
-						<MetricCard
-							label="First Token"
-							value={run.first_token_time / 1000}
-							unit="s"
-							tooltipContent="Time taken to generate the first token."
-						/>
-						<p>+</p>
-						<MetricCard
-							label="Response Time"
-							value={run.response_time / 1000}
-							unit="s"
-							tooltipContent="Time taken to generate the entire response."
-						/>
-						<p>=</p>
-						<MetricCard
-							label="Total Time"
-							value={
-								(run.pre_processing_time +
-									run.first_token_time +
-									run.response_time) /
-								1000
-							}
-							unit="s"
-							tooltipContent="Total time taken to generate the response."
-						/>
-					</div>
+					{/* Usage & Cost */}
+					<Section title="Usage & Cost">
+						<Card className="text-default-foreground">
+							<Card.Content>
+								<div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm md:grid-cols-4">
+									<Stat label="Cost" value={`$${(run.cost || 0).toFixed(6)}`} />
+									<Stat label="Total Tokens" value={run.tokens || 0} />
+									{runData?.totalUsage && (
+										<>
+											<div className="space-y-1">
+												<div className="flex items-center justify-between">
+													<span className="text-xs text-muted">Input</span>
+													<span className="font-semibold">
+														{runData.totalUsage.inputTokens}
+													</span>
+												</div>
+												{runData.totalUsage.inputTokenDetails && (
+													<div className="space-y-0.5 text-xs text-muted">
+														<div className="flex justify-between">
+															<span>Non-cached</span>
+															<span>
+																{runData.totalUsage.inputTokenDetails
+																	.noCacheTokens ?? "-"}
+															</span>
+														</div>
+														<div className="flex justify-between">
+															<span>Cached read</span>
+															<span>
+																{runData.totalUsage.inputTokenDetails
+																	.cacheReadTokens ?? "-"}
+															</span>
+														</div>
+														<div className="flex justify-between">
+															<span>Cached write</span>
+															<span>
+																{runData.totalUsage.inputTokenDetails
+																	.cacheWriteTokens ?? "-"}
+															</span>
+														</div>
+													</div>
+												)}
+											</div>
+											<div className="space-y-1">
+												<div className="flex items-center justify-between">
+													<span className="text-xs text-muted">Output</span>
+													<span className="font-semibold">
+														{runData.totalUsage.outputTokens}
+													</span>
+												</div>
+												{runData.totalUsage.outputTokenDetails && (
+													<div className="space-y-0.5 text-xs text-muted">
+														<div className="flex justify-between">
+															<span>Text</span>
+															<span>
+																{runData.totalUsage.outputTokenDetails
+																	.textTokens ?? "-"}
+															</span>
+														</div>
+														<div className="flex justify-between">
+															<span>Reasoning</span>
+															<span>
+																{runData.totalUsage.outputTokenDetails
+																	.reasoningTokens ?? "-"}
+															</span>
+														</div>
+													</div>
+												)}
+											</div>
+										</>
+									)}
+								</div>
+							</Card.Content>
+						</Card>
+					</Section>
 
 					{!runData ? (
 						<Alert status="warning">
@@ -331,281 +440,152 @@ function RouteComponent() {
 								</Alert>
 							)}
 
-							<Accordion
-								allowsMultipleExpanded
-								defaultExpandedKeys={["response", "usage"]}
+							{/* Request */}
+							<Section
+								title="Request"
+								suffix={
+									<>
+										<Chip size="sm" variant="tertiary">
+											{runData.request?.messages?.length || 0} messages
+										</Chip>
+										{run.is_stream && (
+											<Chip size="sm" variant="tertiary">
+												Streaming
+											</Chip>
+										)}
+									</>
+								}
 							>
-								<Accordion.Item id="request">
-									<Accordion.Heading>
-										<Accordion.Trigger>
-											<div className="flex items-center gap-2">
-												<span className="font-medium">Request</span>
-												<Chip size="sm" variant="tertiary">
-													{runData.request?.messages?.length || 0} messages
-												</Chip>
-												{run.is_stream && (
-													<Chip size="sm" variant="tertiary">
-														Streaming
-													</Chip>
-												)}
-											</div>
-											<Accordion.Indicator />
-										</Accordion.Trigger>
-									</Accordion.Heading>
-									<Accordion.Panel>
-										<Accordion.Body>
-											<div className="p-4 pt-0 space-y-4">
-												<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-													<Card className="text-default-foreground">
-														<Card.Content>
-															<span className="text-xs text-muted block mb-1">
-																Model
+								<div className="space-y-2">
+									<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+										<Card className="text-default-foreground">
+											<Card.Content>
+												<span className="text-xs text-muted block mb-1">
+													Model
+												</span>
+												<span className="text-sm font-medium">
+													{runData.request?.model?.name || "Unknown"}
+												</span>
+												<span className="text-xs text-muted block">
+													{runData.request?.model?.provider_id ||
+														"Unknown Provider"}
+												</span>
+											</Card.Content>
+										</Card>
+
+										<Card className="text-default-foreground">
+											<Card.Content>
+												<span className="text-xs text-muted block mb-1">
+													Parameters
+												</span>
+												<div className="flex flex-wrap gap-1.5">
+													{runData.request?.temperature !== undefined && (
+														<Chip size="sm">
+															Temp: {runData.request.temperature}
+														</Chip>
+													)}
+													{runData.request?.maxOutputTokens !== undefined && (
+														<Chip size="sm">
+															Max Tokens: {runData.request.maxOutputTokens}
+														</Chip>
+													)}
+													{runData.request?.maxStepCount !== undefined && (
+														<Chip size="sm">
+															Max Steps: {runData.request.maxStepCount}
+														</Chip>
+													)}
+													{runData.request?.outputFormat && (
+														<Chip size="sm">
+															Output: {runData.request.outputFormat}
+														</Chip>
+													)}
+													{!runData.request?.temperature &&
+														!runData.request?.maxOutputTokens &&
+														!runData.request?.maxStepCount &&
+														!runData.request?.outputFormat && (
+															<span className="text-xs text-muted italic">
+																Default
 															</span>
-															<span className="text-sm font-medium">
-																{runData.request?.model?.name || "Unknown"}
-															</span>
-															<span className="text-xs text-muted block">
-																{runData.request?.model?.provider_id ||
-																	"Unknown Provider"}
-															</span>
-														</Card.Content>
-													</Card>
-
-													<Card className="text-default-foreground">
-														<Card.Content>
-															<span className="text-xs text-muted block mb-1">
-																Parameters
-															</span>
-															<div className="flex flex-wrap gap-1.5">
-																{runData.request?.temperature !== undefined && (
-																	<Chip size="sm">
-																		Temp: {runData.request.temperature}
-																	</Chip>
-																)}
-																{runData.request?.maxOutputTokens !==
-																	undefined && (
-																	<Chip size="sm">
-																		Max Tokens:{" "}
-																		{runData.request.maxOutputTokens}
-																	</Chip>
-																)}
-																{runData.request?.maxStepCount !==
-																	undefined && (
-																	<Chip size="sm">
-																		Max Steps: {runData.request.maxStepCount}
-																	</Chip>
-																)}
-																{runData.request?.outputFormat && (
-																	<Chip size="sm">
-																		Output: {runData.request.outputFormat}
-																	</Chip>
-																)}
-																{!runData.request?.temperature &&
-																	!runData.request?.maxOutputTokens &&
-																	!runData.request?.maxStepCount &&
-																	!runData.request?.outputFormat && (
-																		<span className="text-xs text-muted italic">
-																			Default
-																		</span>
-																	)}
-															</div>
-														</Card.Content>
-													</Card>
-
-													<Card className="text-default-foreground">
-														<Card.Content>
-															<span className="text-xs text-muted block mb-1">
-																Selected Tools
-															</span>
-															<div className="flex flex-wrap gap-1.5">
-																{runData.request?.tools &&
-																runData.request.tools.length > 0 ? (
-																	runData.request.tools.map((tool) => {
-																		if (tool.type === "mcp") {
-																			return (
-																				<Chip
-																					key={`${tool.mcp_id}-${tool.name}`}
-																					size="sm"
-																				>
-																					{tool.name}
-																				</Chip>
-																			);
-																		}
-
-																		if (tool.type === "custom") {
-																			return (
-																				<Chip
-																					key={`custom-${tool.title}`}
-																					size="sm"
-																				>
-																					{tool.title}
-																				</Chip>
-																			);
-																		}
-
-																		return null;
-																	})
-																) : (
-																	<span className="text-xs text-muted italic">
-																		No tools selected
-																	</span>
-																)}
-															</div>
-														</Card.Content>
-													</Card>
-												</div>
-
-												{runData.request?.messages &&
-												runData.request.messages.length > 0 ? (
-													<Messages
-														value={normalizeMessages(runData.request.messages)}
-														onValueChange={() => {}}
-														isReadOnly
-														onVariablePress={() => {}}
-													/>
-												) : (
-													<p className="text-muted text-sm italic">
-														No request messages available
-													</p>
-												)}
-											</div>
-										</Accordion.Body>
-									</Accordion.Panel>
-								</Accordion.Item>
-
-								<Accordion.Item id="response">
-									<Accordion.Heading>
-										<Accordion.Trigger>
-											<div className="flex items-center gap-2">
-												<span className="font-medium">Response</span>
-												<Chip size="sm" variant="tertiary">
-													{runData.steps?.length || 0} steps
-												</Chip>
-											</div>
-											<Accordion.Indicator />
-										</Accordion.Trigger>
-									</Accordion.Heading>
-									<Accordion.Panel>
-										<Accordion.Body>
-											<div className="p-4 pt-0">
-												{runData.steps && runData.steps.length > 0 ? (
-													<Messages
-														value={normalizeMessages(
-															runData.steps[runData.steps.length - 1].response
-																.messages as MessageT[],
 														)}
-														onValueChange={() => {}}
-														isReadOnly
-														onVariablePress={() => {}}
-													/>
-												) : (
-													<p className="text-muted text-sm italic px-4">
-														No response steps available
-													</p>
-												)}
-											</div>
-										</Accordion.Body>
-									</Accordion.Panel>
-								</Accordion.Item>
+												</div>
+											</Card.Content>
+										</Card>
 
-								<Accordion.Item id="usage">
-									<Accordion.Heading>
-										<Accordion.Trigger>
-											<div className="flex items-center gap-2">
-												<span className="font-medium">Token Usage</span>
-												{runData.totalUsage && (
-													<Chip size="sm" variant="tertiary">
-														{runData.totalUsage.totalTokens} tokens
-													</Chip>
-												)}
-											</div>
-											<Accordion.Indicator />
-										</Accordion.Trigger>
-									</Accordion.Heading>
-									<Accordion.Panel>
-										<Accordion.Body>
-											<div className="p-4 pt-0">
-												{runData.totalUsage ? (
-													<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-														<Card className="text-default-foreground">
-															<Card.Content className="space-y-2">
-																<div className="flex justify-between items-center">
-																	<span className="text-sm font-medium">
-																		Input Tokens
-																	</span>
-																	<span className="text-sm font-bold">
-																		{runData.totalUsage.inputTokens}
-																	</span>
-																</div>
-																{runData.totalUsage.inputTokenDetails && (
-																	<div className="space-y-1 pl-2 border-l-2 border-border">
-																		<div className="flex justify-between text-xs text-muted">
-																			<span>Non-cached</span>
-																			<span>
-																				{runData.totalUsage.inputTokenDetails
-																					.noCacheTokens ?? "-"}
-																			</span>
-																		</div>
-																		<div className="flex justify-between text-xs text-muted">
-																			<span>Cached Read</span>
-																			<span>
-																				{runData.totalUsage.inputTokenDetails
-																					.cacheReadTokens ?? "-"}
-																			</span>
-																		</div>
-																		<div className="flex justify-between text-xs text-muted">
-																			<span>Cached Write</span>
-																			<span>
-																				{runData.totalUsage.inputTokenDetails
-																					.cacheWriteTokens ?? "-"}
-																			</span>
-																		</div>
-																	</div>
-																)}
-															</Card.Content>
-														</Card>
+										<Card className="text-default-foreground">
+											<Card.Content>
+												<span className="text-xs text-muted block mb-1">
+													Selected Tools
+												</span>
+												<div className="flex flex-wrap gap-1.5">
+													{runData.request?.tools &&
+													runData.request.tools.length > 0 ? (
+														runData.request.tools.map((tool) => {
+															if (tool.type === "mcp") {
+																return (
+																	<Chip
+																		key={`${tool.mcp_id}-${tool.name}`}
+																		size="sm"
+																	>
+																		{tool.name}
+																	</Chip>
+																);
+															}
 
-														<Card className="text-default-foreground">
-															<Card.Content className="space-y-3">
-																<div className="flex justify-between items-center">
-																	<span className="text-sm font-medium">
-																		Output Tokens
-																	</span>
-																	<span className="text-sm font-bold">
-																		{runData.totalUsage.outputTokens}
-																	</span>
-																</div>
-																{runData.totalUsage.outputTokenDetails && (
-																	<div className="space-y-1 pl-2 border-l-2 border-border">
-																		<div className="flex justify-between text-xs text-muted">
-																			<span>Text</span>
-																			<span>
-																				{runData.totalUsage.outputTokenDetails
-																					.textTokens ?? "-"}
-																			</span>
-																		</div>
-																		<div className="flex justify-between text-xs text-muted">
-																			<span>Reasoning</span>
-																			<span>
-																				{runData.totalUsage.outputTokenDetails
-																					.reasoningTokens ?? "-"}
-																			</span>
-																		</div>
-																	</div>
-																)}
-															</Card.Content>
-														</Card>
-													</div>
-												) : (
-													<p className="text-muted text-sm italic">
-														No token usage data available
-													</p>
-												)}
-											</div>
-										</Accordion.Body>
-									</Accordion.Panel>
-								</Accordion.Item>
-							</Accordion>
+															if (tool.type === "custom") {
+																return (
+																	<Chip key={`custom-${tool.title}`} size="sm">
+																		{tool.title}
+																	</Chip>
+																);
+															}
+
+															return null;
+														})
+													) : (
+														<span className="text-xs text-muted italic">
+															No tools selected
+														</span>
+													)}
+												</div>
+											</Card.Content>
+										</Card>
+									</div>
+
+									{runData.request?.messages &&
+									runData.request.messages.length > 0 ? (
+										<ReadOnlyMessages
+											messages={normalizeMessages(runData.request.messages)}
+										/>
+									) : (
+										<p className="text-muted text-sm italic">
+											No request messages available
+										</p>
+									)}
+								</div>
+							</Section>
+
+							{/* Response */}
+							<Section
+								title="Response"
+								suffix={
+									<Chip size="sm" variant="tertiary">
+										{runData.steps?.length || 0} steps
+									</Chip>
+								}
+							>
+								{runData.steps && runData.steps.length > 0 ? (
+									<ReadOnlyMessages
+										messages={normalizeMessages(
+											runData.steps[runData.steps.length - 1].response
+												.messages as MessageT[],
+										)}
+									/>
+								) : (
+									<p className="text-muted text-sm italic">
+										No response steps available
+									</p>
+								)}
+							</Section>
 						</>
 					)}
 				</div>
@@ -614,21 +594,23 @@ function RouteComponent() {
 			<Modal state={modalState}>
 				<Modal.Backdrop>
 					<Modal.Container size="cover">
-						<Modal.Dialog>
+						<Modal.Dialog className="flex flex-col">
 							<Modal.CloseTrigger />
 							<Modal.Header>
 								<Modal.Heading>Raw JSON Data</Modal.Heading>
 							</Modal.Header>
-							<Modal.Body className="p-6">
-								<MonacoJsonEditor
-									value={
-										runData
-											? JSON.stringify(runData, null, 2)
-											: JSON.stringify({ error: "Run Data not available" })
-									}
-									readOnly
-									minHeight={400}
-								/>
+							<Modal.Body className="flex-1 min-h-0 p-6">
+								<div className="h-[calc(100vh-10rem)]">
+									<MonacoJsonEditor
+										value={
+											runData
+												? JSON.stringify(runData, null, 2)
+												: JSON.stringify({ error: "Run Data not available" })
+										}
+										readOnly
+										fillHeight
+									/>
+								</div>
 							</Modal.Body>
 						</Modal.Dialog>
 					</Modal.Container>

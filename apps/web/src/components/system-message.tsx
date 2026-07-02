@@ -46,16 +46,20 @@ export function SystemMessage({
 					<span className="text-sm text-muted">System</span>
 				</Card.Header>
 				<Card.Content className="gap-4">
-					<TextareaAutosize
-						className="outline-none w-full resize-none text-sm scrollbar-hide"
-						readOnly={isReadOnly}
-						placeholder="Enter system message..."
-						maxRows={1000}
-						value={value.content}
-						onChange={(e) =>
-							onValueChange({ ...value, content: e.target.value })
-						}
-					/>
+					<div
+						className={`w-full min-w-0${isReadOnly ? " max-h-80 overflow-y-auto scrollbar-thin" : ""}`}
+					>
+						<TextareaAutosize
+							className="outline-none w-full resize-none text-sm scrollbar-hide"
+							readOnly={isReadOnly}
+							placeholder="Enter system message..."
+							maxRows={1000}
+							value={value.content}
+							onChange={(e) =>
+								onValueChange({ ...value, content: e.target.value })
+							}
+						/>
+					</div>
 					<Variables variables={variables} onVariablePress={onVariablePress} />
 				</Card.Content>
 			</Card>

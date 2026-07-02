@@ -63,14 +63,18 @@ function UserMessagePart({
 }) {
 	if (value.type === "text") {
 		return (
-			<TextareaAutosize
-				className="outline-none w-full resize-none text-sm scrollbar-hide"
-				readOnly={isReadOnly}
-				placeholder="Enter user message..."
-				maxRows={1000000000000}
-				value={value.text}
-				onChange={(e) => onValueChange({ ...value, text: e.target.value })}
-			/>
+			<div
+				className={`w-full min-w-0${isReadOnly ? " max-h-80 overflow-y-auto scrollbar-thin" : ""}`}
+			>
+				<TextareaAutosize
+					className="outline-none w-full resize-none text-sm scrollbar-hide"
+					readOnly={isReadOnly}
+					placeholder="Enter user message..."
+					maxRows={1000000000000}
+					value={value.text}
+					onChange={(e) => onValueChange({ ...value, text: e.target.value })}
+				/>
+			</div>
 		);
 	}
 

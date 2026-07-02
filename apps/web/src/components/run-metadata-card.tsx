@@ -1,38 +1,33 @@
-import { Button, Card, Input, toast } from "@heroui/react";
+import { Button, Card, Input, Popover, toast } from "@heroui/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, LucidePlus, LucideTrash2, Pencil, X } from "lucide-react";
-import { nanoid } from "nanoid";
-import { useState } from "react";
+import { LucidePlus, X } from "lucide-react";
+import { type ReactNode, useState } from "react";
 import { updateRunMetadata } from "@/lib/queries";
 
 interface RunMetadataCardProps {
 	workspaceId: string;
 	runId: string;
 	metadata: Record<string, string> | null;
+	/** Extra content rendered in the same card below the metadata (e.g. lineage). */
+	children?: ReactNode;
 }
 
-type Row = { id: string; key: string; value: string };
-
-const toRows = (metadata: Record<string, string> | null): Row[] =>
-	Object.entries(metadata ?? {}).map(([key, value]) => ({
-		id: nanoid(),
-		key,
-		value,
-	}));
-
 /**
- * Metadata panel on the run detail page. Shows the run's labels and lets the
- * user edit them after the fact (tag a run so it can be filtered later). Full
- * replace on save — the editor holds the complete set.
+ * Metadata panel on the run detail page. Shows each label as a pill with a
+ * remove button, plus an "Add" popover to tag the run in place. Every edit is a
+ * full-replace PATCH built from the current set.
  */
 export function RunMetadataCard({
 	workspaceId,
 	runId,
 	metadata,
+	children,
 }: RunMetadataCardProps) {
 	const queryClient = useQueryClient();
-	const [isEditing, setIsEditing] = useState(false);
-	const [rows, setRows] = useState<Row[]>(() => toRows(metadata));
+	const [keyDraft, setKeyDraft] = useState("");
+	const [valueDraft, setValueDraft] = useState("");
+
+	const pairs = Object.entries(metadata ?? {});
 
 	const mutation = useMutation({
 		mutationFn: (next: Record<string, string>) =>
@@ -40,8 +35,6 @@ export function RunMetadataCard({
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ["run", runId] });
 			queryClient.invalidateQueries({ queryKey: ["runs"] });
-			toast.success("Metadata updated.");
-			setIsEditing(false);
 		},
 		onError: (err) => {
 			toast.danger(
@@ -50,125 +43,102 @@ export function RunMetadataCard({
 		},
 	});
 
-	const startEditing = () => {
-		setRows(toRows(metadata));
-		setIsEditing(true);
-	};
-
-	const save = () => {
-		const next: Record<string, string> = {};
-		for (const row of rows) {
-			const key = row.key.trim();
-			if (key) next[key] = row.value;
-		}
+	const removePair = (key: string) => {
+		const next = { ...(metadata ?? {}) };
+		delete next[key];
 		mutation.mutate(next);
 	};
 
-	const pairs = Object.entries(metadata ?? {});
+	const addPair = () => {
+		const key = keyDraft.trim();
+		if (!key) return;
+		mutation.mutate(
+			{ ...(metadata ?? {}), [key]: valueDraft },
+			{
+				onSuccess: () => {
+					setKeyDraft("");
+					setValueDraft("");
+				},
+			},
+		);
+	};
 
 	return (
 		<Card>
-			<Card.Content className="space-y-3 text-sm">
-				<div className="flex items-center justify-between">
+			<Card.Content className="space-y-4 text-sm">
+				<div className="flex flex-col gap-1.5">
 					<span className="text-muted">Metadata</span>
-					{!isEditing && (
-						<Button
-							size="sm"
-							variant="tertiary"
-							onPress={startEditing}
-							aria-label="Edit metadata"
-						>
-							<Pencil className="size-3.5" />
-							{pairs.length > 0 ? "Edit" : "Add"}
-						</Button>
-					)}
-				</div>
-
-				{isEditing ? (
-					<div className="flex flex-col gap-2">
-						{rows.map((row, index) => (
-							<div key={row.id} className="flex items-center gap-2">
-								<Input
-									variant="secondary"
-									aria-label="Metadata key"
-									placeholder="key"
-									className="min-w-0 flex-1"
-									value={row.key}
-									onChange={(e) => {
-										const next = [...rows];
-										next[index] = { ...row, key: e.target.value };
-										setRows(next);
-									}}
-								/>
-								<Input
-									variant="secondary"
-									aria-label="Metadata value"
-									placeholder="value"
-									className="min-w-0 flex-1"
-									value={row.value}
-									onChange={(e) => {
-										const next = [...rows];
-										next[index] = { ...row, value: e.target.value };
-										setRows(next);
-									}}
-								/>
-								<Button
-									isIconOnly
-									variant="tertiary"
-									aria-label="Remove metadata row"
-									className="shrink-0"
-									onPress={() => setRows(rows.filter((r) => r.id !== row.id))}
-								>
-									<LucideTrash2 className="size-4" />
-								</Button>
-							</div>
-						))}
-						<div className="flex items-center justify-between gap-2">
-							<Button
-								size="sm"
-								variant="tertiary"
-								onPress={() =>
-									setRows([...rows, { id: nanoid(), key: "", value: "" }])
-								}
-							>
-								<LucidePlus className="size-3.5" />
-								Add row
-							</Button>
-							<div className="flex items-center gap-2">
-								<Button
-									size="sm"
-									variant="tertiary"
-									isDisabled={mutation.isPending}
-									onPress={() => setIsEditing(false)}
-								>
-									<X className="size-3.5" />
-									Cancel
-								</Button>
-								<Button size="sm" onPress={save} isPending={mutation.isPending}>
-									<Check className="size-3.5" />
-									Save
-								</Button>
-							</div>
-						</div>
-					</div>
-				) : pairs.length > 0 ? (
-					<div className="flex flex-wrap gap-1.5">
+					<div className="flex flex-wrap items-center gap-1.5">
 						{pairs.map(([k, v]) => (
 							<div
 								key={k}
-								className="inline-flex items-center gap-1 rounded-md bg-surface-secondary px-2 py-0.5 text-xs"
+								className="inline-flex items-center gap-1 rounded-full bg-[var(--color-default)] py-1 pl-3 pr-1.5"
 							>
-								<span className="font-medium">{k}</span>
-								<span className="text-muted">=</span>
-								<span>{v}</span>
+								<span>
+									<span className="font-medium">{k}</span>
+									<span className="text-muted"> = </span>
+									<span className="text-muted">{v || '""'}</span>
+								</span>
+								<button
+									type="button"
+									aria-label={`Remove ${k}`}
+									className="shrink-0 cursor-pointer rounded-full p-0.5 text-muted transition hover:text-foreground"
+									onClick={() => removePair(k)}
+								>
+									<X className="size-3.5" />
+								</button>
 							</div>
 						))}
+
+						<Popover>
+							<Popover.Trigger className="contents">
+								<Button size="sm" variant="tertiary">
+									<LucidePlus className="size-3.5" />
+									Add
+								</Button>
+							</Popover.Trigger>
+							<Popover.Content placement="bottom start">
+								<Popover.Dialog className="flex w-72 flex-col gap-2 p-3">
+									<div className="grid grid-cols-2 gap-2">
+										<Input
+											variant="secondary"
+											fullWidth
+											aria-label="Metadata key"
+											placeholder="key"
+											value={keyDraft}
+											onChange={(e) => setKeyDraft(e.target.value)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") addPair();
+											}}
+										/>
+										<Input
+											variant="secondary"
+											fullWidth
+											aria-label="Metadata value"
+											placeholder="value"
+											value={valueDraft}
+											onChange={(e) => setValueDraft(e.target.value)}
+											onKeyDown={(e) => {
+												if (e.key === "Enter") addPair();
+											}}
+										/>
+									</div>
+									<div className="flex justify-end">
+										<Button
+											size="sm"
+											onPress={addPair}
+											isPending={mutation.isPending}
+											isDisabled={!keyDraft.trim()}
+										>
+											Add
+										</Button>
+									</div>
+								</Popover.Dialog>
+							</Popover.Content>
+						</Popover>
 					</div>
-				) : (
-					<p className="text-muted">
-						No metadata. Add labels to filter by later.
-					</p>
-				)}
+				</div>
+				{children}
 			</Card.Content>
 		</Card>
 	);
