@@ -7,9 +7,10 @@ import { toWebHeaders } from "../lib/auth/headers.js";
 import { auth } from "../lib/auth/index.js";
 import { sumUsage } from "../lib/cost.js";
 import { createSSEStream } from "../lib/helpers.js";
+import { MetadataError, parseRunMetadata } from "../lib/metadata.js";
 import { db } from "../lib/pg.js";
 import { assembleRun, recordRun } from "../lib/run-agent.js";
-import type { VersionData } from "../lib/types.js";
+import type { RunMetadata, VersionData } from "../lib/types.js";
 
 export async function registerTestRoute(fastify: FastifyInstance) {
 	fastify.post("/internal/test", async (request, reply) => {
@@ -36,13 +37,25 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			version_id,
 			mcp_options,
 			environment = "staging",
+			metadata: rawMetadata,
 		} = request.body as {
 			data: unknown;
 			variables: Record<string, string>;
 			version_id?: string;
 			mcp_options?: Record<string, { headers?: Record<string, string> }>;
 			environment?: "staging" | "production";
+			metadata?: Record<string, string>;
 		};
+
+		let metadata: RunMetadata | undefined;
+		try {
+			metadata = parseRunMetadata(rawMetadata);
+		} catch (err) {
+			if (err instanceof MetadataError) {
+				return reply.code(400).send({ message: err.message });
+			}
+			throw err;
+		}
 
 		const versionData = data as VersionData;
 
@@ -102,6 +115,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 				variables,
 				mcpOptions: mcp_options,
 				isTest: true,
+				metadata,
 			});
 
 		const preProcessingTime = Date.now() - startTime;
@@ -136,6 +150,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 				await recordRun({
 					id: runId,
 					parentRunId: null,
+					metadata,
 					workspaceId: provider.workspace_id,
 					versionId: resolvedVersionId,
 					environment,
@@ -174,6 +189,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 				await recordRun({
 					id: runId,
 					parentRunId: null,
+					metadata,
 					workspaceId: provider.workspace_id,
 					versionId: resolvedVersionId,
 					environment,
@@ -210,6 +226,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 				await recordRun({
 					id: runId,
 					parentRunId: null,
+					metadata,
 					workspaceId: provider.workspace_id,
 					versionId: resolvedVersionId,
 					environment,

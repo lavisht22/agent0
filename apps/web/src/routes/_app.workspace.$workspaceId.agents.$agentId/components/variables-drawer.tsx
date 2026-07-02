@@ -7,8 +7,9 @@ import {
 	TextArea,
 	TextField,
 } from "@heroui/react";
-import { LucidePlay } from "lucide-react";
-import { useMemo } from "react";
+import { LucidePlay, LucidePlus, LucideTrash2 } from "lucide-react";
+import { nanoid } from "nanoid";
+import { useEffect, useMemo, useState } from "react";
 import type { MessageT } from "@/components/messages";
 
 type MCP = {
@@ -32,6 +33,8 @@ interface VariablesDrawerProps {
 	onMcpHeaderValuesChange: (
 		values: Record<string, Record<string, string>>,
 	) => void;
+	metadataValues: Record<string, string>;
+	onMetadataValuesChange: (values: Record<string, string>) => void;
 }
 
 export function VariablesDrawer({
@@ -45,6 +48,8 @@ export function VariablesDrawer({
 	tools,
 	mcpHeaderValues,
 	onMcpHeaderValuesChange,
+	metadataValues,
+	onMetadataValuesChange,
 }: VariablesDrawerProps) {
 	const variables = useMemo(() => {
 		const vars = new Set<string>();
@@ -93,6 +98,40 @@ export function VariablesDrawer({
 			}))
 			.filter((mcp) => mcp.headers.length > 0);
 	}, [mcps, tools]);
+
+	// Metadata is edited as an ordered list of rows so blank/duplicate keys don't
+	// collide mid-typing (an object would drop them). We seed from the persisted
+	// object each time the drawer opens and push a normalized object back up —
+	// only rows with a non-empty key are stored.
+	const [metaRows, setMetaRows] = useState<
+		{ id: string; key: string; value: string }[]
+	>([]);
+
+	// Re-seed only on open; ignore live prop changes so typing isn't clobbered.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: seed on open only
+	useEffect(() => {
+		if (isOpen) {
+			setMetaRows(
+				Object.entries(metadataValues).map(([key, value]) => ({
+					id: nanoid(),
+					key,
+					value,
+				})),
+			);
+		}
+	}, [isOpen]);
+
+	const commitMetaRows = (
+		rows: { id: string; key: string; value: string }[],
+	) => {
+		setMetaRows(rows);
+		const obj: Record<string, string> = {};
+		for (const row of rows) {
+			const key = row.key.trim();
+			if (key) obj[key] = row.value;
+		}
+		onMetadataValuesChange(obj);
+	};
 
 	return (
 		<Drawer>
@@ -160,6 +199,72 @@ export function VariablesDrawer({
 										))}
 									</>
 								)}
+
+								{/* Metadata Section */}
+								{(variables.length > 0 || mcpHeaders.length > 0) && (
+									<Separator />
+								)}
+								<div className="flex items-center justify-between">
+									<p className="text-sm font-medium text-foreground">
+										Metadata
+									</p>
+									<Button
+										size="sm"
+										variant="tertiary"
+										onPress={() =>
+											commitMetaRows([
+												...metaRows,
+												{ id: nanoid(), key: "", value: "" },
+											])
+										}
+									>
+										<LucidePlus className="size-3.5" />
+										Add
+									</Button>
+								</div>
+								<p className="-mt-2 text-xs text-muted">
+									Arbitrary key-value labels stored on the run for filtering.
+									Max 10 keys; each under 128 characters.
+								</p>
+								{metaRows.map((row, index) => (
+									<div key={row.id} className="flex items-center gap-2">
+										<Input
+											variant="secondary"
+											aria-label="Metadata key"
+											placeholder="key"
+											className="min-w-0 flex-1"
+											value={row.key}
+											onChange={(e) => {
+												const next = [...metaRows];
+												next[index] = { ...row, key: e.target.value };
+												commitMetaRows(next);
+											}}
+										/>
+										<Input
+											variant="secondary"
+											aria-label="Metadata value"
+											placeholder="value"
+											className="min-w-0 flex-1"
+											value={row.value}
+											onChange={(e) => {
+												const next = [...metaRows];
+												next[index] = { ...row, value: e.target.value };
+												commitMetaRows(next);
+											}}
+										/>
+										<Button
+											isIconOnly
+											variant="tertiary"
+											aria-label="Remove metadata row"
+											className="shrink-0"
+											onPress={() =>
+												commitMetaRows(metaRows.filter((r) => r.id !== row.id))
+											}
+										>
+											<LucideTrash2 className="size-4" />
+										</Button>
+									</div>
+								))}
 							</div>
 						</Drawer.Body>
 						{onRun && (

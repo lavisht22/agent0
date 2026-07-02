@@ -27,6 +27,7 @@ import {
 } from "@/components/messages";
 import { MonacoJsonEditor } from "@/components/monaco-json-editor";
 import { PageHeader } from "@/components/page-header";
+import { RunMetadataCard } from "@/components/run-metadata-card";
 import { childRunsQuery, runQuery } from "@/lib/queries";
 import type { AgentFormValues } from "./_app.workspace.$workspaceId.agents.$agentId/types";
 
@@ -253,22 +254,11 @@ function RouteComponent() {
 						</Card>
 					)}
 
-					{run.metadata && Object.keys(run.metadata).length > 0 && (
-						<Card>
-							<Card.Content className="space-y-2 text-sm">
-								<span className="text-muted">Metadata</span>
-								<div className="flex flex-wrap gap-1.5">
-									{Object.entries(run.metadata).map(([k, v]) => (
-										<Chip key={k} variant="soft" size="sm">
-											<span className="font-medium">{k}</span>
-											<span className="text-muted">=</span>
-											<span>{v}</span>
-										</Chip>
-									))}
-								</div>
-							</Card.Content>
-						</Card>
-					)}
+					<RunMetadataCard
+						workspaceId={workspaceId}
+						runId={run.id}
+						metadata={run.metadata}
+					/>
 
 					<div className="flex flex-row items-center gap-4">
 						<MetricCard

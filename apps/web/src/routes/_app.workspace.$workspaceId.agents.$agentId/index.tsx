@@ -83,6 +83,12 @@ function RouteComponent() {
 	>(`agent-mcp-headers-${agentId}`, {
 		defaultValue: {} as Record<string, Record<string, string>>,
 	});
+	const [metadataValues, setMetadataValues] = useDb<Record<string, string>>(
+		`agent-metadata-${agentId}`,
+		{
+			defaultValue: {} as Record<string, string>,
+		},
+	);
 
 	const variablesState = useOverlayState();
 	const editNameState = useOverlayState();
@@ -153,6 +159,7 @@ function RouteComponent() {
 	} = useAgentRunner({
 		variableValues,
 		mcpHeaderValues,
+		metadataValues,
 		versionId,
 		environment: testEnvironment,
 	});
@@ -349,6 +356,8 @@ function RouteComponent() {
 					tools={drawerTools}
 					mcpHeaderValues={mcpHeaderValues}
 					onMcpHeaderValuesChange={setMcpHeaderValues}
+					metadataValues={metadataValues}
+					onMetadataValuesChange={setMetadataValues}
 				/>
 
 				<form.Subscribe

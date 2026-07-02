@@ -25,6 +25,7 @@ import {
 import IDCopy from "@/components/id-copy";
 import { MetadataFilter } from "@/components/metadata-filter";
 import { PageHeader } from "@/components/page-header";
+import { RunMetadataCell } from "@/components/run-metadata-cell";
 import {
 	StatusFilter,
 	type StatusFilterValue,
@@ -106,6 +107,21 @@ function RouteComponent() {
 			params: { workspaceId, runId },
 		});
 		window.open(href, "_blank", "noopener,noreferrer");
+	};
+
+	// Add a single metadata pair (from a run row) to the active filter, merging
+	// with any pairs already applied and resetting to the first page.
+	const applyMetadataFilter = (key: string, val: string) => {
+		navigate({
+			search: {
+				...dateValues,
+				agentId,
+				status,
+				environment,
+				metadata: { ...(metadata ?? {}), [key]: val },
+				page: 1,
+			},
+		});
 	};
 
 	const {
@@ -292,6 +308,7 @@ function RouteComponent() {
 								<Table.Column>Time</Table.Column>
 								<Table.Column>Cost</Table.Column>
 								<Table.Column>Agent</Table.Column>
+								<Table.Column>Metadata</Table.Column>
 								<Table.Column>ID</Table.Column>
 								<Table.Column className="w-20"></Table.Column>
 							</Table.Header>
@@ -368,6 +385,12 @@ function RouteComponent() {
 										</Table.Cell>
 
 										<Table.Cell>{item.agent?.name || "-"}</Table.Cell>
+										<Table.Cell>
+											<RunMetadataCell
+												metadata={item.metadata}
+												onFilter={applyMetadataFilter}
+											/>
+										</Table.Cell>
 										<Table.Cell>
 											<IDCopy id={item.id} />
 										</Table.Cell>

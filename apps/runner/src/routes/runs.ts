@@ -400,6 +400,87 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 		},
 	});
 
+	// Replace a run's metadata labels. Lets users tag existing runs after the
+	// fact (e.g. to mark runs for a teammate to filter). Send an empty object to
+	// clear. Full replace, not a merge — the editor sends the complete set.
+	fastify.patch("/runs/:runId", {
+		preHandler: requireScope("runs:write:*"),
+		schema: {
+			tags: ["Runs"],
+			summary: "Update run metadata",
+			description:
+				"Replace the run's metadata labels. Send an empty object to clear all. Max 10 keys; each key and value must be under 128 characters.",
+			params: {
+				type: "object" as const,
+				properties: {
+					runId: { type: "string" as const, description: "Run ID" },
+				},
+				required: ["runId"],
+			},
+			body: {
+				type: "object" as const,
+				required: ["metadata"],
+				properties: {
+					metadata: {
+						type: "object" as const,
+						additionalProperties: { type: "string" as const },
+						description:
+							"The full set of key-value labels to store on the run.",
+					},
+				},
+			},
+			response: {
+				200: {
+					type: "object" as const,
+					properties: { data: RunSummarySchema },
+				},
+				400: ErrorSchema,
+				404: ErrorSchema,
+			},
+		},
+		handler: async (request, reply) => {
+			const { workspaceId, runId } = request.params as {
+				workspaceId: string;
+				runId: string;
+			};
+			const { metadata: rawMetadata } = request.body as {
+				metadata?: Record<string, string>;
+			};
+
+			let metadata: Record<string, string> | undefined;
+			try {
+				metadata = parseRunMetadata(rawMetadata);
+			} catch (err) {
+				if (err instanceof MetadataError) {
+					return reply.code(400).send({ message: err.message });
+				}
+				throw err;
+			}
+
+			const updated = await db
+				.update(runs)
+				.set({ metadata: metadata ?? null })
+				.where(and(eq(runs.id, runId), eq(runs.workspace_id, workspaceId)))
+				.returning({ id: runs.id });
+
+			if (updated.length === 0) {
+				return reply.code(404).send({ message: "Run not found" });
+			}
+
+			// Re-select with the agent join so the response matches the list/detail
+			// shape (update...returning can't join).
+			const [row] = await db
+				.select(runSelectColumns)
+				.from(runs)
+				.leftJoin(agentVersions, eq(runs.version_id, agentVersions.id))
+				.leftJoin(agents, eq(agentVersions.agent_id, agents.id))
+				.where(and(eq(runs.id, runId), eq(runs.workspace_id, workspaceId)))
+				.limit(1);
+
+			return reply.send({ data: shapeRun(row) });
+		},
+	});
+
 	// How many runs the workspace's retention windows currently make eligible for
 	// cleanup. Drives the "Clean up" button's visibility and the confirm dialog.
 	fastify.get("/runs/cleanup/preview", {

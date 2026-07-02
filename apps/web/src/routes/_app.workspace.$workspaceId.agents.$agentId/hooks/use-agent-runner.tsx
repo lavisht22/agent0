@@ -10,11 +10,13 @@ import type { MessageT } from "@/components/messages";
 export const useAgentRunner = ({
 	variableValues,
 	mcpHeaderValues,
+	metadataValues,
 	versionId,
 	environment,
 }: {
 	variableValues: Record<string, string>;
 	mcpHeaderValues: Record<string, Record<string, string>>;
+	metadataValues: Record<string, string>;
 	versionId?: string;
 	environment: "staging" | "production";
 }) => {
@@ -50,6 +52,10 @@ export const useAgentRunner = ({
 						variables: variableValues,
 						version_id: versionId,
 						environment,
+						// Drop rows with an empty key; server validates the rest.
+						metadata: Object.fromEntries(
+							Object.entries(metadataValues).filter(([k]) => k.trim()),
+						),
 						mcp_options: Object.fromEntries(
 							Object.entries(mcpHeaderValues)
 								.filter(([, headers]) => Object.values(headers).some((v) => v))
@@ -190,7 +196,7 @@ export const useAgentRunner = ({
 				}
 			}
 		},
-		[variableValues, mcpHeaderValues, versionId, environment],
+		[variableValues, mcpHeaderValues, metadataValues, versionId, environment],
 	);
 
 	const handleStop = useCallback(() => {

@@ -1,4 +1,4 @@
-import { Button, Chip, Input, Popover } from "@heroui/react";
+import { Button, Input, Popover } from "@heroui/react";
 import { Tags, X } from "lucide-react";
 import { useState } from "react";
 
@@ -43,31 +43,37 @@ export function MetadataFilter({ value, onValueChange }: MetadataFilterProps) {
 				</span>
 			</Popover.Trigger>
 			<Popover.Content placement="bottom start">
-				<Popover.Dialog className="flex w-72 flex-col gap-3 p-3">
+				<Popover.Dialog className="flex w-80 flex-col gap-2 p-3">
 					{count > 0 && (
-						<div className="flex flex-wrap gap-1.5">
+						<div className="flex flex-col gap-2">
 							{pairs.map(([k, v]) => (
-								<Chip key={k} variant="soft" size="sm">
-									<span className="font-medium">{k}</span>
-									<span className="text-muted">=</span>
-									<span>{v}</span>
+								<div
+									key={k}
+									className="flex items-center gap-2 rounded-field border border-[var(--color-field-border)] bg-[var(--color-default)] py-2 pl-3 pr-2 text-sm"
+								>
+									<span className="min-w-0 flex-1 truncate">
+										<span className="font-medium">{k}</span>
+										<span className="text-muted"> = </span>
+										<span className="text-muted">{v || '""'}</span>
+									</span>
 									<button
 										type="button"
 										aria-label={`Remove ${k}`}
-										className="ml-0.5 cursor-pointer text-muted hover:text-foreground"
+										className="shrink-0 cursor-pointer rounded p-0.5 text-muted transition hover:text-foreground"
 										onClick={() => removePair(k)}
 									>
-										<X className="size-3" />
+										<X className="size-4" />
 									</button>
-								</Chip>
+								</div>
 							))}
 						</div>
 					)}
-					<div className="flex items-center gap-2">
+					<div className="grid grid-cols-2 gap-2">
 						<Input
+							variant="secondary"
+							fullWidth
 							aria-label="Metadata key"
 							placeholder="key"
-							className="min-h-8"
 							value={keyDraft}
 							onChange={(e) => setKeyDraft(e.target.value)}
 							onKeyDown={(e) => {
@@ -75,9 +81,10 @@ export function MetadataFilter({ value, onValueChange }: MetadataFilterProps) {
 							}}
 						/>
 						<Input
+							variant="secondary"
+							fullWidth
 							aria-label="Metadata value"
 							placeholder="value"
-							className="min-h-8"
 							value={valueDraft}
 							onChange={(e) => setValueDraft(e.target.value)}
 							onKeyDown={(e) => {
@@ -85,7 +92,7 @@ export function MetadataFilter({ value, onValueChange }: MetadataFilterProps) {
 							}}
 						/>
 					</div>
-					<div className="flex justify-between gap-2">
+					<div className="flex items-center justify-between gap-2">
 						{count > 0 ? (
 							<Button
 								size="sm"

@@ -678,6 +678,20 @@ export const runQuery = (workspaceId: string, runId: string) =>
 		enabled: !!runId,
 	});
 
+// Replace a run's metadata labels (full set, not a merge). Empty object clears.
+export async function updateRunMetadata(
+	workspaceId: string,
+	runId: string,
+	metadata: Record<string, string>,
+) {
+	const { data } = await api.patch<{ data: RunListItem }>(
+		`/api/v1/workspaces/${workspaceId}/runs/${runId}`,
+		{ metadata },
+	);
+
+	return data;
+}
+
 // Runs invoked by this run via an agent-as-tool (parent_run_id == runId).
 export const childRunsQuery = (
 	workspaceId: string,
