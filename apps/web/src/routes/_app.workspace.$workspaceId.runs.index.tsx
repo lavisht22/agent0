@@ -302,11 +302,8 @@ function RouteComponent() {
 					<Table.ScrollContainer className="flex-1 overflow-y-auto">
 						<Table.Content aria-label="Runs Table">
 							<Table.Header className="sticky top-0 z-10">
-								<Table.Column>Created At</Table.Column>
 								<Table.Column>Status</Table.Column>
-								<Table.Column className="w-12 text-center">Env</Table.Column>
-								<Table.Column>Time</Table.Column>
-								<Table.Column>Cost</Table.Column>
+								<Table.Column>Time &amp; Cost</Table.Column>
 								<Table.Column>Agent</Table.Column>
 								<Table.Column>Metadata</Table.Column>
 								<Table.Column>ID</Table.Column>
@@ -326,62 +323,65 @@ function RouteComponent() {
 										onAction={() => openRunInNewTab(item.id)}
 									>
 										<Table.Cell>
-											{format(item.created_at, "d LLL, hh:mm a")}
-										</Table.Cell>
-										<Table.Cell>
-											<div className="flex items-center gap-2">
-												{item.is_error ? (
-													<Chip variant="soft" color="danger" size="sm">
-														<AlertCircle className="size-3" />
-														Error
-													</Chip>
-												) : (
-													<Chip variant="soft" color="success" size="sm">
-														<CheckCircle2 className="size-3" />
-														Success
-													</Chip>
-												)}
-												{item.is_test && (
-													<Chip variant="soft" color="warning" size="sm">
-														<FlaskConical className="size-3" />
-														Test
-													</Chip>
-												)}
+											<div className="flex flex-col gap-1.5">
+												<div className="flex items-center gap-2">
+													{item.is_error ? (
+														<Chip variant="soft" color="danger" size="sm">
+															<AlertCircle className="size-3" />
+															Error
+														</Chip>
+													) : (
+														<Chip variant="soft" color="success" size="sm">
+															<CheckCircle2 className="size-3" />
+															Success
+														</Chip>
+													)}
+													{item.is_test && (
+														<Chip variant="soft" color="warning" size="sm">
+															<FlaskConical className="size-3" />
+															Test
+														</Chip>
+													)}
+													<Tooltip delay={0}>
+														<Tooltip.Trigger>
+															{item.environment === "staging" ? (
+																<Chip size="sm" color="warning" variant="primary">
+																	S
+																</Chip>
+															) : (
+																<Chip size="sm" color="success" variant="primary">
+																	P
+																</Chip>
+															)}
+														</Tooltip.Trigger>
+														<Tooltip.Content className="capitalize">
+															{item.environment}
+														</Tooltip.Content>
+													</Tooltip>
+												</div>
+												<span className="text-xs text-muted">
+													{format(item.created_at, "d LLL, hh:mm a")}
+												</span>
 											</div>
 										</Table.Cell>
 
-										<Table.Cell className="text-center">
-											<Tooltip delay={0}>
-												<Tooltip.Trigger>
-													{item.environment === "staging" ? (
-														<Chip size="sm" color="warning" variant="primary">
-															S
-														</Chip>
-													) : (
-														<Chip size="sm" color="success" variant="primary">
-															P
-														</Chip>
-													)}
-												</Tooltip.Trigger>
-												<Tooltip.Content className="capitalize">
-													{item.environment}
-												</Tooltip.Content>
-											</Tooltip>
-										</Table.Cell>
-
 										<Table.Cell>
-											{(item.pre_processing_time +
-												item.first_token_time +
-												item.response_time) /
-												1000}
-											<span className="font-semibold text-xs text-muted ml-0.5">
-												s
-											</span>
-										</Table.Cell>
-										<Table.Cell>
-											{item.cost
-												? `$${item.cost.toFixed(5)} (${formatTokens(item.tokens ?? 0)} tokens)`
-												: "-"}
+											<div className="flex flex-col">
+												<span>
+													{(item.pre_processing_time +
+														item.first_token_time +
+														item.response_time) /
+														1000}
+													<span className="font-semibold text-xs text-muted ml-0.5">
+														s
+													</span>
+												</span>
+												<span className="text-xs text-muted">
+													{item.cost
+														? `$${item.cost.toFixed(5)} · ${formatTokens(item.tokens ?? 0)} tokens`
+														: "-"}
+												</span>
+											</div>
 										</Table.Cell>
 
 										<Table.Cell>{item.agent?.name || "-"}</Table.Cell>
@@ -395,23 +395,25 @@ function RouteComponent() {
 											<IDCopy id={item.id} />
 										</Table.Cell>
 
-										<Table.Cell className="flex justify-end">
-											<Dropdown>
-												<Button isIconOnly variant="ghost">
-													<LucideEllipsisVertical className="size-4" />
-												</Button>
-												<Dropdown.Popover>
-													<Dropdown.Menu>
-														<Dropdown.Item
-															id="view"
-															textValue="View"
-															onAction={() => openRunInNewTab(item.id)}
-														>
-															<Label>View</Label>
-														</Dropdown.Item>
-													</Dropdown.Menu>
-												</Dropdown.Popover>
-											</Dropdown>
+										<Table.Cell>
+											<div className="flex justify-end">
+												<Dropdown>
+													<Button isIconOnly variant="ghost">
+														<LucideEllipsisVertical className="size-4" />
+													</Button>
+													<Dropdown.Popover>
+														<Dropdown.Menu>
+															<Dropdown.Item
+																id="view"
+																textValue="View"
+																onAction={() => openRunInNewTab(item.id)}
+															>
+																<Label>View</Label>
+															</Dropdown.Item>
+														</Dropdown.Menu>
+													</Dropdown.Popover>
+												</Dropdown>
+											</div>
 										</Table.Cell>
 									</Table.Row>
 								)}
