@@ -56,6 +56,9 @@ export function parseRunMetadata(raw: unknown): RunMetadata | undefined {
 		if (typeof value !== "string") {
 			throw new MetadataError(`metadata value for "${key}" must be a string`);
 		}
+		if (value.length === 0) {
+			throw new MetadataError(`metadata value for "${key}" must not be empty`);
+		}
 		if (value.length >= MAX_METADATA_FIELD_LENGTH) {
 			throw new MetadataError(
 				`metadata value for "${key}" must be shorter than ${MAX_METADATA_FIELD_LENGTH} characters`,
