@@ -93,6 +93,7 @@ interface RunOptions {
   agentId: string;                    // The ID of the agent to run
   environment?: 'staging' | 'production'; // Environment to run (default: 'production')
   variables?: Record<string, string>; // Variables to pass to the agent
+  metadata?: Record<string, string>;  // Arbitrary key-value labels for filtering (e.g., { user_id: 'u_123' })
   overrides?: ModelOverrides;         // Runtime model configuration overrides
   extraMessages?: Message[];          // Extra messages to append to the prompt
   extraTools?: CustomTool[];          // Additional custom tools to add at runtime
@@ -522,6 +523,23 @@ const response4 = await defaultClient.generate({
   agentId: 'agent_123',
   environment: 'staging',
   variables: { name: 'Test User' }
+});
+```
+
+### Run Metadata
+
+You can attach arbitrary string key-value labels to a run. These labels are stored on the run and can be used later to filter runs in the dashboard or via the API/CLI. Keys and values must each be under 128 characters, with a maximum of 10 keys.
+
+It is recommended to use `snake_case` for metadata keys (e.g., `user_id`, `session_id`) to stay consistent with Agent0's database and query patterns.
+
+```typescript
+const response = await client.generate({
+  agentId: 'agent_123',
+  variables: { name: 'Alice' },
+  metadata: {
+    user_id: 'u_123',
+    session_id: 's_456'
+  }
 });
 ```
 

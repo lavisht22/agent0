@@ -88,7 +88,7 @@ export interface RunOptions {
 	}>;
 	/**
 	 * Arbitrary string key-value labels stored on the run for later filtering
-	 * (e.g. `{ userId: "u_123" }`). Max 10 keys; each key and value must be under
+	 * (e.g. `{ user_id: "u_123" }`). Max 10 keys; each key and value must be under
 	 * 128 characters. Inherited by any agent-as-tool sub-runs this run spawns.
 	 */
 	metadata?: Record<string, string>;

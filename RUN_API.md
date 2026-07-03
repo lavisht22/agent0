@@ -27,6 +27,10 @@ x-api-key: <your-api-key>
     "key": "value"
   },
   "stream": boolean (optional, default: false),
+  "metadata": {
+    "user_id": "string (optional)",
+    "session_id": "string (optional)"
+  },
   "overrides": {
     "model": {
       "provider_id": "string (optional)",
@@ -54,6 +58,7 @@ x-api-key: <your-api-key>
 - **environment** (optional): Which deployed version to run - `"staging"` or `"production"`. Defaults to `"production"` for backward compatibility
 - **variables** (optional): Key-value pairs to replace variables in the agent's messages
 - **stream** (optional): Whether to stream the response (true) or return complete messages at the end (false)
+- **metadata** (optional): Arbitrary string key-value labels stored on the run for later filtering. Max 10 keys; key and value must be under 128 characters. **Note**: `snake_case` keys are preferred (e.g. `{"user_id": "u_123", "session_id": "s_456"}`).
 - **overrides** (optional): Runtime configuration overrides for the model
   - **model.provider_id**: Override the provider to use
   - **model.name**: Override the model name
@@ -171,6 +176,10 @@ curl -X POST https://your-domain.com/api/v1/workspaces/ws_123/runs \
       "user_name": "John",
       "topic": "AI"
     },
+    "metadata": {
+      "user_id": "u_123",
+      "session_id": "s_456"
+    },
     "stream": false
   }'
 ```
@@ -261,6 +270,10 @@ const response = await fetch('https://your-domain.com/api/v1/workspaces/ws_123/r
     variables: {
       user_name: 'John',
       topic: 'AI'
+    },
+    metadata: {
+      user_id: 'u_123',
+      session_id: 's_456'
     },
     stream: false
   })
