@@ -1,4 +1,4 @@
-import { agents, agentVersions, runs } from "@repo/database";
+import { type RunStatus, agents, agentVersions, runs } from "@repo/database";
 import {
 	generateText,
 	jsonSchema,
@@ -389,7 +389,7 @@ export type RecordRunOptions = {
 	preProcessingTime: number;
 	firstTokenTime: number;
 	responseTime: number;
-	isError: boolean;
+	status: RunStatus;
 	isStream: boolean;
 	isTest?: boolean;
 	modelId: string;
@@ -414,7 +414,7 @@ export const recordRun = async (opts: RecordRunOptions): Promise<string> => {
 		parent_run_id: opts.parentRunId ?? null,
 		metadata: opts.metadata ?? null,
 		created_at: new Date(opts.startTime).toISOString(),
-		is_error: opts.isError,
+		status: opts.status,
 		is_test: opts.isTest ?? false,
 		is_stream: opts.isStream,
 		pre_processing_time: String(opts.preProcessingTime),
@@ -527,7 +527,7 @@ export const runAgent = async (
 			preProcessingTime,
 			firstTokenTime: Date.now() - preProcessingTime - startTime,
 			responseTime: 0,
-			isError: false,
+			status: "success",
 			isStream: false,
 			isTest: opts.isTest,
 			modelId,
@@ -572,7 +572,7 @@ export const runAgent = async (
 			preProcessingTime,
 			firstTokenTime: Date.now() - preProcessingTime - startTime,
 			responseTime: 0,
-			isError: true,
+			status: aborted ? "aborted" : "error",
 			isStream: false,
 			isTest: opts.isTest,
 			modelId,

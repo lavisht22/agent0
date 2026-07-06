@@ -52,6 +52,13 @@ export const invitationStatus = pgEnum("invitation_status", [
 	"revoked",
 ]);
 
+// Terminal outcome of a run. `aborted` = the caller/parent disconnected mid-run
+// (client abort), distinct from `error` (the agent itself failed). Kept separate
+// so aborts don't pollute error metrics — see dashboard success_rate, which
+// excludes aborted from its denominator.
+export const runStatus = pgEnum("run_status", ["success", "error", "aborted"]);
+export type RunStatus = (typeof runStatus.enumValues)[number];
+
 // ---------------------------------------------------------------------------
 // better-auth-owned tables (camelCase fields, Date-mode timestamps)
 // ---------------------------------------------------------------------------
@@ -457,7 +464,7 @@ export const runs = pgTable(
 		created_at: timestamp({ withTimezone: true, mode: "string" })
 			.defaultNow()
 			.notNull(),
-		is_error: boolean().default(false).notNull(),
+		status: runStatus().default("success").notNull(),
 		is_test: boolean().default(false).notNull(),
 		environment: text().default("production").notNull(),
 		pre_processing_time: numeric().notNull(),

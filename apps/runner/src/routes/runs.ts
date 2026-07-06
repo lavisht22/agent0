@@ -34,7 +34,7 @@ const runSelectColumns = {
 	version_id: runs.version_id,
 	environment: runs.environment,
 	parent_run_id: runs.parent_run_id,
-	is_error: runs.is_error,
+	status: runs.status,
 	is_test: runs.is_test,
 	is_stream: runs.is_stream,
 	cost: runs.cost,
@@ -105,7 +105,11 @@ const RunSummarySchema = {
 			description:
 				"ID of the run that invoked this one (agent-as-tool). Null for top-level runs.",
 		},
-		is_error: { type: "boolean" as const },
+		status: {
+			type: "string" as const,
+			enum: ["success", "error", "aborted"],
+			description: "Terminal outcome of the run.",
+		},
 		is_test: { type: "boolean" as const },
 		is_stream: { type: "boolean" as const, nullable: true },
 		cost: { type: "number" as const, nullable: true },
@@ -171,8 +175,9 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 					},
 					status: {
 						type: "string" as const,
-						enum: ["success", "failed"],
-						description: "Filter by run status",
+						enum: ["success", "failed", "aborted"],
+						description:
+							"Filter by run status. `failed` matches errored runs; `aborted` matches runs cancelled by client disconnect.",
 					},
 					environment: {
 						type: "string" as const,
@@ -294,9 +299,11 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				conditions.push(eq(runs.parent_run_id, parent_run_id));
 			}
 			if (status === "success") {
-				conditions.push(eq(runs.is_error, false));
+				conditions.push(eq(runs.status, "success"));
 			} else if (status === "failed") {
-				conditions.push(eq(runs.is_error, true));
+				conditions.push(eq(runs.status, "error"));
+			} else if (status === "aborted") {
+				conditions.push(eq(runs.status, "aborted"));
 			}
 			if (environment === "staging" || environment === "production") {
 				conditions.push(eq(runs.environment, environment));
@@ -892,7 +899,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 									(firstTokenTime || 0) -
 									preProcessingTime -
 									startTime,
-								isError: false,
+								status: "success",
 								isStream: true,
 								modelId,
 								usage: totalUsage,
@@ -935,7 +942,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 									(firstTokenTime || 0) -
 									preProcessingTime -
 									startTime,
-								isError: true,
+								status: "error",
 								isStream: true,
 								modelId,
 								runData,
@@ -974,7 +981,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 									(firstTokenTime || 0) -
 									preProcessingTime -
 									startTime,
-								isError: true,
+								status: "aborted",
 								isStream: true,
 								modelId,
 								usage: totalUsage,
@@ -1053,7 +1060,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						preProcessingTime,
 						firstTokenTime: Date.now() - preProcessingTime - startTime,
 						responseTime: 0,
-						isError: false,
+						status: "success",
 						isStream: false,
 						modelId,
 						usage: totalUsage,
@@ -1068,8 +1075,9 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 					completed = true;
 
 					if (controller.signal.aborted) {
-						// Client disconnected — log as error with partial cost from
-						// completed steps. Socket is gone, so don't try to send a reply.
+						// Client disconnected — record as an abort (distinct from error)
+						// with partial cost from completed steps. Socket is gone, so don't
+						// try to send a reply.
 						const totalUsage = sumUsage(collectedSteps);
 
 						runData.steps = collectedSteps;
@@ -1090,7 +1098,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 							preProcessingTime,
 							firstTokenTime: Date.now() - preProcessingTime - startTime,
 							responseTime: 0,
-							isError: true,
+							status: "aborted",
 							isStream: false,
 							modelId,
 							usage: totalUsage,
@@ -1120,7 +1128,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						preProcessingTime,
 						firstTokenTime: Date.now() - preProcessingTime - startTime,
 						responseTime: 0,
-						isError: true,
+						status: "error",
 						isStream: false,
 						modelId,
 						runData,

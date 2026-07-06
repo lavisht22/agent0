@@ -13,7 +13,7 @@ interface RunSummary {
 	id: string;
 	version_id: string;
 	parent_run_id: string | null;
-	is_error: boolean;
+	status: "success" | "error" | "aborted";
 	is_test: boolean;
 	is_stream: boolean;
 	cost: number | null;
@@ -59,9 +59,12 @@ export async function runsListCommand(opts: RunsListOpts): Promise<void> {
 	if (
 		opts.status !== undefined &&
 		opts.status !== "success" &&
-		opts.status !== "failed"
+		opts.status !== "failed" &&
+		opts.status !== "aborted"
 	) {
-		fail(`--status must be "success" or "failed" (got "${opts.status}").`);
+		fail(
+			`--status must be "success", "failed", or "aborted" (got "${opts.status}").`,
+		);
 	}
 
 	const profile = await requireProfile(opts);
@@ -97,7 +100,9 @@ export async function runsListCommand(opts: RunsListOpts): Promise<void> {
 	}
 
 	for (const r of res.data) {
-		const status = r.is_error ? "failed" : "success";
+		// Map the stored `error` status to the CLI's "failed" label; success and
+		// aborted pass through unchanged.
+		const status = r.status === "error" ? "failed" : r.status;
 		const agentName = r.agent?.name ?? "(deleted)";
 		// Mark sub-runs (invoked by another agent via agent-as-tool) with their
 		// parent run id, so it can be inspected with `runs get <parentId>`.

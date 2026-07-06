@@ -11,14 +11,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
-import {
-	AlertCircle,
-	CheckCircle2,
-	Code,
-	FlaskConical,
-	LucideInfo,
-	RotateCcw,
-} from "lucide-react";
+import { Code, FlaskConical, LucideInfo, RotateCcw } from "lucide-react";
 import type { ReactNode } from "react";
 import {
 	Messages,
@@ -28,6 +21,7 @@ import {
 import { MonacoJsonEditor } from "@/components/monaco-json-editor";
 import { PageHeader } from "@/components/page-header";
 import { RunMetadataCard } from "@/components/run-metadata-card";
+import { RunStatusChip } from "@/components/run-status-chip";
 import { childRunsQuery, runQuery } from "@/lib/queries";
 import type { AgentFormValues } from "./_app.workspace.$workspaceId.agents.$agentId/types";
 
@@ -110,7 +104,7 @@ function ReadOnlyMessages({ messages }: { messages: MessageT[] }) {
 // both render identically. Opens the run in a new tab.
 type LineageRun = {
 	id: string;
-	is_error: boolean;
+	status: "success" | "error" | "aborted";
 	created_at: string;
 	agent: { name: string | null } | null;
 };
@@ -124,17 +118,7 @@ function RunLink({
 }) {
 	return (
 		<li className="flex items-center gap-2">
-			{run.is_error ? (
-				<Chip variant="soft" color="danger" size="sm">
-					<AlertCircle className="size-3" />
-					Error
-				</Chip>
-			) : (
-				<Chip variant="soft" color="success" size="sm">
-					<CheckCircle2 className="size-3" />
-					Success
-				</Chip>
-			)}
+			<RunStatusChip status={run.status} />
 			<Link
 				to="/workspace/$workspaceId/runs/$runId"
 				params={{ workspaceId, runId: run.id }}
@@ -229,17 +213,7 @@ function RouteComponent() {
 			<div className="flex-1 overflow-y-auto p-6">
 				<div className="max-w-5xl mx-auto space-y-6">
 					<div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-						{run.is_error ? (
-							<Chip variant="soft" color="danger" size="sm">
-								<AlertCircle className="size-3" />
-								Error
-							</Chip>
-						) : (
-							<Chip variant="soft" color="success" size="sm">
-								<CheckCircle2 className="size-3" />
-								Success
-							</Chip>
-						)}
+						<RunStatusChip status={run.status} />
 						{run.is_test && (
 							<Chip variant="soft" color="warning" size="sm">
 								<FlaskConical className="size-3" />

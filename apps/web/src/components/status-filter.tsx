@@ -1,7 +1,7 @@
 import { ListBox, Select } from "@heroui/react";
 import { Activity } from "lucide-react";
 
-export type StatusFilterValue = "success" | "failed" | undefined;
+export type StatusFilterValue = "success" | "failed" | "aborted" | undefined;
 
 interface StatusFilterProps {
 	value: StatusFilterValue;
@@ -32,6 +32,10 @@ export function StatusFilter({ value, onValueChange }: StatusFilterProps) {
 					</ListBox.Item>
 					<ListBox.Item id="failed" textValue="Failed" variant="danger">
 						Failed
+						<ListBox.ItemIndicator />
+					</ListBox.Item>
+					<ListBox.Item id="aborted" textValue="Aborted">
+						Aborted
 						<ListBox.ItemIndicator />
 					</ListBox.Item>
 				</ListBox>
