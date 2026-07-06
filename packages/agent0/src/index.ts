@@ -42,7 +42,7 @@ export class Agent0 {
 			"x-api-key": this.apiKey,
 		};
 
-		const timeoutSignal = AbortSignal.timeout(10 * 60 * 1000);
+		const timeoutSignal = AbortSignal.timeout(30 * 60 * 1000);
 		const combinedSignal = signal
 			? anySignal([signal, timeoutSignal])
 			: timeoutSignal;
