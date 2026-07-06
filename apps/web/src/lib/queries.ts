@@ -591,7 +591,7 @@ export type RunListItem = {
 	version_id: string | null;
 	environment: "staging" | "production";
 	parent_run_id: string | null;
-	is_error: boolean;
+	status: "success" | "error" | "aborted";
 	is_test: boolean;
 	is_stream: boolean | null;
 	cost: number | null;
@@ -614,7 +614,7 @@ export const runsQuery = (
 	page: number,
 	dateFilter: DateRangeValue,
 	agentId?: string,
-	status?: "success" | "failed",
+	status?: "success" | "failed" | "aborted",
 	environment?: "staging" | "production",
 	metadata?: Record<string, string>,
 ) =>
@@ -836,6 +836,7 @@ export const dashboardStatsQuery = (
 					total_runs: number;
 					successful_runs: number;
 					failed_runs: number;
+					aborted_runs: number;
 					success_rate: number;
 					total_cost: number;
 					total_tokens: number;
@@ -849,6 +850,7 @@ export const dashboardStatsQuery = (
 				totalRuns: stats.total_runs,
 				successfulRuns: stats.successful_runs,
 				failedRuns: stats.failed_runs,
+				abortedRuns: stats.aborted_runs,
 				successRate: stats.success_rate,
 				totalCost: stats.total_cost,
 				totalTokens: stats.total_tokens,
@@ -898,6 +900,7 @@ export const topAgentsQuery = (
 					name: string;
 					runs: number;
 					errors: number;
+					aborted: number;
 					cost: number;
 				}>;
 			}>(`/api/v1/workspaces/${workspaceId}/dashboard/top-agents`, {

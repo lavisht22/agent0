@@ -222,10 +222,13 @@ cli
 cli
 	.command(
 		"runs [action] [target]",
-		"Inspect runs — actions: list [--agent <id>] [--status success|failed] [--from <iso>] [--to <iso>], get <runId>",
+		"Inspect runs — actions: list [--agent <id>] [--status success|failed|aborted] [--from <iso>] [--to <iso>], get <runId>",
 	)
 	.option("--agent <id>", "Filter by agent ID (list)")
-	.option("--status <status>", "Filter by status: success or failed (list)")
+	.option(
+		"--status <status>",
+		"Filter by status: success, failed, or aborted (list)",
+	)
 	.option("--from <iso>", "Only runs created on or after this ISO date (list)")
 	.option("--to <iso>", "Only runs created on or before this ISO date (list)")
 	.option(

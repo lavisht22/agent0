@@ -7,8 +7,6 @@ import {
 } from "@tanstack/react-router";
 import { format } from "date-fns";
 import {
-	AlertCircle,
-	CheckCircle2,
 	FlaskConical,
 	LucideChevronLeft,
 	LucideChevronRight,
@@ -26,6 +24,7 @@ import IDCopy from "@/components/id-copy";
 import { MetadataFilter } from "@/components/metadata-filter";
 import { PageHeader } from "@/components/page-header";
 import { RunMetadataCell } from "@/components/run-metadata-cell";
+import { RunStatusChip } from "@/components/run-status-chip";
 import {
 	StatusFilter,
 	type StatusFilterValue,
@@ -325,17 +324,7 @@ function RouteComponent() {
 										<Table.Cell>
 											<div className="flex flex-col gap-1.5">
 												<div className="flex items-center gap-2">
-													{item.is_error ? (
-														<Chip variant="soft" color="danger" size="sm">
-															<AlertCircle className="size-3" />
-															Error
-														</Chip>
-													) : (
-														<Chip variant="soft" color="success" size="sm">
-															<CheckCircle2 className="size-3" />
-															Success
-														</Chip>
-													)}
+													<RunStatusChip status={item.status} />
 													{item.is_test && (
 														<Chip variant="soft" color="warning" size="sm">
 															<FlaskConical className="size-3" />
@@ -345,11 +334,19 @@ function RouteComponent() {
 													<Tooltip delay={0}>
 														<Tooltip.Trigger>
 															{item.environment === "staging" ? (
-																<Chip size="sm" color="warning" variant="primary">
+																<Chip
+																	size="sm"
+																	color="warning"
+																	variant="primary"
+																>
 																	S
 																</Chip>
 															) : (
-																<Chip size="sm" color="success" variant="primary">
+																<Chip
+																	size="sm"
+																	color="success"
+																	variant="primary"
+																>
 																	P
 																</Chip>
 															)}

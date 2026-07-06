@@ -110,7 +110,7 @@ versions   list <agentId> [--page N] [--limit N]
            get <agentId> <versionId>
            deploy <agentId> <versionId> --env staging|production
 run        <agentId> --input "..." [--env staging|production] [--var key=val]...
-runs       list [--agent <id>] [--status success|failed] [--from <iso>] [--to <iso>]
+runs       list [--agent <id>] [--status success|failed|aborted] [--from <iso>] [--to <iso>]
            get <runId>
 tags       list
            create --name ... --color "#aabbcc"

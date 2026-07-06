@@ -159,7 +159,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 					firstTokenTime: firstTokenTime as number,
 					responseTime:
 						Date.now() - (firstTokenTime || 0) - preProcessingTime - startTime,
-					isError: false,
+					status: "success",
 					isStream: true,
 					isTest: true,
 					modelId,
@@ -198,7 +198,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 					firstTokenTime,
 					responseTime:
 						Date.now() - (firstTokenTime || 0) - preProcessingTime - startTime,
-					isError: true,
+					status: "error",
 					isStream: true,
 					isTest: true,
 					modelId,
@@ -235,7 +235,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 					firstTokenTime,
 					responseTime:
 						Date.now() - (firstTokenTime || 0) - preProcessingTime - startTime,
-					isError: true,
+					status: "aborted",
 					isStream: true,
 					isTest: true,
 					modelId,

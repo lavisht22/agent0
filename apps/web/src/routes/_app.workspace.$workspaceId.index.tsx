@@ -13,9 +13,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
 import {
 	Activity,
-	AlertCircle,
 	Bot,
-	CheckCircle2,
 	Clock,
 	DollarSign,
 	FlaskConical,
@@ -29,6 +27,7 @@ import {
 	type DateRangeValue,
 } from "@/components/date-range-picker";
 import { PageHeader } from "@/components/page-header";
+import { RunStatusChip } from "@/components/run-status-chip";
 import {
 	dashboardStatsQuery,
 	recentRunsQuery,
@@ -166,7 +165,9 @@ function RouteComponent() {
 					<StatCard
 						title="Total Runs"
 						value={stats?.totalRuns ?? 0}
-						subtitle={`${stats?.successfulRuns ?? 0} successful, ${stats?.failedRuns ?? 0} failed`}
+						subtitle={`${stats?.successfulRuns ?? 0} successful, ${stats?.failedRuns ?? 0} failed${
+							stats?.abortedRuns ? `, ${stats.abortedRuns} aborted` : ""
+						}`}
 						icon={Activity}
 						isLoading={statsLoading}
 					/>
@@ -175,7 +176,9 @@ function RouteComponent() {
 						value={`${(stats?.successRate ?? 0).toFixed(1)}%`}
 						subtitle={
 							stats?.totalRuns
-								? `${stats.successfulRuns} of ${stats.totalRuns} runs`
+								? // Aborted runs are excluded from the denominator, so show the
+									// decisive (non-aborted) run count for consistency.
+									`${stats.successfulRuns} of ${stats.totalRuns - stats.abortedRuns} runs`
 								: "No runs yet"
 						}
 						icon={TrendingUp}
@@ -251,9 +254,13 @@ function RouteComponent() {
 													</span>
 													<span className="text-xs text-muted truncate">
 														{`${agent.runs} runs • ${
-															agent.runs > 0
+															// Success rate over decisive (non-aborted) runs.
+															agent.runs - agent.aborted > 0
 																? (
-																		((agent.runs - agent.errors) / agent.runs) *
+																		((agent.runs -
+																			agent.errors -
+																			agent.aborted) /
+																			(agent.runs - agent.aborted)) *
 																		100
 																	).toFixed(0)
 																: 0
@@ -265,6 +272,11 @@ function RouteComponent() {
 													{agent.errors > 0 && (
 														<p className="text-xs text-danger">
 															{agent.errors} errors
+														</p>
+													)}
+													{agent.aborted > 0 && (
+														<p className="text-xs text-warning">
+															{agent.aborted} aborted
 														</p>
 													)}
 												</div>
@@ -324,17 +336,7 @@ function RouteComponent() {
 										>
 											<div className="flex items-center justify-between w-full gap-3">
 												<div className="flex items-center gap-2 min-w-0">
-													{run.is_error ? (
-														<Chip variant="soft" color="danger" size="sm">
-															<AlertCircle className="size-3" />
-															Error
-														</Chip>
-													) : (
-														<Chip variant="soft" color="success" size="sm">
-															<CheckCircle2 className="size-3" />
-															Success
-														</Chip>
-													)}
+													<RunStatusChip status={run.status} />
 													{run.is_test && (
 														<Chip variant="soft" color="warning" size="sm">
 															<FlaskConical className="size-3" />
