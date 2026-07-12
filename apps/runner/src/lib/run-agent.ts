@@ -26,6 +26,7 @@ import {
 } from "./helpers.js";
 import { db } from "./pg.js";
 import { createPromptCachePrepareStep } from "./prompt-cache.js";
+import { RUN_TIMEOUT } from "./timeouts.js";
 import type {
 	AgentTool,
 	Environment,
@@ -518,6 +519,7 @@ export const runAgent = async (
 			output: data.outputFormat === "json" ? Output.json() : Output.text(),
 			providerOptions: data.providerOptions,
 			prepareStep,
+			timeout: RUN_TIMEOUT,
 			abortSignal: opts.abortSignal,
 			onStepFinish: (step) => {
 				collectedSteps.push(step as StepResult<ToolSet>);

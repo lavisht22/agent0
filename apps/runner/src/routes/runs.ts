@@ -24,6 +24,7 @@ import {
 } from "../lib/run-cleanup.js";
 import { hasScope, requireScope, requireUserId } from "../lib/scopes.js";
 import { runLogStore } from "../lib/storage.js";
+import { RUN_TIMEOUT } from "../lib/timeouts.js";
 import type { RunOverrides } from "../lib/types.js";
 import { requireAdminOrOwner } from "../lib/workspace-access.js";
 
@@ -864,6 +865,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						output: outputFormat === "json" ? Output.json() : Output.text(),
 						providerOptions,
 						prepareStep,
+						timeout: RUN_TIMEOUT,
 						abortSignal: controller.signal,
 						onChunk: () => {
 							if (!firstTokenTime) {
@@ -1041,6 +1043,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						output: outputFormat === "json" ? Output.json() : Output.text(),
 						providerOptions,
 						prepareStep,
+						timeout: RUN_TIMEOUT,
 						abortSignal: controller.signal,
 						onStepFinish: (step) => {
 							collectedSteps.push(step as StepResult<ToolSet>);

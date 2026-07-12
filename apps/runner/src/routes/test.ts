@@ -10,6 +10,7 @@ import { createSSEStream } from "../lib/helpers.js";
 import { MetadataError, parseRunMetadata } from "../lib/metadata.js";
 import { db } from "../lib/pg.js";
 import { assembleRun, recordRun } from "../lib/run-agent.js";
+import { RUN_TIMEOUT } from "../lib/timeouts.js";
 import type { RunMetadata, VersionData } from "../lib/types.js";
 
 export async function registerTestRoute(fastify: FastifyInstance) {
@@ -140,6 +141,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			output: outputFormat === "json" ? Output.json() : Output.text(),
 			providerOptions,
 			prepareStep,
+			timeout: RUN_TIMEOUT,
 			abortSignal: controller.signal,
 			onChunk: () => {
 				if (!firstTokenTime) {
