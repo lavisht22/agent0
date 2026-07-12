@@ -853,6 +853,30 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 					let firstTokenTime: number | null = null;
 
+					// Abort the model call if the provider opens the stream but then
+					// goes silent (no tokens) for too long. Without this a stalled
+					// upstream stream hangs until the client/infra connection times out
+					// — often many minutes — holding the run open the whole time. The
+					// watchdog resets on every chunk and step boundary so it bounds
+					// time-to-first-token at each step, not only the first (a stall on
+					// the model call after a tool result is the common failure).
+					const STREAM_IDLE_TIMEOUT_MS = 60_000;
+					let idleTimedOut = false;
+					let idleTimer: ReturnType<typeof setTimeout> | undefined;
+					const clearIdle = () => {
+						if (idleTimer) {
+							clearTimeout(idleTimer);
+							idleTimer = undefined;
+						}
+					};
+					const armIdle = () => {
+						clearIdle();
+						idleTimer = setTimeout(() => {
+							idleTimedOut = true;
+							controller.abort();
+						}, STREAM_IDLE_TIMEOUT_MS);
+					};
+
 					const result = streamText({
 						model,
 						maxOutputTokens,
@@ -864,12 +888,20 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						providerOptions,
 						abortSignal: controller.signal,
 						onChunk: () => {
+							armIdle();
 							if (!firstTokenTime) {
 								firstTokenTime = Date.now() - preProcessingTime - startTime;
 							}
 						},
+						onStepFinish: () => {
+							// Bound the next step's time-to-first-token — the stall this
+							// guards against happens on the model call issued after a
+							// tool result comes back.
+							armIdle();
+						},
 
 						onFinish: async ({ steps, totalUsage }) => {
+							clearIdle();
 							// Another terminal callback (onError/onAbort) may have already
 							// recorded this run.
 							if (streamCompleted) return;
@@ -907,6 +939,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 							});
 						},
 						onError: async ({ error }) => {
+							clearIdle();
 							if (streamCompleted) return;
 							streamCompleted = true;
 							closeAll();
@@ -949,6 +982,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 							});
 						},
 						onAbort: async ({ steps }) => {
+							clearIdle();
 							if (streamCompleted) return;
 							streamCompleted = true;
 							closeAll();
@@ -961,10 +995,15 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 							runData.steps = steps;
 							runData.totalUsage = totalUsage;
-							runData.error = {
-								name: "AbortError",
-								message: "Run aborted by client disconnect",
-							};
+							runData.error = idleTimedOut
+								? {
+										name: "AbortError",
+										message: "Model stream idle timeout",
+									}
+								: {
+										name: "AbortError",
+										message: "Run aborted by client disconnect",
+									};
 
 							await recordRun({
 								workspaceId,
@@ -989,6 +1028,10 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 							});
 						},
 					});
+
+					// Arm the watchdog before the first token so a stream that stalls
+					// with zero output is caught too.
+					armIdle();
 
 					// Abort the AI SDK call when the client disconnects. Under Fastify 5
 					// the request-side 'close' event is unreliable during a streamed
