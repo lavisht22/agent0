@@ -1018,6 +1018,17 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				let completed = false;
 				const collectedSteps: StepResult<ToolSet>[] = [];
 
+				// Cap total wall-clock for the model call so a stalled upstream request
+				// can't hold the run open indefinitely. The client-disconnect handler
+				// below only aborts if/when the caller gives up, which can be many
+				// minutes; this bounds it regardless.
+				const GENERATE_TIMEOUT_MS = 5 * 60 * 1000;
+				let timedOut = false;
+				const timeout = setTimeout(() => {
+					timedOut = true;
+					controller.abort();
+				}, GENERATE_TIMEOUT_MS);
+
 				// Same pattern as the streaming path — Fastify 5 only fires close on
 				// reply.raw for response disconnects. Listen on both for safety.
 				const handleClientClose = () => {
@@ -1084,7 +1095,9 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						runData.totalUsage = totalUsage;
 						runData.error = {
 							name: "AbortError",
-							message: "Run aborted by client disconnect",
+							message: timedOut
+								? "Model generation timeout"
+								: "Run aborted by client disconnect",
 						};
 
 						await recordRun({
@@ -1135,6 +1148,8 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 					});
 
 					return reply.code(500).send(error);
+				} finally {
+					clearTimeout(timeout);
 				}
 			} finally {
 				// Streaming cleanup is handled by the onFinish/onError/close handlers.
