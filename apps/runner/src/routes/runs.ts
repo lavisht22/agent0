@@ -832,6 +832,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				data,
 				finalMessages,
 				allTools,
+				prepareStep,
 				closeAll,
 				preProcessingTime,
 				runData,
@@ -862,6 +863,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						tools: allTools as ToolSet,
 						output: outputFormat === "json" ? Output.json() : Output.text(),
 						providerOptions,
+						prepareStep,
 						abortSignal: controller.signal,
 						onChunk: () => {
 							if (!firstTokenTime) {
@@ -1038,6 +1040,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						tools: allTools as ToolSet,
 						output: outputFormat === "json" ? Output.json() : Output.text(),
 						providerOptions,
+						prepareStep,
 						abortSignal: controller.signal,
 						onStepFinish: (step) => {
 							collectedSteps.push(step as StepResult<ToolSet>);

@@ -106,17 +106,24 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			providerOptions,
 		} = versionData;
 
-		const { model, modelId, finalMessages, allTools, closeAll, runData } =
-			await assembleRun(versionData, {
-				workspaceId: provider.workspace_id,
-				environment,
-				runId,
-				agentId: editedAgentId,
-				variables,
-				mcpOptions: mcp_options,
-				isTest: true,
-				metadata,
-			});
+		const {
+			model,
+			modelId,
+			finalMessages,
+			allTools,
+			prepareStep,
+			closeAll,
+			runData,
+		} = await assembleRun(versionData, {
+			workspaceId: provider.workspace_id,
+			environment,
+			runId,
+			agentId: editedAgentId,
+			variables,
+			mcpOptions: mcp_options,
+			isTest: true,
+			metadata,
+		});
 
 		const preProcessingTime = Date.now() - startTime;
 		let firstTokenTime: number | null = null;
@@ -132,6 +139,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			tools: allTools as ToolSet,
 			output: outputFormat === "json" ? Output.json() : Output.text(),
 			providerOptions,
+			prepareStep,
 			abortSignal: controller.signal,
 			onChunk: () => {
 				if (!firstTokenTime) {

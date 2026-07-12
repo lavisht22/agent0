@@ -6,6 +6,7 @@ import {
 	type LanguageModelUsage,
 	type ModelMessage,
 	Output,
+	type PrepareStepFunction,
 	type StepResult,
 	stepCountIs,
 	type Tool,
@@ -24,6 +25,7 @@ import {
 	uploadRunData,
 } from "./helpers.js";
 import { db } from "./pg.js";
+import { createPromptCachePrepareStep } from "./prompt-cache.js";
 import type {
 	AgentTool,
 	Environment,
@@ -144,6 +146,7 @@ export type PreparedRun = {
 	data: VersionData;
 	finalMessages: ModelMessage[];
 	allTools: ToolSet;
+	prepareStep?: PrepareStepFunction<ToolSet>;
 	closeAll: () => void;
 	preProcessingTime: number;
 	runData: RunData;
@@ -300,6 +303,7 @@ export type AssembledRun = {
 	data: VersionData;
 	finalMessages: ModelMessage[];
 	allTools: ToolSet;
+	prepareStep?: PrepareStepFunction<ToolSet>;
 	closeAll: () => void;
 	runData: RunData;
 };
@@ -327,12 +331,15 @@ export const assembleRun = async (
 	} = opts;
 
 	const processedMessages = applyMessageVariables(data, variables);
-	const [{ model }, { tools, closeAll }, { systemAddendum, skillTools }] =
-		await Promise.all([
-			resolveProviderModel(data, environment),
-			prepareMCPServers(data, environment, mcpOptions),
-			prepareSkills(data),
-		]);
+	const [
+		{ model, providerType },
+		{ tools, closeAll },
+		{ systemAddendum, skillTools },
+	] = await Promise.all([
+		resolveProviderModel(data, environment),
+		prepareMCPServers(data, environment, mcpOptions),
+		prepareSkills(data),
+	]);
 
 	const messagesWithSkills = applySkillCatalog(
 		processedMessages,
@@ -369,6 +376,7 @@ export const assembleRun = async (
 	runData.request = { ...data, messages: finalMessages };
 
 	const modelId = typeof model === "string" ? model : model.modelId;
+	const prepareStep = createPromptCachePrepareStep(providerType);
 
 	return {
 		model,
@@ -376,6 +384,7 @@ export const assembleRun = async (
 		data,
 		finalMessages,
 		allTools,
+		prepareStep,
 		closeAll,
 		runData,
 	};
@@ -489,6 +498,7 @@ export const runAgent = async (
 		data,
 		finalMessages,
 		allTools,
+		prepareStep,
 		closeAll,
 		preProcessingTime,
 		runData,
@@ -507,6 +517,7 @@ export const runAgent = async (
 			tools: allTools,
 			output: data.outputFormat === "json" ? Output.json() : Output.text(),
 			providerOptions: data.providerOptions,
+			prepareStep,
 			abortSignal: opts.abortSignal,
 			onStepFinish: (step) => {
 				collectedSteps.push(step as StepResult<ToolSet>);

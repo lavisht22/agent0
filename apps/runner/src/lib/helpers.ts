@@ -8,15 +8,10 @@ import {
 	type streamText,
 	type Tool,
 	type ToolSet,
-	wrapLanguageModel,
 } from "ai";
 import { eq } from "drizzle-orm";
 import { cachedQuery } from "./cache.js";
 import { decryptSecret } from "./crypto.js";
-import {
-	bedrockCacheMiddleware,
-	vertexAnthropicCacheMiddleware,
-} from "./middleware.js";
 import { db } from "./pg.js";
 import { getAIProvider } from "./providers.js";
 import { runLogStore } from "./storage.js";
@@ -74,20 +69,9 @@ export const resolveProviderModel = async (
 		},
 	);
 
-	const baseModel = aiProvider(model.name);
-	const cacheMiddleware =
-		provider.type === "anthropic-vertex"
-			? vertexAnthropicCacheMiddleware
-			: provider.type === "bedrock"
-				? bedrockCacheMiddleware
-				: null;
-	const wrappedModel = cacheMiddleware
-		? wrapLanguageModel({ model: baseModel, middleware: cacheMiddleware })
-		: baseModel;
-
 	return {
-		model: wrappedModel as LanguageModel,
-		provider,
+		model: aiProvider(model.name) as LanguageModel,
+		providerType: provider.type as string,
 	};
 };
 
