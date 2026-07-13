@@ -1078,6 +1078,55 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				});
 				runLog.onAbortSignal(controller.signal);
 
+				// Record the abort from the signal itself rather than after the await
+				// below. If a tool never settles, `generateText` never settles either,
+				// so everything after the await is unreachable and the run is lost
+				// entirely. The streaming path gets this for free via streamText's
+				// onAbort callback; the non-streaming path has to do it by hand.
+				let recorded = false;
+				const recordAborted = async () => {
+					if (recorded) return;
+					recorded = true;
+
+					const totalUsage = sumUsage(collectedSteps);
+					runData.steps = collectedSteps;
+					runData.totalUsage = totalUsage;
+					runData.error = {
+						name: "AbortError",
+						message: "Run aborted by client disconnect",
+					};
+
+					runLog.end("aborted", {
+						stepCount: collectedSteps.length,
+						abortMessage: "client_disconnect_or_timeout",
+					});
+
+					await recordRun({
+						workspaceId,
+						id: runId,
+						parentRunId: null,
+						metadata,
+						versionId: preparedVersionId,
+						environment,
+						startTime,
+						preProcessingTime,
+						firstTokenTime: Date.now() - preProcessingTime - startTime,
+						responseTime: 0,
+						status: "aborted",
+						isStream: false,
+						modelId,
+						usage: totalUsage,
+						runData,
+					});
+				};
+				controller.signal.addEventListener(
+					"abort",
+					() => {
+						void recordAborted();
+					},
+					{ once: true },
+				);
+
 				try {
 					const result = await generateText({
 						model,
@@ -1098,6 +1147,10 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						},
 					});
 					completed = true;
+
+					// The abort listener already owns this run; the client is gone.
+					if (recorded) return;
+					recorded = true;
 
 					const { response, text, steps, totalUsage } = result;
 					runData.steps = steps;
@@ -1135,41 +1188,15 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 					if (controller.signal.aborted) {
 						// Client disconnected — record as an abort (distinct from error)
-						// with partial cost from completed steps. Socket is gone, so don't
-						// try to send a reply.
-						const totalUsage = sumUsage(collectedSteps);
-
-						runData.steps = collectedSteps;
-						runData.totalUsage = totalUsage;
-						runData.error = {
-							name: "AbortError",
-							message: "Run aborted by client disconnect",
-						};
-
-						runLog.end("aborted", {
-							stepCount: collectedSteps.length,
-							abortMessage: "client_disconnect_or_timeout",
-						});
-
-						await recordRun({
-							workspaceId,
-							id: runId,
-							parentRunId: null,
-							metadata,
-							versionId: preparedVersionId,
-							environment,
-							startTime,
-							preProcessingTime,
-							firstTokenTime: Date.now() - preProcessingTime - startTime,
-							responseTime: 0,
-							status: "aborted",
-							isStream: false,
-							modelId,
-							usage: totalUsage,
-							runData,
-						});
+						// with partial cost from completed steps. Usually a no-op: the
+						// abort listener above has already recorded it. Socket is gone, so
+						// don't try to send a reply.
+						await recordAborted();
 						return;
 					}
+
+					if (recorded) return;
+					recorded = true;
 
 					runLog.onError(error);
 					runLog.end("error");

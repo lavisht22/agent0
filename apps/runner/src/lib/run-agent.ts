@@ -339,7 +339,7 @@ export const assembleRun = async (
 		{ systemAddendum, skillTools },
 	] = await Promise.all([
 		resolveProviderModel(data, environment),
-		prepareMCPServers(data, environment, mcpOptions),
+		prepareMCPServers(data, environment, mcpOptions, runId),
 		prepareSkills(data),
 	]);
 

@@ -15,6 +15,7 @@ import { decryptSecret } from "./crypto.js";
 import { db } from "./pg.js";
 import { getAIProvider } from "./providers.js";
 import { runLogStore } from "./storage.js";
+import { MCP_TOOL_TIMEOUT_MS } from "./timeouts.js";
 import type {
 	Environment,
 	MCPConfig,
@@ -85,11 +86,64 @@ export const applyMessageVariables = (
 
 type MCPClient = Awaited<ReturnType<typeof createMCPClient>>;
 type Tools = Awaited<ReturnType<MCPClient["tools"]>>;
+type McpTool = Tools[string];
+
+/**
+ * Races an MCP tool call against MCP_TOOL_TIMEOUT_MS and the run's abort signal
+ * so a server that never answers fails the tool instead of hanging the run. See
+ * MCP_TOOL_TIMEOUT_MS for why the SDK can't do this for us.
+ *
+ * The underlying MCP promise may stay pending after we reject; `closeAll()` at
+ * the end of the run closes the client, which errors any handlers still parked.
+ */
+export const withCallTimeout = (name: string, tool: McpTool): McpTool => {
+	const execute = tool.execute;
+	if (typeof execute !== "function") return tool;
+
+	type Execute = NonNullable<McpTool["execute"]>;
+	const guarded = (
+		args: Parameters<Execute>[0],
+		options: Parameters<Execute>[1],
+	) => {
+		const { abortSignal } = options;
+
+		let release = () => {};
+		const guard = new Promise<never>((_, reject) => {
+			const timer = setTimeout(() => {
+				reject(
+					new Error(
+						`MCP tool "${name}" did not respond within ${MCP_TOOL_TIMEOUT_MS}ms. The connection may have been dropped without an error.`,
+					),
+				);
+			}, MCP_TOOL_TIMEOUT_MS);
+
+			const onAbort = () => {
+				reject(new Error(`MCP tool "${name}" aborted: the run was cancelled.`));
+			};
+			abortSignal?.addEventListener("abort", onAbort, { once: true });
+
+			release = () => {
+				clearTimeout(timer);
+				abortSignal?.removeEventListener("abort", onAbort);
+			};
+		});
+
+		return Promise.race([
+			Promise.resolve(execute(args, options)),
+			guard,
+		]).finally(release);
+	};
+
+	// ToolExecuteFunction's return is a union (value | promise | async iterable)
+	// that TS won't reconcile with the Promise we hand back, so assert once here.
+	return { ...tool, execute: guarded } as unknown as McpTool;
+};
 
 export const prepareMCPServers = async (
 	data: VersionData,
 	environment: Environment,
 	mcpOptions?: Record<string, MCPOptions>,
+	runId?: string,
 ) => {
 	const { tools } = data;
 
@@ -157,9 +211,36 @@ export const prepareMCPServers = async (
 					};
 				}
 
-				const mcpClient = await createMCPClient(mcpConfig);
+				const mcpClient = await createMCPClient({
+					...mcpConfig,
+					// The SDK drops transport errors here by default, which is how a
+					// severed connection stays invisible. Log them against the run.
+					onUncaughtError: (error) => {
+						console.log(
+							JSON.stringify({
+								scope: "agent-run",
+								event: "mcp_transport_error",
+								ts: new Date().toISOString(),
+								runId,
+								mcpId: mcp.id,
+								error:
+									error instanceof Error
+										? { name: error.name, message: error.message }
+										: String(error),
+							}),
+						);
+					},
+				});
+
 				const tools = await mcpClient.tools();
-				servers[mcp.id] = { client: mcpClient, tools };
+				const guardedTools = Object.fromEntries(
+					Object.entries(tools).map(([name, tool]) => [
+						name,
+						withCallTimeout(name, tool),
+					]),
+				) as Tools;
+
+				servers[mcp.id] = { client: mcpClient, tools: guardedTools };
 			}),
 		);
 	}
