@@ -26,6 +26,7 @@ import {
 } from "./helpers.js";
 import { db } from "./pg.js";
 import { createPromptCachePrepareStep } from "./prompt-cache.js";
+import { createRunLogger } from "./run-logger.js";
 import { RUN_TIMEOUT } from "./timeouts.js";
 import type {
 	AgentTool,
@@ -508,6 +509,21 @@ export const runAgent = async (
 	// Collected for partial cost attribution if the run is aborted mid-flight.
 	const collectedSteps: StepResult<ToolSet>[] = [];
 
+	const runLog = createRunLogger({
+		runId,
+		parentRunId: opts.parentRunId,
+		modelId,
+		agentId: opts.agentId,
+		isStream: false,
+		isTest: opts.isTest,
+	});
+	runLog.start({
+		environment: opts.environment,
+		maxStepCount: data.maxStepCount || 10,
+		toolCount: Object.keys(allTools).length,
+	});
+	runLog.onAbortSignal(opts.abortSignal);
+
 	try {
 		const result = await generateText({
 			model,
@@ -521,14 +537,21 @@ export const runAgent = async (
 			prepareStep,
 			timeout: RUN_TIMEOUT,
 			abortSignal: opts.abortSignal,
+			...runLog.lifecycle,
 			onStepFinish: (step) => {
 				collectedSteps.push(step as StepResult<ToolSet>);
+				runLog.onStepFinish(step as StepResult<ToolSet>);
 			},
 		});
 
 		const { response, text, steps, totalUsage } = result;
 		runData.steps = steps;
 		runData.totalUsage = totalUsage;
+
+		runLog.end("success", {
+			stepCount: steps.length,
+			totalTokens: totalUsage?.totalTokens,
+		});
 
 		await recordRun({
 			id: runId,
@@ -574,6 +597,13 @@ export const runAgent = async (
 							? (error as Error & { cause?: unknown }).cause
 							: undefined,
 				};
+
+		if (!aborted) {
+			runLog.onError(error);
+		}
+		runLog.end(aborted ? "aborted" : "error", {
+			stepCount: collectedSteps.length,
+		});
 
 		await recordRun({
 			id: runId,

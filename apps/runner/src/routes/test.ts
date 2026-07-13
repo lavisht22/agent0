@@ -1,5 +1,11 @@
 import { agentVersions, providers, workspaceUser } from "@repo/database";
-import { Output, stepCountIs, streamText, type ToolSet } from "ai";
+import {
+	Output,
+	type StepResult,
+	stepCountIs,
+	streamText,
+	type ToolSet,
+} from "ai";
 import { and, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
@@ -10,6 +16,7 @@ import { createSSEStream } from "../lib/helpers.js";
 import { MetadataError, parseRunMetadata } from "../lib/metadata.js";
 import { db } from "../lib/pg.js";
 import { assembleRun, recordRun } from "../lib/run-agent.js";
+import { createRunLogger } from "../lib/run-logger.js";
 import { RUN_TIMEOUT } from "../lib/timeouts.js";
 import type { RunMetadata, VersionData } from "../lib/types.js";
 
@@ -131,6 +138,20 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 		let streamCompleted = false;
 		const controller = new AbortController();
 
+		const runLog = createRunLogger({
+			runId,
+			modelId,
+			agentId: editedAgentId,
+			isStream: true,
+			isTest: true,
+		});
+		runLog.start({
+			environment,
+			maxStepCount: maxStepCount || 10,
+			toolCount: Object.keys(allTools as ToolSet).length,
+		});
+		runLog.onAbortSignal(controller.signal);
+
 		const result = streamText({
 			model,
 			maxOutputTokens,
@@ -143,10 +164,15 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			prepareStep,
 			timeout: RUN_TIMEOUT,
 			abortSignal: controller.signal,
+			...runLog.lifecycle,
 			onChunk: () => {
+				runLog.onChunk();
 				if (!firstTokenTime) {
 					firstTokenTime = Date.now() - preProcessingTime - startTime;
 				}
+			},
+			onStepFinish: (step) => {
+				runLog.onStepFinish(step as StepResult<ToolSet>);
 			},
 			onFinish: async ({ steps, totalUsage }) => {
 				if (streamCompleted) return;
@@ -156,6 +182,11 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 
 				runData.steps = steps;
 				runData.totalUsage = totalUsage;
+
+				runLog.end("success", {
+					stepCount: steps.length,
+					totalTokens: totalUsage?.totalTokens,
+				});
 
 				await recordRun({
 					id: runId,
@@ -185,6 +216,9 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 				if (!firstTokenTime) {
 					firstTokenTime = Date.now() - preProcessingTime - startTime;
 				}
+
+				runLog.onError(error);
+				runLog.end("error");
 
 				runData.error = {
 					name: error instanceof Error ? error.name : "UnknownError",
@@ -233,6 +267,11 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 					message: "Run aborted by client disconnect",
 				};
 
+				runLog.end("aborted", {
+					stepCount: steps.length,
+					abortMessage: "client_disconnect_or_timeout",
+				});
+
 				await recordRun({
 					id: runId,
 					parentRunId: null,
@@ -259,6 +298,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 		// listening to both reply.raw and request.raw under Fastify 5 / Cloud Run.
 		const handleClientClose = () => {
 			if (!streamCompleted) {
+				runLog.log("client_close");
 				controller.abort();
 				closeAll();
 			}

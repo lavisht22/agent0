@@ -22,6 +22,7 @@ import {
 	previewCleanup,
 	runCleanup,
 } from "../lib/run-cleanup.js";
+import { createRunLogger } from "../lib/run-logger.js";
 import { hasScope, requireScope, requireUserId } from "../lib/scopes.js";
 import { runLogStore } from "../lib/storage.js";
 import { RUN_TIMEOUT } from "../lib/timeouts.js";
@@ -855,6 +856,19 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 					let firstTokenTime: number | null = null;
 
+					const runLog = createRunLogger({
+						runId,
+						modelId,
+						agentId: agent_id,
+						isStream: true,
+					});
+					runLog.start({
+						environment,
+						maxStepCount: maxStepCount || 10,
+						toolCount: Object.keys(allTools as ToolSet).length,
+					});
+					runLog.onAbortSignal(controller.signal);
+
 					const result = streamText({
 						model,
 						maxOutputTokens,
@@ -867,10 +881,15 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						prepareStep,
 						timeout: RUN_TIMEOUT,
 						abortSignal: controller.signal,
+						...runLog.lifecycle,
 						onChunk: () => {
+							runLog.onChunk();
 							if (!firstTokenTime) {
 								firstTokenTime = Date.now() - preProcessingTime - startTime;
 							}
+						},
+						onStepFinish: (step) => {
+							runLog.onStepFinish(step as StepResult<ToolSet>);
 						},
 
 						onFinish: async ({ steps, totalUsage }) => {
@@ -887,6 +906,11 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 							runData.steps = steps;
 							runData.totalUsage = totalUsage;
+
+							runLog.end("success", {
+								stepCount: steps.length,
+								totalTokens: totalUsage?.totalTokens,
+							});
 
 							await recordRun({
 								workspaceId,
@@ -918,6 +942,9 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 							if (!firstTokenTime) {
 								firstTokenTime = Date.now() - preProcessingTime - startTime;
 							}
+
+							runLog.onError(error);
+							runLog.end("error");
 
 							runData.error = {
 								name: error instanceof Error ? error.name : "UnknownError",
@@ -970,6 +997,11 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 								message: "Run aborted by client disconnect",
 							};
 
+							runLog.end("aborted", {
+								stepCount: steps.length,
+								abortMessage: "client_disconnect_or_timeout",
+							});
+
 							await recordRun({
 								workspaceId,
 								id: runId,
@@ -1001,6 +1033,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 					// double-handling.
 					const handleClientClose = () => {
 						if (!streamCompleted) {
+							runLog.log("client_close");
 							controller.abort();
 							closeAll();
 						}
@@ -1032,6 +1065,19 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 				reply.raw.on("close", handleClientClose);
 				request.raw.on("close", handleClientClose);
 
+				const runLog = createRunLogger({
+					runId,
+					modelId,
+					agentId: agent_id,
+					isStream: false,
+				});
+				runLog.start({
+					environment,
+					maxStepCount: maxStepCount || 10,
+					toolCount: Object.keys(allTools as ToolSet).length,
+				});
+				runLog.onAbortSignal(controller.signal);
+
 				try {
 					const result = await generateText({
 						model,
@@ -1045,8 +1091,10 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						prepareStep,
 						timeout: RUN_TIMEOUT,
 						abortSignal: controller.signal,
+						...runLog.lifecycle,
 						onStepFinish: (step) => {
 							collectedSteps.push(step as StepResult<ToolSet>);
+							runLog.onStepFinish(step as StepResult<ToolSet>);
 						},
 					});
 					completed = true;
@@ -1054,6 +1102,11 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 					const { response, text, steps, totalUsage } = result;
 					runData.steps = steps;
 					runData.totalUsage = totalUsage;
+
+					runLog.end("success", {
+						stepCount: steps.length,
+						totalTokens: totalUsage?.totalTokens,
+					});
 
 					await recordRun({
 						workspaceId,
@@ -1093,6 +1146,11 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 							message: "Run aborted by client disconnect",
 						};
 
+						runLog.end("aborted", {
+							stepCount: collectedSteps.length,
+							abortMessage: "client_disconnect_or_timeout",
+						});
+
 						await recordRun({
 							workspaceId,
 							id: runId,
@@ -1112,6 +1170,9 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						});
 						return;
 					}
+
+					runLog.onError(error);
+					runLog.end("error");
 
 					runData.error = {
 						name: error instanceof Error ? error.name : "UnknownError",
