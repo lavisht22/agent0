@@ -30,6 +30,7 @@ import {
 	removeWorkspaceMember,
 	revokeInvitation,
 	updateWorkspace,
+	updateWorkspaceMemberRole,
 	type WorkspaceMember,
 	type WorkspaceRole,
 	workspacesQuery,
@@ -172,6 +173,27 @@ function SettingsPage() {
 			toast.success("Member removed successfully.");
 			setMemberToRemove(null);
 			removeMemberState.close();
+		},
+		onError: (error) => {
+			toast.danger(error.message);
+		},
+	});
+
+	const updateMemberRoleMutation = useMutation({
+		mutationFn: ({ userId, role }: { userId: string; role: WorkspaceRole }) =>
+			updateWorkspaceMemberRole(workspaceId, userId, role),
+		onSuccess: (member) => {
+			queryClient.invalidateQueries({
+				queryKey: ["workspace-members", workspaceId],
+			});
+			// Role changes affect permissions in the sidebar and workspace list.
+			queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+			queryClient.invalidateQueries({
+				queryKey: ["workspace-user", workspaceId],
+			});
+			const roleLabel =
+				ROLE_OPTIONS.find((r) => r.id === member.role)?.label ?? member.role;
+			toast.success(`${member.user?.name || "Member"} is now a ${roleLabel}.`);
 		},
 		onError: (error) => {
 			toast.danger(error.message);
@@ -377,8 +399,67 @@ function SettingsPage() {
 															</div>
 														</div>
 													</Table.Cell>
-													<Table.Cell className="capitalize">
-														{wu.role}
+													<Table.Cell>
+														<Select
+															aria-label={`Role for ${memberName}`}
+															className="min-w-28"
+															variant="secondary"
+															value={wu.role}
+															isDisabled={
+																!isAdmin || updateMemberRoleMutation.isPending
+															}
+															onChange={(value) => {
+																if (!isAdmin) return;
+																const role = value as WorkspaceRole;
+																if (role === wu.role) return;
+																updateMemberRoleMutation.mutate({
+																	userId: wu.user_id,
+																	role,
+																});
+															}}
+														>
+															<Select.Trigger>
+																<Select.Value>
+																	{({
+																		defaultChildren,
+																		isPlaceholder,
+																		state,
+																	}) => {
+																		if (
+																			isPlaceholder ||
+																			state.selectedItems.length === 0
+																		) {
+																			return defaultChildren;
+																		}
+																		// Label only in the trigger; descriptions
+																		// stay in the open list options.
+																		return (
+																			state.selectedItems[0]?.textValue ??
+																			defaultChildren
+																		);
+																	}}
+																</Select.Value>
+																<Select.Indicator />
+															</Select.Trigger>
+															<Select.Popover>
+																<ListBox>
+																	{ROLE_OPTIONS.map((role) => (
+																		<ListBox.Item
+																			key={role.id}
+																			id={role.id}
+																			textValue={role.label}
+																		>
+																			<div className="flex flex-col">
+																				<Label>{role.label}</Label>
+																				<span className="text-xs text-muted">
+																					{role.description}
+																				</span>
+																			</div>
+																		</ListBox.Item>
+																	))}
+																</ListBox>
+															</Select.Popover>
+														</Select>
 													</Table.Cell>
 													<Table.Cell>
 														{format(wu.created_at, "d LLL, hh:mm a")}

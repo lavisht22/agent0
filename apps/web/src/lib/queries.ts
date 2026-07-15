@@ -94,6 +94,19 @@ export async function removeWorkspaceMember(
 
 export type WorkspaceRole = "admin" | "writer" | "reader";
 
+export async function updateWorkspaceMemberRole(
+	workspaceId: string,
+	userId: string,
+	role: WorkspaceRole,
+) {
+	const { data } = await api.patch<{ data: WorkspaceMember }>(
+		`/api/v1/workspaces/${workspaceId}/members/${userId}`,
+		{ role },
+	);
+
+	return data;
+}
+
 export type PendingInvitation = {
 	id: string;
 	email: string;

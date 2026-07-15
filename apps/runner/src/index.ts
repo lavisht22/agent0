@@ -42,13 +42,13 @@ await fastify.register(cors, {
 // CSP for the SPA document — the primary XSS mitigation now that the session
 // cookie is httpOnly. Permits what the bundle needs: Monaco loads its editor +
 // blob workers from jsdelivr and uses eval for its tokenizer; HeroUI / React
-// Aria inject inline styles.
+// Aria inject inline styles; member avatars are SVGs from DiceBear.
 const CONTENT_SECURITY_POLICY = [
 	"default-src 'self'",
 	"script-src 'self' 'unsafe-eval' blob: https://cdn.jsdelivr.net",
 	"worker-src 'self' blob:",
 	"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
-	"img-src 'self' data: blob:",
+	"img-src 'self' data: blob: https://api.dicebear.com",
 	"font-src 'self' data: https://cdn.jsdelivr.net",
 	"connect-src 'self' https://cdn.jsdelivr.net",
 	"frame-ancestors 'none'",
