@@ -250,6 +250,13 @@ export const MODELS: Model[] = [
 	},
 
 	{
+		id: "claude-opus-5",
+		providers: ["anthropic-vertex"],
+		status: "active",
+		cost: { noCacheInput: 5, cacheInput: 0.5, output: 25 },
+		releaseDate: "2026-07-24",
+	},
+	{
 		id: "claude-opus-4-8",
 		providers: ["anthropic-vertex"],
 		status: "active",
@@ -281,6 +288,13 @@ export const MODELS: Model[] = [
 		cost: { noCacheInput: 3, cacheInput: 0.3, output: 15 },
 	},
 
+	{
+		id: "global.anthropic.claude-opus-5",
+		providers: ["bedrock"],
+		status: "active",
+		cost: { noCacheInput: 5, cacheInput: 0.5, output: 25 },
+		releaseDate: "2026-07-24",
+	},
 	{
 		id: "global.anthropic.claude-sonnet-5",
 		providers: ["bedrock"],
