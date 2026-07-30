@@ -226,10 +226,15 @@ function anySignal(signals: AbortSignal[]): AbortSignal {
 // Re-export types for convenience
 export type {
 	Agent0Config,
+	AgentCustomTool,
 	AgentDetails,
+	AgentMCPTool,
+	AgentSkill,
+	AgentSubagentTool,
 	AgentTag,
 	AgentVersion,
 	AgentVersionData,
+	AgentVersionTool,
 	CustomTool,
 	EmbedManyOptions,
 	EmbedManyResponse,

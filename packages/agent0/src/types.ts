@@ -126,8 +126,48 @@ export interface AgentTag {
 	color: string;
 }
 
+/** A tool backed by an MCP server. */
+export interface AgentMCPTool {
+	type: "mcp";
+	mcp_id: string;
+	name: string;
+}
+
+/** A client-executed tool: the LLM emits calls, execution happens externally. */
+export interface AgentCustomTool {
+	type: "custom";
+	title: string;
+	description: string;
+	inputSchema?: Record<string, unknown>;
+}
+
 /**
- * The full content of a deployed agent version: prompt, model, tools, and settings.
+ * A subagent: another workspace agent exposed as a tool. The runner executes the
+ * referenced agent's deployed version in-process and returns its text output.
+ */
+export interface AgentSubagentTool {
+	type: "agent";
+	agent_id: string;
+	name: string;
+	description: string;
+}
+
+/** A tool assigned to an agent version — an MCP tool, a custom tool, or a subagent. */
+export type AgentVersionTool =
+	| AgentMCPTool
+	| AgentCustomTool
+	| AgentSubagentTool;
+
+/** A skill embedded in (and versioned with) an agent version. */
+export interface AgentSkill {
+	id: string;
+	name: string;
+	description: string;
+	body: string;
+}
+
+/**
+ * The full content of a deployed agent version: prompt, model, tools, skills, and settings.
  */
 export interface AgentVersionData {
 	model: { provider_id: string; name: string };
@@ -136,7 +176,10 @@ export interface AgentVersionData {
 	outputFormat?: "text" | "json";
 	temperature?: number;
 	maxStepCount?: number;
-	tools?: unknown[];
+	/** MCP tools, custom tools, and subagents (entries with `type: "agent"`). */
+	tools?: AgentVersionTool[];
+	/** Skills embedded in this version. */
+	skills?: AgentSkill[];
 	providerOptions?: ProviderOptions;
 }
 
