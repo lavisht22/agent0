@@ -172,6 +172,8 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 		schema: {
 			tags: ["Agents"],
 			summary: "Get a single agent",
+			description:
+				"Fetch an agent by ID. Pass `environment` to also resolve and include the full deployed version (prompt, model, tools, etc.) for that environment.",
 			params: {
 				type: "object" as const,
 				properties: {
@@ -179,11 +181,33 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 				},
 				required: ["agentId"],
 			},
+			querystring: {
+				type: "object" as const,
+				properties: {
+					environment: {
+						type: "string" as const,
+						enum: ["staging", "production"],
+						description:
+							"Resolve and include the deployed version for this environment",
+					},
+				},
+			},
 			response: {
 				200: {
 					type: "object" as const,
 					properties: {
-						data: AgentSchema,
+						data: {
+							type: "object" as const,
+							properties: {
+								...AgentSchema.properties,
+								environment: {
+									type: "string" as const,
+									enum: ["staging", "production"],
+									nullable: true,
+								},
+								version: { ...VersionDetailSchema, nullable: true },
+							},
+						},
 					},
 				},
 				404: ErrorSchema,
@@ -194,6 +218,9 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 			const { workspaceId, agentId } = request.params as {
 				workspaceId: string;
 				agentId: string;
+			};
+			const { environment } = request.query as {
+				environment?: "staging" | "production";
 			};
 
 			try {
@@ -210,7 +237,51 @@ export async function registerAgentRoutes(fastify: FastifyInstance) {
 				}
 
 				const [hydrated] = await hydrateAgents([agent]);
-				return reply.send({ data: hydrated });
+
+				// Without an environment, return agent metadata only.
+				if (!environment) {
+					return reply.send({ data: hydrated });
+				}
+
+				// Resolve the deployed version for the requested environment.
+				const versionId =
+					environment === "staging"
+						? agent.staging_version_id
+						: agent.production_version_id;
+
+				if (!versionId) {
+					return reply.code(404).send({
+						message: `No ${environment} version found for this agent`,
+					});
+				}
+
+				const [version] = await db
+					.select()
+					.from(agentVersions)
+					.where(
+						and(
+							eq(agentVersions.id, versionId),
+							eq(agentVersions.agent_id, agentId),
+						),
+					)
+					.limit(1);
+
+				if (!version) {
+					return reply.code(404).send({
+						message: `No ${environment} version found for this agent`,
+					});
+				}
+
+				return reply.send({
+					data: {
+						...hydrated,
+						environment,
+						version: {
+							...version,
+							created_at: new Date(version.created_at).toISOString(),
+						},
+					},
+				});
 			} catch {
 				return reply.code(500).send({ message: "Failed to fetch agent" });
 			}

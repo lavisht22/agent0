@@ -7,6 +7,8 @@ import type {
 	EmbedResponse,
 	Environment,
 	GenerateResponse,
+	GetAgentOptions,
+	GetAgentResponse,
 	RunOptions,
 } from "./types";
 
@@ -34,6 +36,7 @@ export class Agent0 {
 		endpoint: string,
 		body: unknown,
 		signal?: AbortSignal,
+		method: string = "POST",
 	): Promise<Response> {
 		const url = `${this.baseUrl}${endpoint}`;
 
@@ -48,9 +51,9 @@ export class Agent0 {
 			: timeoutSignal;
 
 		const response = await fetch(url, {
-			method: "POST",
+			method,
 			headers,
-			body: JSON.stringify(body),
+			body: body !== undefined ? JSON.stringify(body) : undefined,
 			signal: combinedSignal,
 		});
 
@@ -79,6 +82,32 @@ export class Agent0 {
 				stream: false,
 			},
 			options.signal,
+		);
+
+		return await response.json();
+	}
+
+	/**
+	 * Fetch an agent's details, including the full deployed version
+	 * (prompt, model, tools, and settings) for the resolved environment.
+	 *
+	 * The environment is resolved as: option-level > constructor-level > 'production'.
+	 * For example, an SDK instance created with `environment: "staging"` returns the
+	 * staging prompt by default.
+	 *
+	 * @param options - The agent ID and optional environment
+	 * @returns The agent details with the resolved version
+	 */
+	async getAgent(options: GetAgentOptions): Promise<GetAgentResponse> {
+		const environment = this.resolveEnvironment(options.environment);
+		const query = new URLSearchParams({ environment }).toString();
+		const response = await this.fetchApi(
+			`/api/v1/workspaces/${this.workspaceId}/agents/${encodeURIComponent(
+				options.agentId,
+			)}?${query}`,
+			undefined,
+			options.signal,
+			"GET",
 		);
 
 		return await response.json();
@@ -197,6 +226,10 @@ function anySignal(signals: AbortSignal[]): AbortSignal {
 // Re-export types for convenience
 export type {
 	Agent0Config,
+	AgentDetails,
+	AgentTag,
+	AgentVersion,
+	AgentVersionData,
 	CustomTool,
 	EmbedManyOptions,
 	EmbedManyResponse,
@@ -205,6 +238,8 @@ export type {
 	EmbedResponse,
 	Environment,
 	GenerateResponse,
+	GetAgentOptions,
+	GetAgentResponse,
 	ModelOverrides,
 	ProviderOptions,
 	RunOptions,
