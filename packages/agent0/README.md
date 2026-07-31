@@ -335,6 +335,161 @@ const googleResult = await client.embed({
 });
 ```
 
+### `getAgent(agentId: string, options?): Promise<Agent>`
+
+Fetch a single agent, including which version is currently deployed to staging and production.
+
+**Returns:**
+
+```typescript
+interface Agent {
+  id: string;
+  name: string;
+  staging_version_id: string | null;     // null if nothing is deployed to staging
+  production_version_id: string | null;  // null if nothing is deployed to production
+  staging_model: { provider_id: string; name: string } | null;
+  production_model: { provider_id: string; name: string } | null;
+  tags: { id: string; name: string; color: string }[];
+  created_at: string;   // ISO 8601
+  updated_at: string;   // ISO 8601
+}
+```
+
+**Example:**
+
+```typescript
+const agent = await client.getAgent('agent_123');
+
+console.log(agent.name);
+console.log('Live in production:', agent.production_version_id);
+```
+
+### `listAgents(options?): Promise<PaginatedResponse<Agent>>`
+
+List agents in the workspace, newest first.
+
+**Parameters:**
+
+```typescript
+interface ListAgentsOptions {
+  search?: string;      // Case-insensitive substring match on the agent name
+  tagIds?: string[];    // Only agents carrying ALL of these tag IDs
+  page?: number;        // 1-based, defaults to 1
+  limit?: number;       // Defaults to 20, capped at 100 by the server
+  signal?: AbortSignal;
+}
+```
+
+**Returns:**
+
+```typescript
+interface PaginatedResponse<Agent> {
+  data: Agent[];
+  page: number;
+  limit: number;
+}
+```
+
+**Example:**
+
+```typescript
+const { data: agents } = await client.listAgents({ search: 'support', limit: 50 });
+
+for (const agent of agents) {
+  console.log(agent.id, agent.name);
+}
+```
+
+### `getVersion(agentId: string, versionId: string, options?): Promise<AgentVersion>`
+
+Fetch a version including its full contents — the prompt messages, model, tools, skills and generation settings as they were saved.
+
+**Returns:**
+
+```typescript
+interface AgentVersion {
+  id: string;
+  agent_id: string;
+  is_deployed: boolean;
+  user_id: string;      // ID of the user who pushed the version
+  created_at: string;
+  data: VersionData;
+}
+
+interface VersionData {
+  model: { provider_id: string; name: string };
+  messages: ModelMessage[];   // The prompt
+  maxOutputTokens?: number;
+  outputFormat?: 'text' | 'json';
+  temperature?: number;
+  maxStepCount?: number;
+  tools?: ToolDefinition[];   // MCP, custom, and agent-as-tool definitions
+  skills?: Skill[];
+  providerOptions?: ProviderOptions;
+}
+```
+
+> ℹ️ `data` is the prompt **as saved**: `{{variable}}` placeholders are left intact, and none of the run-time assembly (skill catalog injection, MCP tool discovery) has been applied. It's what a run starts from, not the final payload sent to the model.
+
+### `listVersions(agentId: string, options?): Promise<PaginatedResponse<AgentVersionSummary>>`
+
+List an agent's versions, newest first. Summaries only (no `data`) — use `getVersion()` to read a version's contents.
+
+**Parameters:**
+
+```typescript
+interface ListVersionsOptions {
+  page?: number;        // 1-based, defaults to 1
+  limit?: number;       // Defaults to 20, capped at 100 by the server
+  signal?: AbortSignal;
+}
+```
+
+### Reading an Agent's Prompt at Runtime
+
+To read the prompt your agent is currently running, fetch the agent to find the deployed version ID, then fetch that version:
+
+```typescript
+const agent = await client.getAgent('agent_123');
+
+const versionId = agent.production_version_id;
+if (!versionId) throw new Error('Nothing deployed to production');
+
+const version = await client.getVersion('agent_123', versionId);
+
+console.log(version.data.messages);  // The prompt
+console.log(version.data.model);     // { provider_id, name }
+```
+
+Wrap it up if you do this often:
+
+```typescript
+async function getDeployedPrompt(
+  agentId: string,
+  environment: 'staging' | 'production' = 'production',
+) {
+  const agent = await client.getAgent(agentId);
+
+  const versionId =
+    environment === 'staging'
+      ? agent.staging_version_id
+      : agent.production_version_id;
+
+  if (!versionId) {
+    throw new Error(`No ${environment} version deployed for ${agentId}`);
+  }
+
+  const version = await client.getVersion(agentId, versionId);
+  return version.data;
+}
+
+const prompt = await getDeployedPrompt('agent_123');
+```
+
+Two round trips gives you something a single call wouldn't: you can pin to a specific `versionId` instead of whatever is live, which is what you want for diffing staging against production or auditing which prompt produced a given run.
+
+> ⚠️ **Scopes**: these four methods need `agents:read:*` (or `agents:read:<agentId>` for the single-agent calls) on your API key. A key created with only `agents:run:*` will get a `403 Missing required scope`. Add the read scope under **API Keys** in the dashboard.
+
 ## Examples
 
 
