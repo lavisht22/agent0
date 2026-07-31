@@ -1,14 +1,32 @@
 import type { TextStreamPart, ToolSet } from "ai";
 import type {
+	Agent,
 	Agent0Config,
+	AgentVersion,
+	AgentVersionSummary,
 	EmbedManyOptions,
 	EmbedManyResponse,
 	EmbedOptions,
 	EmbedResponse,
 	Environment,
 	GenerateResponse,
+	ListAgentsOptions,
+	ListVersionsOptions,
+	PaginatedResponse,
+	RequestOptions,
 	RunOptions,
 } from "./types";
+
+/** Runs can legitimately take a very long time; reads cannot. */
+const RUN_TIMEOUT_MS = 30 * 60 * 1000;
+const READ_TIMEOUT_MS = 30 * 1000;
+
+type FetchOptions = {
+	body?: unknown;
+	query?: Record<string, string | number | undefined>;
+	signal?: AbortSignal;
+	timeoutMs?: number;
+};
 
 export class Agent0 {
 	private apiKey: string;
@@ -31,26 +49,39 @@ export class Agent0 {
 	}
 
 	private async fetchApi(
+		method: "GET" | "POST",
 		endpoint: string,
-		body: unknown,
-		signal?: AbortSignal,
+		options: FetchOptions = {},
 	): Promise<Response> {
-		const url = `${this.baseUrl}${endpoint}`;
+		const { body, query, signal, timeoutMs = RUN_TIMEOUT_MS } = options;
 
-		const headers = {
-			"Content-Type": "application/json",
+		let url = `${this.baseUrl}${endpoint}`;
+
+		if (query) {
+			const params = new URLSearchParams();
+			for (const [key, value] of Object.entries(query)) {
+				if (value !== undefined) params.set(key, String(value));
+			}
+			const queryString = params.toString();
+			if (queryString) url += `?${queryString}`;
+		}
+
+		const headers: Record<string, string> = {
 			"x-api-key": this.apiKey,
 		};
+		if (body !== undefined) {
+			headers["Content-Type"] = "application/json";
+		}
 
-		const timeoutSignal = AbortSignal.timeout(30 * 60 * 1000);
+		const timeoutSignal = AbortSignal.timeout(timeoutMs);
 		const combinedSignal = signal
 			? anySignal([signal, timeoutSignal])
 			: timeoutSignal;
 
 		const response = await fetch(url, {
-			method: "POST",
+			method,
 			headers,
-			body: JSON.stringify(body),
+			body: body === undefined ? undefined : JSON.stringify(body),
 			signal: combinedSignal,
 		});
 
@@ -66,19 +97,22 @@ export class Agent0 {
 
 	async generate(options: RunOptions): Promise<GenerateResponse> {
 		const response = await this.fetchApi(
+			"POST",
 			`/api/v1/workspaces/${this.workspaceId}/runs`,
 			{
-				agent_id: options.agentId,
-				environment: this.resolveEnvironment(options.environment),
-				variables: options.variables,
-				overrides: options.overrides,
-				extra_messages: options.extraMessages,
-				extra_tools: options.extraTools,
-				mcp_options: options.mcpOptions,
-				metadata: options.metadata,
-				stream: false,
+				body: {
+					agent_id: options.agentId,
+					environment: this.resolveEnvironment(options.environment),
+					variables: options.variables,
+					overrides: options.overrides,
+					extra_messages: options.extraMessages,
+					extra_tools: options.extraTools,
+					mcp_options: options.mcpOptions,
+					metadata: options.metadata,
+					stream: false,
+				},
+				signal: options.signal,
 			},
-			options.signal,
 		);
 
 		return await response.json();
@@ -88,19 +122,22 @@ export class Agent0 {
 		options: RunOptions,
 	): AsyncGenerator<TextStreamPart<ToolSet>, void, unknown> {
 		const response = await this.fetchApi(
+			"POST",
 			`/api/v1/workspaces/${this.workspaceId}/runs`,
 			{
-				agent_id: options.agentId,
-				environment: this.resolveEnvironment(options.environment),
-				variables: options.variables,
-				overrides: options.overrides,
-				extra_messages: options.extraMessages,
-				extra_tools: options.extraTools,
-				mcp_options: options.mcpOptions,
-				metadata: options.metadata,
-				stream: true,
+				body: {
+					agent_id: options.agentId,
+					environment: this.resolveEnvironment(options.environment),
+					variables: options.variables,
+					overrides: options.overrides,
+					extra_messages: options.extraMessages,
+					extra_tools: options.extraTools,
+					mcp_options: options.mcpOptions,
+					metadata: options.metadata,
+					stream: true,
+				},
+				signal: options.signal,
 			},
-			options.signal,
 		);
 
 		if (!response.body) {
@@ -151,9 +188,9 @@ export class Agent0 {
 	async embed(options: EmbedOptions): Promise<EmbedResponse> {
 		const { signal, ...body } = options;
 		const response = await this.fetchApi(
+			"POST",
 			`/api/v1/workspaces/${this.workspaceId}/embed`,
-			body,
-			signal,
+			{ body, signal },
 		);
 		return await response.json();
 	}
@@ -168,9 +205,99 @@ export class Agent0 {
 	async embedMany(options: EmbedManyOptions): Promise<EmbedManyResponse> {
 		const { signal, ...body } = options;
 		const response = await this.fetchApi(
+			"POST",
 			`/api/v1/workspaces/${this.workspaceId}/embed-many`,
-			body,
-			signal,
+			{ body, signal },
+		);
+		return await response.json();
+	}
+
+	/**
+	 * Fetch a single agent, including which version is deployed to staging and
+	 * production. Pair with {@link getVersion} to read the deployed prompt:
+	 *
+	 * ```ts
+	 * const agent = await client.getAgent("agent_123");
+	 * const version = await client.getVersion("agent_123", agent.production_version_id!);
+	 * version.data.messages;
+	 * ```
+	 *
+	 * Requires the `agents:read:<agentId>` scope on the API key.
+	 */
+	async getAgent(
+		agentId: string,
+		options: RequestOptions = {},
+	): Promise<Agent> {
+		const response = await this.fetchApi(
+			"GET",
+			`/api/v1/workspaces/${this.workspaceId}/agents/${encodeURIComponent(agentId)}`,
+			{ signal: options.signal, timeoutMs: READ_TIMEOUT_MS },
+		);
+		const { data } = (await response.json()) as { data: Agent };
+		return data;
+	}
+
+	/**
+	 * List agents in the workspace, newest first.
+	 *
+	 * Requires the `agents:read:*` scope on the API key.
+	 */
+	async listAgents(
+		options: ListAgentsOptions = {},
+	): Promise<PaginatedResponse<Agent>> {
+		const { search, tagIds, page, limit, signal } = options;
+		const response = await this.fetchApi(
+			"GET",
+			`/api/v1/workspaces/${this.workspaceId}/agents`,
+			{
+				query: {
+					search,
+					tag_ids: tagIds && tagIds.length > 0 ? tagIds.join(",") : undefined,
+					page,
+					limit,
+				},
+				signal,
+				timeoutMs: READ_TIMEOUT_MS,
+			},
+		);
+		return await response.json();
+	}
+
+	/**
+	 * Fetch a single version including its full contents — the prompt messages,
+	 * model, tools, skills and generation settings as they were saved.
+	 *
+	 * Requires the `agents:read:<agentId>` scope on the API key.
+	 */
+	async getVersion(
+		agentId: string,
+		versionId: string,
+		options: RequestOptions = {},
+	): Promise<AgentVersion> {
+		const response = await this.fetchApi(
+			"GET",
+			`/api/v1/workspaces/${this.workspaceId}/agents/${encodeURIComponent(agentId)}/versions/${encodeURIComponent(versionId)}`,
+			{ signal: options.signal, timeoutMs: READ_TIMEOUT_MS },
+		);
+		const { data } = (await response.json()) as { data: AgentVersion };
+		return data;
+	}
+
+	/**
+	 * List an agent's versions, newest first. Summaries only — use
+	 * {@link getVersion} to read a version's contents.
+	 *
+	 * Requires the `agents:read:<agentId>` scope on the API key.
+	 */
+	async listVersions(
+		agentId: string,
+		options: ListVersionsOptions = {},
+	): Promise<PaginatedResponse<AgentVersionSummary>> {
+		const { page, limit, signal } = options;
+		const response = await this.fetchApi(
+			"GET",
+			`/api/v1/workspaces/${this.workspaceId}/agents/${encodeURIComponent(agentId)}/versions`,
+			{ query: { page, limit }, signal, timeoutMs: READ_TIMEOUT_MS },
 		);
 		return await response.json();
 	}
@@ -196,8 +323,13 @@ function anySignal(signals: AbortSignal[]): AbortSignal {
 
 // Re-export types for convenience
 export type {
+	Agent,
 	Agent0Config,
+	AgentToolDefinition,
+	AgentVersion,
+	AgentVersionSummary,
 	CustomTool,
+	CustomToolDefinition,
 	EmbedManyOptions,
 	EmbedManyResponse,
 	EmbedModel,
@@ -205,7 +337,17 @@ export type {
 	EmbedResponse,
 	Environment,
 	GenerateResponse,
+	ListAgentsOptions,
+	ListVersionsOptions,
+	McpToolDefinition,
 	ModelOverrides,
+	ModelSummary,
+	PaginatedResponse,
 	ProviderOptions,
+	RequestOptions,
 	RunOptions,
+	Skill,
+	Tag,
+	ToolDefinition,
+	VersionData,
 } from "./types";

@@ -157,3 +157,140 @@ export interface EmbedManyResponse {
 	/** The embedding vectors (one per input value) */
 	embeddings: number[][];
 }
+
+/** A tag attached to an agent. */
+export interface Tag {
+	id: string;
+	name: string;
+	color: string;
+}
+
+/** A provider/model pair as stored on an agent version. */
+export interface ModelSummary {
+	provider_id: string;
+	name: string;
+}
+
+/**
+ * An agent, as returned by `getAgent` / `listAgents`.
+ * `staging_model` and `production_model` are read off the deployed versions and
+ * are `null` when nothing is deployed to that environment.
+ */
+export interface Agent {
+	id: string;
+	name: string;
+	staging_version_id: string | null;
+	production_version_id: string | null;
+	staging_model: ModelSummary | null;
+	production_model: ModelSummary | null;
+	tags: Tag[];
+	created_at: string;
+	updated_at: string;
+}
+
+/** A tool backed by an MCP server configured in the workspace. */
+export interface McpToolDefinition {
+	type: "mcp";
+	mcp_id: string;
+	name: string;
+}
+
+/** A client-executed tool: the model emits calls, your app executes them. */
+export interface CustomToolDefinition {
+	type: "custom";
+	title: string;
+	description: string;
+	inputSchema?: Record<string, unknown>;
+}
+
+/** Another agent in the same workspace exposed as a tool. */
+export interface AgentToolDefinition {
+	type: "agent";
+	agent_id: string;
+	name: string;
+	description: string;
+}
+
+export type ToolDefinition =
+	| McpToolDefinition
+	| CustomToolDefinition
+	| AgentToolDefinition;
+
+/** A skill embedded in an agent version (versioned alongside the prompt). */
+export interface Skill {
+	id: string;
+	name: string;
+	description: string;
+	body: string;
+}
+
+/**
+ * The stored contents of an agent version — the prompt and everything versioned
+ * with it.
+ *
+ * This is the prompt *as saved*: `{{variable}}` placeholders are left intact and
+ * no run-time assembly (skill catalog injection, MCP tool discovery) has been
+ * applied. It is what a run would start from, not the final payload sent to the
+ * model.
+ */
+export interface VersionData {
+	model: ModelSummary;
+	messages: ModelMessage[];
+	maxOutputTokens?: number;
+	outputFormat?: "text" | "json";
+	temperature?: number;
+	maxStepCount?: number;
+	tools?: ToolDefinition[];
+	skills?: Skill[];
+	providerOptions?: ProviderOptions;
+}
+
+/** An agent version without its contents, as returned by `listVersions`. */
+export interface AgentVersionSummary {
+	id: string;
+	agent_id: string;
+	/** True if this version was deployed to an environment when it was created. */
+	is_deployed: boolean;
+	/** ID of the user who pushed the version. */
+	user_id: string;
+	created_at: string;
+}
+
+/** An agent version including its contents, as returned by `getVersion`. */
+export interface AgentVersion extends AgentVersionSummary {
+	data: VersionData;
+}
+
+export interface ListAgentsOptions {
+	/** Case-insensitive substring match on the agent name. */
+	search?: string;
+	/** Only return agents carrying ALL of these tag IDs. */
+	tagIds?: string[];
+	/** 1-based page number. Defaults to 1. */
+	page?: number;
+	/** Items per page, capped at 100 by the server. Defaults to 20. */
+	limit?: number;
+	/** Abort signal to cancel the HTTP request. */
+	signal?: AbortSignal;
+}
+
+export interface ListVersionsOptions {
+	/** 1-based page number. Defaults to 1. */
+	page?: number;
+	/** Items per page, capped at 100 by the server. Defaults to 20. */
+	limit?: number;
+	/** Abort signal to cancel the HTTP request. */
+	signal?: AbortSignal;
+}
+
+export interface RequestOptions {
+	/** Abort signal to cancel the HTTP request. */
+	signal?: AbortSignal;
+}
+
+/** A page of results, echoing back the pagination that produced it. */
+export interface PaginatedResponse<T> {
+	data: T[];
+	page: number;
+	limit: number;
+}
