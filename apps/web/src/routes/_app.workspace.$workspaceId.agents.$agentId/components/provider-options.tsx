@@ -22,6 +22,12 @@ type GoogleVertexOptionsValue = {
 		| "MEDIA_RESOLUTION_HIGH";
 };
 
+type BedrockReasoningConfig = {
+	type?: "adaptive" | "disabled";
+	maxReasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max";
+	display?: "omitted" | "summarized";
+};
+
 export type ProviderOptionsValue = {
 	openai?: {
 		reasoningEffort?: "minimal" | "low" | "medium" | "high";
@@ -32,6 +38,9 @@ export type ProviderOptionsValue = {
 	};
 	google?: GoogleVertexOptionsValue;
 	vertex?: GoogleVertexOptionsValue;
+	bedrock?: {
+		reasoningConfig?: BedrockReasoningConfig;
+	};
 };
 
 interface ProviderOptionsProps {
@@ -200,6 +209,158 @@ function GoogleVertexOptions({
 	);
 }
 
+// Sentinel for the "Not set" item. A Select has no clear affordance once a
+// value is picked, so each list carries an explicit item that maps back to
+// undefined and drops the field from the request.
+const UNSET = "__unset__";
+
+// Anthropic models on Bedrock, Claude 4.6 and newer. Each control is set
+// independently; Reasoning Effort maps to `output_config.effort`, and Display
+// rides along on the thinking config, so the provider only forwards it under
+// the "adaptive" mode. The legacy fixed thinking budget is not exposed.
+function BedrockOptions({
+	value,
+	onValueChange,
+}: {
+	value: ProviderOptionsValue | undefined;
+	onValueChange: (value: ProviderOptionsValue) => void;
+}) {
+	const opts = value?.bedrock?.reasoningConfig;
+	const setOpts = (newOpts: BedrockReasoningConfig) => {
+		onValueChange({ ...value, bedrock: { reasoningConfig: newOpts } });
+	};
+
+	return (
+		<>
+			<Select
+				placeholder="Not set"
+				value={opts?.type ?? null}
+				onChange={(selected) => {
+					setOpts({
+						...opts,
+						type:
+							selected === UNSET
+								? undefined
+								: (selected as "adaptive" | "disabled"),
+					});
+				}}
+				variant="secondary"
+				fullWidth
+			>
+				<Label>Thinking</Label>
+				<Select.Trigger>
+					<Select.Value />
+					<Select.Indicator />
+				</Select.Trigger>
+				<Description>
+					Adaptive lets the model decide how much to think per request
+				</Description>
+				<Select.Popover>
+					<ListBox>
+						<ListBox.Item id={UNSET} textValue="Not set">
+							Not set
+						</ListBox.Item>
+						<ListBox.Item id="adaptive" textValue="Adaptive">
+							Adaptive
+						</ListBox.Item>
+						<ListBox.Item id="disabled" textValue="Disabled">
+							Disabled
+						</ListBox.Item>
+					</ListBox>
+				</Select.Popover>
+			</Select>
+			<div className="flex flex-col gap-2 w-full">
+				<Select
+					placeholder="Not set"
+					value={opts?.maxReasoningEffort ?? null}
+					onChange={(selected) => {
+						setOpts({
+							...opts,
+							maxReasoningEffort:
+								selected === UNSET
+									? undefined
+									: (selected as "low" | "medium" | "high" | "xhigh" | "max"),
+						});
+					}}
+					variant="secondary"
+					fullWidth
+				>
+					<Label>Reasoning Effort</Label>
+					<Select.Trigger>
+						<Select.Value />
+						<Select.Indicator />
+					</Select.Trigger>
+					<Select.Popover>
+						<ListBox>
+							<ListBox.Item id={UNSET} textValue="Not set">
+								Not set
+							</ListBox.Item>
+							<ListBox.Item id="low" textValue="Low">
+								Low
+							</ListBox.Item>
+							<ListBox.Item id="medium" textValue="Medium">
+								Medium
+							</ListBox.Item>
+							<ListBox.Item id="high" textValue="High">
+								High
+							</ListBox.Item>
+							<ListBox.Item id="xhigh" textValue="Extra High">
+								Extra High
+							</ListBox.Item>
+							<ListBox.Item id="max" textValue="Max">
+								Max
+							</ListBox.Item>
+						</ListBox>
+					</Select.Popover>
+				</Select>
+				<p className="text-xs text-muted">
+					These options apply to Claude 4.6 and newer. Extra High requires
+					Claude Opus 4.7 or newer, and Disabled cannot be combined with Extra
+					High or Max on Claude Opus 5.
+				</p>
+			</div>
+			<Select
+				placeholder="Not set"
+				value={opts?.display ?? null}
+				onChange={(selected) => {
+					setOpts({
+						...opts,
+						display:
+							selected === UNSET
+								? undefined
+								: (selected as "omitted" | "summarized"),
+					});
+				}}
+				variant="secondary"
+				fullWidth
+			>
+				<Label>Thinking Display</Label>
+				<Select.Trigger>
+					<Select.Value />
+					<Select.Indicator />
+				</Select.Trigger>
+				<Description>
+					Controls whether the model returns a summary of its reasoning. Takes
+					effect when Thinking is Adaptive.
+				</Description>
+				<Select.Popover>
+					<ListBox>
+						<ListBox.Item id={UNSET} textValue="Not set">
+							Not set
+						</ListBox.Item>
+						<ListBox.Item id="omitted" textValue="Omitted">
+							Omitted
+						</ListBox.Item>
+						<ListBox.Item id="summarized" textValue="Summarized">
+							Summarized
+						</ListBox.Item>
+					</ListBox>
+				</Select.Popover>
+			</Select>
+		</>
+	);
+}
+
 // Reasoning/thinking options; the visible controls depend on provider type.
 export function ProviderOptions({
 	providerType,
@@ -208,7 +369,7 @@ export function ProviderOptions({
 }: ProviderOptionsProps) {
 	// Only show for providers with reasoning options
 	if (
-		!["openai", "xai", "azure", "google", "google-vertex"].includes(
+		!["openai", "xai", "azure", "google", "google-vertex", "bedrock"].includes(
 			providerType,
 		)
 	) {
@@ -346,6 +507,10 @@ export function ProviderOptions({
 					value={value}
 					onValueChange={onValueChange}
 				/>
+			)}
+
+			{providerType === "bedrock" && (
+				<BedrockOptions value={value} onValueChange={onValueChange} />
 			)}
 		</>
 	);

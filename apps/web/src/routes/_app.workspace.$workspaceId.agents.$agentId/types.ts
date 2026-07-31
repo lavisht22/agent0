@@ -81,6 +81,19 @@ export const agentFormSchema = z.object({
 					.optional(),
 			})
 			.optional(),
+		bedrock: z
+			.object({
+				reasoningConfig: z
+					.object({
+						type: z.enum(["adaptive", "disabled"]).optional(),
+						maxReasoningEffort: z
+							.enum(["low", "medium", "high", "xhigh", "max"])
+							.optional(),
+						display: z.enum(["omitted", "summarized"]).optional(),
+					})
+					.optional(),
+			})
+			.optional(),
 	}),
 });
 
