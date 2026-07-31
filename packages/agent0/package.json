@@ -4,9 +4,11 @@
 	"description": "TypeScript SDK for Agent0",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
+	"files": ["dist", "README.md"],
 	"scripts": {
 		"build": "tsc",
-		"dev": "tsc -w"
+		"dev": "tsc -w",
+		"prepublishOnly": "tsc"
 	},
 	"keywords": [
 		"agent0",
