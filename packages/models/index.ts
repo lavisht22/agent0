@@ -52,6 +52,27 @@ export const MODELS: Model[] = [
 	},
 
 	{
+		id: "gpt-5.6-sol",
+		providers: ["openai"],
+		status: "active",
+		cost: { noCacheInput: 5, cacheInput: 0.5, output: 30 },
+		releaseDate: "2026-07-09",
+	},
+	{
+		id: "gpt-5.6-terra",
+		providers: ["openai"],
+		status: "active",
+		cost: { noCacheInput: 2, cacheInput: 0.2, output: 12 },
+		releaseDate: "2026-07-09",
+	},
+	{
+		id: "gpt-5.6-luna",
+		providers: ["openai"],
+		status: "active",
+		cost: { noCacheInput: 0.2, cacheInput: 0.02, output: 1.2 },
+		releaseDate: "2026-07-09",
+	},
+	{
 		id: "gpt-5.5",
 		providers: ["openai", "azure"],
 		status: "active",
