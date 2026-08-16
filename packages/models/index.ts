@@ -193,6 +193,13 @@ export const MODELS: Model[] = [
 	},
 
 	{
+		id: "gemini-3.7-flash",
+		providers: ["google", "google-vertex"],
+		status: "active",
+		cost: { noCacheInput: 1.5, cacheInput: 0.15, output: 7.5 },
+		releaseDate: "2026-08-13",
+	},
+	{
 		id: "gemini-3.6-flash",
 		providers: ["google", "google-vertex"],
 		status: "active",
