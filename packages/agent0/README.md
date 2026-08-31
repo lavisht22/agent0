@@ -122,7 +122,7 @@ interface ModelOverrides {
 
 interface ProviderOptions {
   openai?: {
-    reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
+    reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high';
     reasoningSummary?: 'auto' | 'detailed';
   };
   xai?: {
@@ -750,7 +750,7 @@ const response = await client.generate({
   overrides: {
     providerOptions: {
       openai: {
-        reasoningEffort: 'high', // 'minimal' | 'low' | 'medium' | 'high'
+        reasoningEffort: 'high', // 'none' | 'minimal' | 'low' | 'medium' | 'high'
         reasoningSummary: 'auto' // 'auto' | 'detailed' - controls reasoning output
       }
     }

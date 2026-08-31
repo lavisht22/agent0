@@ -40,7 +40,7 @@ x-api-key: <your-api-key>
     "temperature": number (optional),
     "maxStepCount": number (optional),
     "providerOptions": {
-      "openai": { "reasoningEffort": "minimal" | "low" | "medium" | "high", "reasoningSummary": "auto" | "detailed" },
+      "openai": { "reasoningEffort": "none" | "minimal" | "low" | "medium" | "high", "reasoningSummary": "auto" | "detailed" },
       "xai": { "reasoningEffort": "low" | "medium" | "high" },
       "google": { "thinkingConfig": { "thinkingBudget": number, "thinkingLevel": "low" | "medium" | "high", "includeThoughts": boolean } },
       "vertex": { "thinkingConfig": { "thinkingBudget": number, "thinkingLevel": "low" | "medium" | "high", "includeThoughts": boolean } }
@@ -66,7 +66,7 @@ x-api-key: <your-api-key>
   - **temperature**: Override the temperature setting
   - **maxStepCount**: Override the maximum step count
   - **providerOptions**: Provider-specific options for reasoning/thinking
-    - For OpenAI/Azure: `{ openai: { reasoningEffort: 'minimal' | 'low' | 'medium' | 'high', reasoningSummary: 'auto' | 'detailed' } }`
+    - For OpenAI/Azure: `{ openai: { reasoningEffort: 'none' | 'minimal' | 'low' | 'medium' | 'high', reasoningSummary: 'auto' | 'detailed' } }`
       - `reasoningSummary: 'auto'` returns a condensed summary; `'detailed'` returns comprehensive reasoning. When enabled, reasoning summaries appear in the stream as events with type `'reasoning'`.
     - For xAI: `{ xai: { reasoningEffort: 'low' | 'medium' | 'high' } }`
     - For Google Generative AI: `{ google: { thinkingConfig: { thinkingBudget?: number, thinkingLevel?: 'low' | 'medium' | 'high', includeThoughts?: boolean } } }` (use either thinkingBudget OR thinkingLevel, not both)
