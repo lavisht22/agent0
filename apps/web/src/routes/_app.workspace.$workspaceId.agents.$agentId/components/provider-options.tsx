@@ -30,7 +30,7 @@ type BedrockReasoningConfig = {
 
 export type ProviderOptionsValue = {
 	openai?: {
-		reasoningEffort?: "minimal" | "low" | "medium" | "high";
+		reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
 		reasoningSummary?: "auto" | "detailed";
 	};
 	xai?: {
@@ -391,6 +391,7 @@ export function ProviderOptions({
 								openai: {
 									...value?.openai,
 									reasoningEffort: selected as
+										| "none"
 										| "minimal"
 										| "low"
 										| "medium"
@@ -406,8 +407,15 @@ export function ProviderOptions({
 							<Select.Value />
 							<Select.Indicator />
 						</Select.Trigger>
+						<Description>
+							None skips reasoning on models that support it, such as GPT-5.6
+							Luna
+						</Description>
 						<Select.Popover>
 							<ListBox>
+								<ListBox.Item id="none" textValue="None">
+									None
+								</ListBox.Item>
 								<ListBox.Item id="minimal" textValue="Minimal">
 									Minimal
 								</ListBox.Item>

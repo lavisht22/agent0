@@ -46,7 +46,7 @@ export const agentFormSchema = z.object({
 		openai: z
 			.object({
 				reasoningEffort: z
-					.enum(["minimal", "low", "medium", "high"])
+					.enum(["none", "minimal", "low", "medium", "high"])
 					.optional(),
 			})
 			.optional(),
