@@ -1,11 +1,37 @@
 import { toast } from "@heroui/react";
-import type { TextStreamPart, Tool } from "ai";
+import type { ProviderMetadata, TextStreamPart, Tool } from "ai";
 import { events } from "fetch-event-stream";
 import { nanoid } from "nanoid";
 import { useCallback, useRef, useState } from "react";
 import type z from "zod";
 import type { assistantMessageSchema } from "@/components/assistant-message";
 import type { MessageT } from "@/components/messages";
+
+type AssistantMessage = z.infer<typeof assistantMessageSchema>;
+type ReasoningPart = Extract<
+	AssistantMessage["content"][number],
+	{ type: "reasoning" }
+>;
+
+/**
+ * Merges provider metadata one provider key deep. Successive chunks for the same
+ * part can each carry only a subset of the keys — OpenAI's `reasoning-end` sends
+ * just `itemId` while `reasoning-start` also sends `reasoningEncryptedContent` —
+ * so replacing wholesale would drop fields already captured.
+ */
+const mergeProviderOptions = (
+	existing: ProviderMetadata | undefined,
+	incoming: ProviderMetadata | undefined,
+): ProviderMetadata | undefined => {
+	if (!incoming) return existing;
+	if (!existing) return incoming;
+
+	const merged: ProviderMetadata = { ...existing };
+	for (const [provider, values] of Object.entries(incoming)) {
+		merged[provider] = { ...merged[provider], ...values };
+	}
+	return merged;
+};
 
 export const useAgentRunner = ({
 	variableValues,
@@ -74,6 +100,10 @@ export const useAgentRunner = ({
 
 				const generatedMessageState: MessageT[] = [];
 
+				// Reasoning parts keyed by stream part id, so `reasoning-delta` and
+				// `reasoning-end` land on the part their `reasoning-start` created.
+				const reasoningParts = new Map<string, ReasoningPart>();
+
 				for await (const chunk of chunks) {
 					if (!chunk.data) continue;
 
@@ -94,8 +124,6 @@ export const useAgentRunner = ({
 
 						setWarnings((prev) => [...prev, ...parsed.warnings]);
 					}
-
-					type AssistantMessage = z.infer<typeof assistantMessageSchema>;
 
 					const lastMessage = generatedMessageState[
 						generatedMessageState.length - 1
@@ -118,18 +146,40 @@ export const useAgentRunner = ({
 					}
 
 					if (parsed.type === "reasoning-start") {
-						lastMessage.content.push({
+						// The metadata carries the provider's reasoning item id (OpenAI's
+						// `rs_…`). Dropping it means a later replay of this conversation
+						// sends the sibling tool call as a stored-item reference whose
+						// reasoning item is missing, which the Responses API rejects.
+						const part: ReasoningPart = {
 							type: "reasoning",
 							text: "",
-						});
+							providerOptions: parsed.providerMetadata,
+						};
+
+						lastMessage.content.push(part);
+						reasoningParts.set(parsed.id, part);
 					}
 
 					if (parsed.type === "reasoning-delta") {
-						const lastPart =
-							lastMessage.content[lastMessage.content.length - 1];
+						const part = reasoningParts.get(parsed.id);
 
-						if (lastPart.type === "reasoning") {
-							lastPart.text += parsed.text;
+						if (part) {
+							part.text += parsed.text;
+							part.providerOptions = mergeProviderOptions(
+								part.providerOptions,
+								parsed.providerMetadata,
+							);
+						}
+					}
+
+					if (parsed.type === "reasoning-end") {
+						const part = reasoningParts.get(parsed.id);
+
+						if (part) {
+							part.providerOptions = mergeProviderOptions(
+								part.providerOptions,
+								parsed.providerMetadata,
+							);
 						}
 					}
 
