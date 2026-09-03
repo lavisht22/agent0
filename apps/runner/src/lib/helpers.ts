@@ -11,6 +11,7 @@ import {
 } from "ai";
 import { eq } from "drizzle-orm";
 import { cachedQuery } from "./cache.js";
+import { getCatalogCost } from "./cost.js";
 import { decryptSecret } from "./crypto.js";
 import { db } from "./pg.js";
 import { getAIProvider } from "./providers.js";
@@ -50,6 +51,7 @@ export const resolveProviderModel = async (
 					type: providers.type,
 					encrypted_data_production: providers.encrypted_data_production,
 					encrypted_data_staging: providers.encrypted_data_staging,
+					models: providers.models,
 				})
 				.from(providers)
 				.where(eq(providers.id, model.provider_id))
@@ -70,9 +72,18 @@ export const resolveProviderModel = async (
 		},
 	);
 
+	// A provider serving a custom catalog prices its own models; fall back to the
+	// built-in catalog for everything else. Resolved here, where both the
+	// provider row and the model name are in hand, so nothing downstream has to
+	// re-derive it.
+	const modelCost =
+		provider.models?.find((m) => m.id === model.name)?.cost ??
+		getCatalogCost(model.name);
+
 	return {
 		model: aiProvider(model.name) as LanguageModel,
 		providerType: provider.type as string,
+		modelCost,
 	};
 };
 

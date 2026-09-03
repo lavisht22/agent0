@@ -1,3 +1,4 @@
+import type { ProviderModel } from "@repo/models";
 import { sql } from "drizzle-orm";
 import {
 	type AnyPgColumn,
@@ -407,6 +408,13 @@ export const providers = pgTable(
 		workspace_id: text().notNull(),
 		encrypted_data_production: text().notNull(),
 		encrypted_data_staging: text(),
+		// Models this provider serves in place of the built-in catalog for its
+		// type. Set it when the provider points somewhere the stock model list
+		// doesn't describe — an OpenAI-compatible gateway, Bedrock's
+		// OpenAI-compatible endpoint, a self-hosted server. Left empty, the
+		// provider keeps the built-in list. Deliberately not part of the
+		// encrypted config: the UI needs to read it to populate the model picker.
+		models: jsonb().$type<ProviderModel[]>(),
 	},
 	(table) => [
 		index("providers_workspace_id_idx").using(

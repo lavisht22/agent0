@@ -5,6 +5,7 @@ import {
 	Popover,
 	useOverlayState,
 } from "@heroui/react";
+import type { ProviderModel } from "@repo/models";
 import { LucideServer } from "lucide-react";
 import { useEffect, useState } from "react";
 import { MODELS, PROVIDER_TYPES, type ProviderType } from "@/lib/providers";
@@ -13,6 +14,7 @@ interface Provider {
 	id: string;
 	name: string;
 	type: string;
+	models?: ProviderModel[] | null;
 }
 
 type Value = { provider_id: string; name: string };
@@ -34,15 +36,21 @@ export function ModelSelector({
 	const [selectedModel, setSelectedModel] = useState<string>("");
 	const state = useOverlayState();
 
-	const selectedProviderType = providers.find(
-		(p) => p.id === selectedProvider,
-	)?.type;
+	const selectedProviderRow = providers.find((p) => p.id === selectedProvider);
+	const selectedProviderType = selectedProviderRow?.type;
 
-	const availableModels = selectedProviderType
-		? MODELS.filter((m) =>
-				m.providers.includes(selectedProviderType as ProviderType),
-			)
-		: [];
+	// A provider carrying its own model list replaces the built-in catalog
+	// rather than extending it: it points somewhere the stock models don't
+	// describe, so offering them alongside would just invite a bad selection.
+	const customModels = selectedProviderRow?.models;
+	const availableModels =
+		customModels && customModels.length > 0
+			? customModels.map((m) => ({ ...m, status: m.status ?? "active" }))
+			: selectedProviderType
+				? MODELS.filter((m) =>
+						m.providers.includes(selectedProviderType as ProviderType),
+					)
+				: [];
 
 	useEffect(() => {
 		setSelectedProvider(value.provider_id);

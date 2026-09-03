@@ -1,4 +1,5 @@
 import type { Json, tags } from "@repo/database";
+import type { ProviderModel } from "@repo/models";
 import { queryOptions } from "@tanstack/react-query";
 import { events } from "fetch-event-stream";
 import {
@@ -192,6 +193,9 @@ export type Provider = {
 	name: string;
 	type: string;
 	has_staging_config: boolean;
+	// Replaces the built-in catalog for this provider when non-empty. Plaintext,
+	// unlike the credential blobs, because the model picker has to read it.
+	models: ProviderModel[] | null;
 	created_at: string;
 	updated_at: string;
 };
@@ -217,6 +221,7 @@ export async function createProvider(
 		type: string;
 		data_production: string;
 		data_staging: string | null;
+		models?: ProviderModel[];
 	},
 ) {
 	const { data } = await api.post<{ data: Provider }>(
@@ -236,6 +241,8 @@ export async function updateProvider(
 		type?: string;
 		data_production?: string;
 		data_staging?: string | null;
+		// An empty array drops back to the built-in catalog.
+		models?: ProviderModel[];
 	},
 ) {
 	const { data } = await api.patch<{ data: Provider }>(

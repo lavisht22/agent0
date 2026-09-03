@@ -835,6 +835,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 			const {
 				model,
 				modelId,
+				modelCost,
 				versionId: preparedVersionId,
 				data,
 				finalMessages,
@@ -939,7 +940,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 									startTime,
 								status: "success",
 								isStream: true,
-								modelId,
+								modelCost,
 								usage: totalUsage,
 								runData,
 							});
@@ -985,7 +986,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 									startTime,
 								status: "error",
 								isStream: true,
-								modelId,
+								modelCost,
 								runData,
 							});
 						},
@@ -1030,7 +1031,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 									startTime,
 								status: "aborted",
 								isStream: true,
-								modelId,
+								modelCost,
 								usage: totalUsage,
 								runData,
 							});
@@ -1126,7 +1127,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						responseTime: 0,
 						status: "aborted",
 						isStream: false,
-						modelId,
+						modelCost,
 						usage: totalUsage,
 						runData,
 					});
@@ -1190,7 +1191,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						responseTime: 0,
 						status: "success",
 						isStream: false,
-						modelId,
+						modelCost,
 						usage: totalUsage,
 						runData,
 					});
@@ -1240,7 +1241,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						responseTime: 0,
 						status: "error",
 						isStream: false,
-						modelId,
+						modelCost,
 						runData,
 					});
 

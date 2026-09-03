@@ -122,11 +122,11 @@ interface ModelOverrides {
 
 interface ProviderOptions {
   openai?: {
-    reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high';
+    reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
     reasoningSummary?: 'auto' | 'detailed';
   };
   xai?: {
-    reasoningEffort?: 'low' | 'medium' | 'high';
+    reasoningEffort?: 'none' | 'low' | 'medium' | 'high' | 'xhigh';
   };
   google?: {
     thinkingConfig?: {
@@ -750,7 +750,7 @@ const response = await client.generate({
   overrides: {
     providerOptions: {
       openai: {
-        reasoningEffort: 'high', // 'none' | 'minimal' | 'low' | 'medium' | 'high'
+        reasoningEffort: 'high', // 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
         reasoningSummary: 'auto' // 'auto' | 'detailed' - controls reasoning output
       }
     }
@@ -770,7 +770,7 @@ const response = await client.generate({
   overrides: {
     providerOptions: {
       xai: {
-        reasoningEffort: 'high' // 'low' | 'medium' | 'high'
+        reasoningEffort: 'high' // 'none' | 'low' | 'medium' | 'high' | 'xhigh'
       }
     }
   }

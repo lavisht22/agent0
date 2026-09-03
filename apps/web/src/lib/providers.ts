@@ -1,4 +1,4 @@
-import { MODELS, type ProviderType } from "@repo/models";
+import { MODELS, type ProviderModel, type ProviderType } from "@repo/models";
 import {
 	AnthropicIcon,
 	AwsIcon,
@@ -9,18 +9,29 @@ import {
 	XaiIcon,
 } from "@/components/boxicons";
 
-export type { Model, ModelStatus, ProviderType } from "@repo/models";
+export type {
+	Model,
+	ModelStatus,
+	ProviderModel,
+	ProviderType,
+} from "@repo/models";
 export { MODELS } from "@repo/models";
 
+// `customModels` is a provider's own catalog; when present it is the only place
+// its models are described, so the built-in list is not consulted at all.
 export function getModelStatus(
 	providerType: string | undefined,
 	modelId: string,
+	customModels?: ProviderModel[] | null,
 ) {
+	if (customModels && customModels.length > 0) {
+		const custom = customModels.find((m) => m.id === modelId);
+		return custom ? (custom.status ?? "active") : undefined;
+	}
 	if (!providerType) return undefined;
 	const model = MODELS.find(
 		(m) =>
-			m.id === modelId &&
-			m.providers.includes(providerType as ProviderType),
+			m.id === modelId && m.providers.includes(providerType as ProviderType),
 	);
 	return model?.status;
 }

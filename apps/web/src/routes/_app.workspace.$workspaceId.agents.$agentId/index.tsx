@@ -656,10 +656,14 @@ function RouteComponent() {
 					<div className="border-b border-border">
 						<form.Subscribe selector={(state) => state.values.model}>
 							{(model) => {
-								const providerType = providers?.find(
+								const provider = providers?.find(
 									(p) => p.id === model.provider_id,
-								)?.type;
-								const status = getModelStatus(providerType, model.name);
+								);
+								const status = getModelStatus(
+									provider?.type,
+									model.name,
+									provider?.models,
+								);
 								if (status !== "deprecated" && status !== "retired")
 									return null;
 								const isRetired = status === "retired";

@@ -56,9 +56,20 @@ const stepMessages = (
  * - anthropic-vertex: Anthropic-style `cacheControl` (1h TTL)
  * - bedrock: Converse `cachePoint` (default 5m TTL — supported on all
  *   caching-capable Claude models; `1h` errors on models that don't support it)
+ *
+ * Bedrock hosts non-Anthropic models too, and an explicit `cachePoint` block is
+ * Anthropic-only there: Grok offers implicit caching only, and GPT-5.6 supports
+ * caching solely through the Responses API while this provider speaks Converse.
+ * The SDK pushes the block into the request without checking the model, so an
+ * ungated breakpoint fails the call. Non-Anthropic Bedrock models therefore get
+ * no breakpoint and fall back to whatever implicit caching the model offers.
  */
+const isBedrockAnthropicModel = (modelId: string): boolean =>
+	/(?:^|\.)anthropic\./.test(modelId);
+
 export const createPromptCachePrepareStep = (
 	providerType: string,
+	modelId: string,
 ): PrepareStepFunction<ToolSet> | undefined => {
 	if (providerType === "anthropic-vertex") {
 		return ({ initialMessages, responseMessages }) => ({
@@ -71,7 +82,7 @@ export const createPromptCachePrepareStep = (
 		});
 	}
 
-	if (providerType === "bedrock") {
+	if (providerType === "bedrock" && isBedrockAnthropicModel(modelId)) {
 		return ({ initialMessages, responseMessages }) => ({
 			messages: markLastMessageForCache(
 				stepMessages(initialMessages, responseMessages),

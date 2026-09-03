@@ -121,6 +121,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 		const {
 			model,
 			modelId,
+			modelCost,
 			finalMessages,
 			allTools,
 			prepareStep,
@@ -212,7 +213,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 					status: "success",
 					isStream: true,
 					isTest: true,
-					modelId,
+					modelCost,
 					usage: totalUsage,
 					runData,
 				});
@@ -254,7 +255,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 					status: "error",
 					isStream: true,
 					isTest: true,
-					modelId,
+					modelCost,
 					runData,
 				});
 			},
@@ -297,7 +298,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 					status: "aborted",
 					isStream: true,
 					isTest: true,
-					modelId,
+					modelCost,
 					usage: totalUsage,
 					runData,
 				});

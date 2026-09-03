@@ -9,6 +9,7 @@ import {
 	toast,
 	useOverlayState,
 } from "@heroui/react";
+import type { ProviderModel } from "@repo/models";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
@@ -28,7 +29,11 @@ import { TagsSelect } from "@/components/tags-select";
 import { getModelStatus, PROVIDER_TYPES } from "@/lib/providers";
 import { agentsQuery, deleteAgent, providersQuery } from "@/lib/queries";
 
-type ProviderForCell = { id: string; type: string };
+type ProviderForCell = {
+	id: string;
+	type: string;
+	models?: ProviderModel[] | null;
+};
 
 type ModelSummary = { provider_id: string; name: string } | null;
 
@@ -41,9 +46,10 @@ function ModelLine({
 	providers: ProviderForCell[];
 	label?: string;
 }) {
-	const providerType = providers.find((p) => p.id === model.provider_id)?.type;
+	const provider = providers.find((p) => p.id === model.provider_id);
+	const providerType = provider?.type;
 	const Icon = PROVIDER_TYPES.find((p) => p.key === providerType)?.icon;
-	const status = getModelStatus(providerType, model.name);
+	const status = getModelStatus(providerType, model.name, provider?.models);
 
 	return (
 		<div className="flex items-center gap-1.5 min-w-0">

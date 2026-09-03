@@ -3,6 +3,10 @@ import type { LanguageModelUsage } from "ai";
 
 const COSTS = new Map<string, ModelCost>(MODELS.map((m) => [m.id, m.cost]));
 
+/** Built-in catalog price, or null for a model the catalog doesn't list. */
+export const getCatalogCost = (modelId: string): ModelCost | null =>
+	COSTS.get(modelId) ?? null;
+
 export const sumUsage = (
 	steps: ReadonlyArray<{ usage: LanguageModelUsage }>,
 ): LanguageModelUsage => {
@@ -36,12 +40,12 @@ export const sumUsage = (
 	};
 };
 
-export const calculateModelCost = (
-	model: string,
+// Takes an already-resolved price rather than a model id: a custom model is
+// priced by the provider that serves it, so the id alone can't identify a cost.
+export const calculateRunCost = (
 	usage: LanguageModelUsage,
+	cost: ModelCost | null,
 ) => {
-	const cost = COSTS.get(model);
-
 	if (!cost) {
 		return null;
 	}
