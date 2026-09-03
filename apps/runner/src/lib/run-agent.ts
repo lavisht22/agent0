@@ -1,6 +1,7 @@
-import { type RunStatus, agents, agentVersions, runs } from "@repo/database";
+import { agents, agentVersions, type RunStatus, runs } from "@repo/database";
 import {
 	generateText,
+	isStepCount,
 	jsonSchema,
 	type LanguageModel,
 	type LanguageModelUsage,
@@ -8,7 +9,6 @@ import {
 	Output,
 	type PrepareStepFunction,
 	type StepResult,
-	stepCountIs,
 	type Tool,
 	type ToolSet,
 } from "ai";
@@ -107,6 +107,16 @@ export const buildAgentTools = (
 
 	return toolSet;
 };
+
+/**
+ * As of AI SDK 7 `step.response.messages` carries only that step's messages
+ * instead of the accumulated history, so the full transcript has to be rebuilt
+ * from the steps. Used on the abort paths, which expose `steps` but no
+ * `responseMessages`.
+ */
+export const collectResponseMessages = (
+	steps: ReadonlyArray<StepResult<ToolSet>>,
+): ModelMessage[] => steps.flatMap((step) => step.response.messages);
 
 export class RunPrepError extends Error {
 	code: number;
@@ -529,8 +539,11 @@ export const runAgent = async (
 			model,
 			maxOutputTokens: data.maxOutputTokens,
 			temperature: data.temperature,
-			stopWhen: stepCountIs(data.maxStepCount || 10),
+			stopWhen: isStepCount(data.maxStepCount || 10),
 			messages: finalMessages,
+			// Agent versions persist their system prompt as the leading message in
+			// `messages`; v7 rejects that unless it is explicitly opted into.
+			allowSystemInMessages: true,
 			tools: allTools,
 			output: data.outputFormat === "json" ? Output.json() : Output.text(),
 			providerOptions: data.providerOptions,
@@ -538,14 +551,15 @@ export const runAgent = async (
 			timeout: RUN_TIMEOUT,
 			abortSignal: opts.abortSignal,
 			...runLog.lifecycle,
-			onStepFinish: (step) => {
+			onStepEnd: (step) => {
 				collectedSteps.push(step as StepResult<ToolSet>);
-				runLog.onStepFinish(step as StepResult<ToolSet>);
+				runLog.onStepEnd(step as StepResult<ToolSet>);
 			},
 		});
 
-		const { response, text, steps, totalUsage } = result;
+		const { responseMessages, text, steps, usage: totalUsage } = result;
 		runData.steps = steps;
+		runData.responseMessages = responseMessages;
 		runData.totalUsage = totalUsage;
 
 		runLog.end("success", {
@@ -574,7 +588,7 @@ export const runAgent = async (
 
 		return {
 			text,
-			messages: response.messages,
+			messages: responseMessages,
 			steps,
 			usage: totalUsage,
 			runId,
@@ -585,6 +599,7 @@ export const runAgent = async (
 		const aborted = opts.abortSignal?.aborted ?? false;
 		const totalUsage = sumUsage(collectedSteps);
 		runData.steps = collectedSteps;
+		runData.responseMessages = collectResponseMessages(collectedSteps);
 		runData.totalUsage = totalUsage;
 		runData.error = aborted
 			? { name: "AbortError", message: "Run aborted by parent run" }

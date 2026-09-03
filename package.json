@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-     "dev": "pnpm -r --parallel --filter \"./apps/*\" run dev"
+    "dev": "pnpm -r --parallel --filter \"./apps/*\" run dev"
+  },
+  "engines": {
+    "node": ">=24"
   },
   "keywords": [],
   "author": "",

@@ -1,4 +1,4 @@
-import type { ModelMessage, PrepareStepFunction } from "ai";
+import type { ModelMessage, PrepareStepFunction, ToolSet } from "ai";
 
 type ProviderOptions = NonNullable<ModelMessage["providerOptions"]>;
 
@@ -35,6 +35,20 @@ const markLastMessageForCache = (
 };
 
 /**
+ * Rebuilds the step's message list from the untouched originals rather than
+ * from `messages`. As of AI SDK 7 a `messages` override returned by
+ * `prepareStep` carries forward into every later step, so re-marking the new
+ * last message on top of the previous step's output would leave the earlier
+ * breakpoint in place and accumulate one per step — Anthropic caps a request at
+ * four. `initialMessages + responseMessages` is the same list the SDK would
+ * have built on its own, minus our markers.
+ */
+const stepMessages = (
+	initialMessages: ModelMessage[],
+	responseMessages: ModelMessage[],
+): ModelMessage[] => [...initialMessages, ...responseMessages];
+
+/**
  * Returns a `prepareStep` callback that applies the correct cache breakpoint
  * for the provider on every agent step. Returns `undefined` for providers
  * without explicit prompt-cache support so callers can pass it through as-is.
@@ -45,20 +59,26 @@ const markLastMessageForCache = (
  */
 export const createPromptCachePrepareStep = (
 	providerType: string,
-): PrepareStepFunction | undefined => {
+): PrepareStepFunction<ToolSet> | undefined => {
 	if (providerType === "anthropic-vertex") {
-		return ({ messages }) => ({
-			messages: markLastMessageForCache(messages, {
-				anthropic: { cacheControl: { type: "ephemeral"} },
-			}),
+		return ({ initialMessages, responseMessages }) => ({
+			messages: markLastMessageForCache(
+				stepMessages(initialMessages, responseMessages),
+				{
+					anthropic: { cacheControl: { type: "ephemeral" } },
+				},
+			),
 		});
 	}
 
 	if (providerType === "bedrock") {
-		return ({ messages }) => ({
-			messages: markLastMessageForCache(messages, {
-				bedrock: { cachePoint: { type: "default" } },
-			}),
+		return ({ initialMessages, responseMessages }) => ({
+			messages: markLastMessageForCache(
+				stepMessages(initialMessages, responseMessages),
+				{
+					bedrock: { cachePoint: { type: "default" } },
+				},
+			),
 		});
 	}
 

@@ -1,8 +1,8 @@
 import { agentVersions, providers, workspaceUser } from "@repo/database";
 import {
+	isStepCount,
 	Output,
 	type StepResult,
-	stepCountIs,
 	streamText,
 	type ToolSet,
 } from "ai";
@@ -15,8 +15,12 @@ import { sumUsage } from "../lib/cost.js";
 import { createSSEStream } from "../lib/helpers.js";
 import { MetadataError, parseRunMetadata } from "../lib/metadata.js";
 import { db } from "../lib/pg.js";
-import { assembleRun, recordRun } from "../lib/run-agent.js";
-import { createRunLogger } from "../lib/run-logger.js";
+import {
+	assembleRun,
+	collectResponseMessages,
+	recordRun,
+} from "../lib/run-agent.js";
+import { createRunLogger, isContentChunk } from "../lib/run-logger.js";
 import { RUN_TIMEOUT } from "../lib/timeouts.js";
 import type { RunMetadata, VersionData } from "../lib/types.js";
 
@@ -156,8 +160,11 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			model,
 			maxOutputTokens,
 			temperature,
-			stopWhen: stepCountIs(maxStepCount || 10),
+			stopWhen: isStepCount(maxStepCount || 10),
 			messages: finalMessages,
+			// Agent versions persist their system prompt as the leading message;
+			// v7 rejects that unless explicitly opted into.
+			allowSystemInMessages: true,
 			tools: allTools as ToolSet,
 			output: outputFormat === "json" ? Output.json() : Output.text(),
 			providerOptions,
@@ -165,22 +172,24 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 			timeout: RUN_TIMEOUT,
 			abortSignal: controller.signal,
 			...runLog.lifecycle,
-			onChunk: () => {
+			onChunk: ({ chunk }) => {
+				if (!isContentChunk(chunk)) return;
 				runLog.onChunk();
 				if (!firstTokenTime) {
 					firstTokenTime = Date.now() - preProcessingTime - startTime;
 				}
 			},
-			onStepFinish: (step) => {
-				runLog.onStepFinish(step as StepResult<ToolSet>);
+			onStepEnd: (step) => {
+				runLog.onStepEnd(step as StepResult<ToolSet>);
 			},
-			onFinish: async ({ steps, totalUsage }) => {
+			onEnd: async ({ steps, responseMessages, usage: totalUsage }) => {
 				if (streamCompleted) return;
 				if (controller.signal.aborted) return;
 				streamCompleted = true;
 				closeAll();
 
 				runData.steps = steps;
+				runData.responseMessages = responseMessages;
 				runData.totalUsage = totalUsage;
 
 				runLog.end("success", {
@@ -261,6 +270,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 				const totalUsage = sumUsage(steps);
 
 				runData.steps = steps;
+				runData.responseMessages = collectResponseMessages(steps);
 				runData.totalUsage = totalUsage;
 				runData.error = {
 					name: "AbortError",

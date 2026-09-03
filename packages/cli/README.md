@@ -8,7 +8,7 @@ Command-line interface for [agent0](https://github.com/lavisht22/agent0) — the
 npm install -g agent0-cli
 ```
 
-The package installs an `agent0` binary. Requires Node 20+.
+The package installs an `agent0` binary. Requires Node 24+.
 
 ## Quick start
 

@@ -10,6 +10,9 @@
 		"dev": "tsc -w",
 		"prepublishOnly": "tsc"
 	},
+	"engines": {
+		"node": ">=24"
+	},
 	"keywords": [
 		"agent0",
 		"sdk",
@@ -19,14 +22,14 @@
 	"author": "",
 	"license": "ISC",
 	"devDependencies": {
-		"@types/node": "^20.0.0",
+		"@types/node": "^24.9.2",
 		"typescript": "^5.0.0"
 	},
 	"dependencies": {
-		"@ai-sdk/amazon-bedrock": "^4.0.108",
-		"@ai-sdk/google": "^3.0.79",
-		"@ai-sdk/openai": "^3.0.65",
-		"@ai-sdk/xai": "^3.0.92",
-		"ai": "^6.0.191"
+		"@ai-sdk/amazon-bedrock": "^5.0.73",
+		"@ai-sdk/google": "^4.0.63",
+		"@ai-sdk/openai": "^4.0.57",
+		"@ai-sdk/xai": "^4.0.54",
+		"ai": "^7.0.91"
 	}
 }

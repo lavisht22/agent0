@@ -145,6 +145,16 @@ function RouteComponent() {
 	);
 	const runData = run?.run_data ?? null;
 
+	// Runners on AI SDK 7+ persist the full transcript as `responseMessages`.
+	// Runs recorded before that only have `steps`, whose last entry's
+	// `response.messages` was the accumulated history back then.
+	const responseMessages =
+		runData?.responseMessages ??
+		(runData?.steps?.length
+			? (runData.steps[runData.steps.length - 1].response
+					.messages as MessageT[])
+			: undefined);
+
 	// Parent/child run lineage (agent-as-tool). Both enable only once their id
 	// is known, so they're safe to call unconditionally before the early returns.
 	const { data: parentRun } = useQuery(
@@ -547,12 +557,9 @@ function RouteComponent() {
 									</Chip>
 								}
 							>
-								{runData.steps && runData.steps.length > 0 ? (
+								{responseMessages && responseMessages.length > 0 ? (
 									<ReadOnlyMessages
-										messages={normalizeMessages(
-											runData.steps[runData.steps.length - 1].response
-												.messages as MessageT[],
-										)}
+										messages={normalizeMessages(responseMessages)}
 									/>
 								) : (
 									<p className="text-muted text-sm italic">

@@ -15,7 +15,7 @@
 		"prepublishOnly": "tsup"
 	},
 	"engines": {
-		"node": ">=20"
+		"node": ">=24"
 	},
 	"keywords": ["agent0", "cli", "ai", "agent", "llm", "prompt", "mcp"],
 	"license": "ISC",
@@ -35,7 +35,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.2.4",
-		"@types/node": "^22.19.1",
+		"@types/node": "^24.9.2",
 		"tsup": "^8.3.5",
 		"typescript": "^5.9.3"
 	}

@@ -1,5 +1,5 @@
 import { ReadableStream } from "node:stream/web";
-import { experimental_createMCPClient as createMCPClient } from "@ai-sdk/mcp";
+import { createMCPClient } from "@ai-sdk/mcp";
 import { mcps, providers } from "@repo/database";
 import {
 	jsonSchema,
@@ -317,7 +317,7 @@ export const createSSEStream = (
 
 			let downstreamClosed = false;
 			try {
-				for await (const part of result.fullStream) {
+				for await (const part of result.stream) {
 					if (downstreamClosed) break;
 					try {
 						controller.enqueue(
