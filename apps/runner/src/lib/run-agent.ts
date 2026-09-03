@@ -391,7 +391,7 @@ export const assembleRun = async (
 	runData.request = { ...data, messages: finalMessages };
 
 	const modelId = typeof model === "string" ? model : model.modelId;
-	const prepareStep = createPromptCachePrepareStep(providerType);
+	const prepareStep = createPromptCachePrepareStep(providerType, modelId);
 
 	return {
 		model,
