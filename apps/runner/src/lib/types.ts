@@ -1,4 +1,4 @@
-import type { GoogleGenerativeAIProviderOptions } from "@ai-sdk/google";
+import type { GoogleLanguageModelOptions } from "@ai-sdk/google";
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import type { XaiProviderOptions } from "@ai-sdk/xai";
 import type { LanguageModelUsage, ModelMessage, StepResult, ToolSet } from "ai";
@@ -6,8 +6,8 @@ import type { LanguageModelUsage, ModelMessage, StepResult, ToolSet } from "ai";
 export type ProviderOptions = {
 	openai?: OpenAIResponsesProviderOptions;
 	xai?: XaiProviderOptions;
-	google?: GoogleGenerativeAIProviderOptions;
-	vertex?: GoogleGenerativeAIProviderOptions;
+	google?: GoogleLanguageModelOptions;
+	vertex?: GoogleLanguageModelOptions;
 };
 
 export type MCPTool = {
@@ -74,6 +74,13 @@ export type RunData = {
 		overrides?: RunOverrides;
 	};
 	steps?: StepResult<ToolSet>[];
+	/**
+	 * The full assistant transcript for the run. Written since the AI SDK 7
+	 * upgrade, where `steps[last].response.messages` stopped accumulating across
+	 * steps. Absent on runs recorded before it, which the UI still reads the old
+	 * way.
+	 */
+	responseMessages?: ModelMessage[];
 	error?: {
 		name: string;
 		message: string;

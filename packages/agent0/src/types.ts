@@ -1,5 +1,5 @@
 import type { BedrockProviderOptions } from "@ai-sdk/amazon-bedrock";
-import type { GoogleGenerativeAIProviderOptions } from "@ai-sdk/google";
+import type { GoogleLanguageModelOptions } from "@ai-sdk/google";
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import type { XaiProviderOptions } from "@ai-sdk/xai";
 import type { embed, embedMany, ModelMessage } from "ai";
@@ -22,9 +22,9 @@ export interface ProviderOptions {
 	/** xAI reasoning effort options */
 	xai?: XaiProviderOptions;
 	/** Google Generative AI thinking configuration */
-	google?: GoogleGenerativeAIProviderOptions;
+	google?: GoogleLanguageModelOptions;
 	/** Google Vertex AI thinking configuration */
-	vertex?: GoogleGenerativeAIProviderOptions;
+	vertex?: GoogleLanguageModelOptions;
 	/** Amazon Bedrock thinking configuration */
 	bedrock?: BedrockProviderOptions;
 }

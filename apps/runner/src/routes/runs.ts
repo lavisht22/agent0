@@ -1,10 +1,10 @@
 import { agents, agentVersions, runs } from "@repo/database";
 import {
 	generateText,
+	isStepCount,
 	type ModelMessage,
 	Output,
 	type StepResult,
-	stepCountIs,
 	streamText,
 	type ToolSet,
 } from "ai";
@@ -16,13 +16,18 @@ import { sumUsage } from "../lib/cost.js";
 import { createSSEStream } from "../lib/helpers.js";
 import { MetadataError, parseRunMetadata } from "../lib/metadata.js";
 import { db } from "../lib/pg.js";
-import { prepareRun, RunPrepError, recordRun } from "../lib/run-agent.js";
+import {
+	collectResponseMessages,
+	prepareRun,
+	RunPrepError,
+	recordRun,
+} from "../lib/run-agent.js";
 import {
 	getRetentionSettings,
 	previewCleanup,
 	runCleanup,
 } from "../lib/run-cleanup.js";
-import { createRunLogger } from "../lib/run-logger.js";
+import { createRunLogger, isContentChunk } from "../lib/run-logger.js";
 import { hasScope, requireScope, requireUserId } from "../lib/scopes.js";
 import { runLogStore } from "../lib/storage.js";
 import { RUN_TIMEOUT } from "../lib/timeouts.js";
@@ -873,8 +878,11 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						model,
 						maxOutputTokens,
 						temperature,
-						stopWhen: stepCountIs(maxStepCount || 10),
+						stopWhen: isStepCount(maxStepCount || 10),
 						messages: finalMessages,
+						// Agent versions persist their system prompt as the leading
+						// message; v7 rejects that unless explicitly opted into.
+						allowSystemInMessages: true,
 						tools: allTools as ToolSet,
 						output: outputFormat === "json" ? Output.json() : Output.text(),
 						providerOptions,
@@ -882,17 +890,18 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						timeout: RUN_TIMEOUT,
 						abortSignal: controller.signal,
 						...runLog.lifecycle,
-						onChunk: () => {
+						onChunk: ({ chunk }) => {
+							if (!isContentChunk(chunk)) return;
 							runLog.onChunk();
 							if (!firstTokenTime) {
 								firstTokenTime = Date.now() - preProcessingTime - startTime;
 							}
 						},
-						onStepFinish: (step) => {
-							runLog.onStepFinish(step as StepResult<ToolSet>);
+						onStepEnd: (step) => {
+							runLog.onStepEnd(step as StepResult<ToolSet>);
 						},
 
-						onFinish: async ({ steps, totalUsage }) => {
+						onEnd: async ({ steps, responseMessages, usage: totalUsage }) => {
 							// Another terminal callback (onError/onAbort) may have already
 							// recorded this run.
 							if (streamCompleted) return;
@@ -905,6 +914,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 							closeAll();
 
 							runData.steps = steps;
+							runData.responseMessages = responseMessages;
 							runData.totalUsage = totalUsage;
 
 							runLog.end("success", {
@@ -991,6 +1001,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 							const totalUsage = sumUsage(steps);
 
 							runData.steps = steps;
+							runData.responseMessages = collectResponseMessages(steps);
 							runData.totalUsage = totalUsage;
 							runData.error = {
 								name: "AbortError",
@@ -1090,6 +1101,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 					const totalUsage = sumUsage(collectedSteps);
 					runData.steps = collectedSteps;
+					runData.responseMessages = collectResponseMessages(collectedSteps);
 					runData.totalUsage = totalUsage;
 					runData.error = {
 						name: "AbortError",
@@ -1132,8 +1144,11 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						model,
 						maxOutputTokens,
 						temperature,
-						stopWhen: stepCountIs(maxStepCount || 10),
+						stopWhen: isStepCount(maxStepCount || 10),
 						messages: finalMessages,
+						// Agent versions persist their system prompt as the leading
+						// message; v7 rejects that unless explicitly opted into.
+						allowSystemInMessages: true,
 						tools: allTools as ToolSet,
 						output: outputFormat === "json" ? Output.json() : Output.text(),
 						providerOptions,
@@ -1141,9 +1156,9 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						timeout: RUN_TIMEOUT,
 						abortSignal: controller.signal,
 						...runLog.lifecycle,
-						onStepFinish: (step) => {
+						onStepEnd: (step) => {
 							collectedSteps.push(step as StepResult<ToolSet>);
-							runLog.onStepFinish(step as StepResult<ToolSet>);
+							runLog.onStepEnd(step as StepResult<ToolSet>);
 						},
 					});
 					completed = true;
@@ -1152,8 +1167,9 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 					if (recorded) return;
 					recorded = true;
 
-					const { response, text, steps, totalUsage } = result;
+					const { responseMessages, text, steps, usage: totalUsage } = result;
 					runData.steps = steps;
+					runData.responseMessages = responseMessages;
 					runData.totalUsage = totalUsage;
 
 					runLog.end("success", {
@@ -1181,7 +1197,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 					return reply.send({
 						text,
-						messages: response.messages,
+						messages: responseMessages,
 					});
 				} catch (error) {
 					completed = true;

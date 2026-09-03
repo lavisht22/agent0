@@ -1,4 +1,11 @@
-import type { StepResult, ToolSet } from "ai";
+import type {
+	GenerateTextStepStartEvent,
+	StepResult,
+	TextStreamPart,
+	ToolExecutionEndEvent,
+	ToolExecutionStartEvent,
+	ToolSet,
+} from "ai";
 import { RUN_TIMEOUT } from "./timeouts.js";
 
 export type RunLogContext = {
@@ -21,6 +28,28 @@ const toolNamesFromStep = (step: StepResult<ToolSet>): string[] => {
 	}
 	return names;
 };
+
+/**
+ * v7 hands `onChunk` every stream part, including lifecycle/boundary/finish
+ * parts. Only the parts that carry model output count as activity, so
+ * `first_chunk` and `sinceActivityMs` keep measuring time-to-first-token rather
+ * than time-to-stream-open.
+ */
+const CONTENT_CHUNK_TYPES = new Set<TextStreamPart<ToolSet>["type"]>([
+	"text-delta",
+	"reasoning-delta",
+	"source",
+	"file",
+	"reasoning-file",
+	"tool-input-start",
+	"tool-input-delta",
+	"tool-call",
+	"tool-result",
+	"raw",
+]);
+
+export const isContentChunk = (chunk: TextStreamPart<ToolSet>): boolean =>
+	CONTENT_CHUNK_TYPES.has(chunk.type);
 
 /**
  * Structured JSON logs for multi-step agent runs. Grep docker logs with:
@@ -97,14 +126,11 @@ export const createRunLogger = (ctx: RunLogContext) => {
 
 	/** Spread into streamText / generateText for lifecycle hooks. */
 	const lifecycle = {
-		experimental_onStart: () => {
+		onStart: () => {
 			touch();
 			log("generation_start");
 		},
-		experimental_onStepStart: (event: {
-			stepNumber: number;
-			messages: unknown[];
-		}) => {
+		onStepStart: (event: GenerateTextStepStartEvent<ToolSet>) => {
 			currentStep = event.stepNumber;
 			currentTool = undefined;
 			currentToolCallId = undefined;
@@ -114,47 +140,42 @@ export const createRunLogger = (ctx: RunLogContext) => {
 				messageCount: event.messages?.length,
 			});
 		},
-		experimental_onToolCallStart: (event: {
-			stepNumber: number | undefined;
-			toolCall: { toolName: string; toolCallId: string };
-		}) => {
-			currentStep = event.stepNumber ?? currentStep;
+		// v7 dropped `stepNumber` from the tool-execution events; tool calls only
+		// run inside a step, so the value tracked by onStepStart is the same one.
+		onToolExecutionStart: (event: ToolExecutionStartEvent<ToolSet>) => {
 			currentTool = event.toolCall.toolName;
 			currentToolCallId = event.toolCall.toolCallId;
 			touch();
 			log("tool_start", {
-				stepNumber: event.stepNumber,
+				stepNumber: currentStep,
 				toolName: event.toolCall.toolName,
 				toolCallId: event.toolCall.toolCallId,
 			});
 		},
-		experimental_onToolCallFinish: (event: {
-			stepNumber: number | undefined;
-			toolCall: { toolName: string; toolCallId: string };
-			durationMs: number;
-			success: boolean;
-			error?: unknown;
-		}) => {
+		onToolExecutionEnd: (event: ToolExecutionEndEvent<ToolSet>) => {
 			touch();
+			// v7 replaced the `success`/`error` pair with a discriminated
+			// `toolOutput`, and `durationMs` with `toolExecutionMs`.
+			const failed = event.toolOutput.type === "tool-error";
+			const error = failed ? event.toolOutput.error : undefined;
 			log("tool_finish", {
-				stepNumber: event.stepNumber,
+				stepNumber: currentStep,
 				toolName: event.toolCall.toolName,
 				toolCallId: event.toolCall.toolCallId,
-				success: event.success,
-				durationMs: event.durationMs,
-				error:
-					event.success === false
-						? event.error instanceof Error
-							? { name: event.error.name, message: event.error.message }
-							: String(event.error)
-						: undefined,
+				success: !failed,
+				durationMs: event.toolExecutionMs,
+				error: failed
+					? error instanceof Error
+						? { name: error.name, message: error.message }
+						: String(error)
+					: undefined,
 			});
 			currentTool = undefined;
 			currentToolCallId = undefined;
 		},
 	};
 
-	const onStepFinish = (step: StepResult<ToolSet>) => {
+	const onStepEnd = (step: StepResult<ToolSet>) => {
 		touch();
 		currentStep = step.stepNumber ?? currentStep;
 		log("step_finish", {
@@ -197,7 +218,7 @@ export const createRunLogger = (ctx: RunLogContext) => {
 		end,
 		onAbortSignal,
 		lifecycle,
-		onStepFinish,
+		onStepEnd,
 		onChunk,
 		onError,
 	};

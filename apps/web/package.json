@@ -13,6 +13,9 @@
 		"lint": "biome lint",
 		"check": "biome check"
 	},
+	"engines": {
+		"node": ">=24"
+	},
 	"dependencies": {
 		"@heroui/react": "^3.0.3",
 		"@heroui/styles": "^3.0.3",
@@ -27,7 +30,7 @@
 		"@tanstack/react-router": "^1.132.0",
 		"@tanstack/react-router-devtools": "^1.132.0",
 		"@tanstack/router-plugin": "^1.132.0",
-		"ai": "^6.0.191",
+		"ai": "^7.0.91",
 		"better-auth": "1.6.14",
 		"date-fns": "^4.1.0",
 		"fetch-event-stream": "^0.1.6",
@@ -46,7 +49,7 @@
 		"@tanstack/devtools-vite": "^0.3.11",
 		"@testing-library/dom": "^10.4.0",
 		"@testing-library/react": "^16.2.0",
-		"@types/node": "^22.10.2",
+		"@types/node": "^24.9.2",
 		"@types/react": "^19.2.0",
 		"@types/react-dom": "^19.2.0",
 		"@vitejs/plugin-react": "^5.0.4",

@@ -1,4 +1,4 @@
-FROM node:20-slim AS base
+FROM node:24-slim AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
@@ -10,7 +10,7 @@ RUN corepack enable
 # NOTE: this derives from the external node image directly, not `base`. The
 # --platform pin is only honored against an external image; `FROM base` would
 # inherit the per-target platform and silently run the build twice.
-FROM --platform=$BUILDPLATFORM node:20-slim AS build
+FROM --platform=$BUILDPLATFORM node:24-slim AS build
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable

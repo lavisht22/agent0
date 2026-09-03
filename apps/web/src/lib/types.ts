@@ -35,6 +35,12 @@ export type RunData = {
 		providerOptions?: Record<string, unknown>;
 	};
 	steps?: StepResult<ToolSet>[];
+	/**
+	 * The full assistant transcript. Written by runners on AI SDK 7+, where
+	 * `steps[last].response.messages` stopped accumulating across steps. Absent
+	 * on runs recorded before that, which fall back to the old shape.
+	 */
+	responseMessages?: MessageT[];
 	totalUsage?: LanguageModelUsage;
 	error?: {
 		name: string;

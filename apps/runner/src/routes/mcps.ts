@@ -1,4 +1,4 @@
-import { experimental_createMCPClient as createMCPClient } from "@ai-sdk/mcp";
+import { createMCPClient } from "@ai-sdk/mcp";
 import { mcps } from "@repo/database";
 import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
@@ -26,7 +26,11 @@ async function fetchToolsForEnv(encrypted: string): Promise<ToolEntry[]> {
 		const tools = await client.tools();
 		return Object.entries(tools).map(([name, tool]) => ({
 			name,
-			description: tool.description,
+			// v7 allows a tool description to be a context-resolved function. MCP
+			// servers advertise plain strings; anything else has no static text to
+			// catalogue, so it is stored without one.
+			description:
+				typeof tool.description === "string" ? tool.description : undefined,
 		}));
 	} finally {
 		await client.close();
