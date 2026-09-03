@@ -15,6 +15,17 @@ export type ModelCost = {
 	output: number;
 };
 
+// A model contributed by a single provider row instead of the built-in catalog
+// below. Which provider serves it is implied by the row it hangs off, so a
+// custom entry carries only what the app reads back: the id sent to the
+// provider, and the cost used for run accounting.
+export type ProviderModel = {
+	id: string;
+	cost: ModelCost;
+	status?: ModelStatus;
+	releaseDate?: string;
+};
+
 export type Model = {
 	id: string;
 	providers: ProviderType[];

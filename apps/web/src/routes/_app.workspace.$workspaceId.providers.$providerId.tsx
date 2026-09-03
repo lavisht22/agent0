@@ -11,13 +11,16 @@ import {
 	TextField,
 	toast,
 } from "@heroui/react";
+import type { ProviderModel } from "@repo/models";
 import { useForm } from "@tanstack/react-form";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Pencil, ShieldAlert } from "lucide-react";
 import { useState } from "react";
+import { FormSection } from "@/components/form-section";
 import { MonacoJsonField } from "@/components/monaco-json-field";
 import { PageHeader } from "@/components/page-header";
+import { ProviderModelsField } from "@/components/provider-models-field";
 import { PROVIDER_TYPES } from "@/lib/providers";
 import { createProvider, providersQuery, updateProvider } from "@/lib/queries";
 
@@ -45,6 +48,18 @@ function validateJsonField(value: string) {
 	} catch (e) {
 		return e instanceof Error ? e.message : "Invalid JSON format";
 	}
+}
+
+// Empty is valid: the provider then uses the built-in catalog for its type.
+function validateModelsField(models: ProviderModel[]) {
+	const seen = new Set<string>();
+	for (const model of models) {
+		const id = model.id.trim();
+		if (id === "") return "Every model needs an ID";
+		if (seen.has(id)) return `Duplicate model ID "${id}"`;
+		seen.add(id);
+	}
+	return undefined;
 }
 
 function RouteComponent() {
@@ -88,12 +103,14 @@ function RouteComponent() {
 			data_production: string;
 			data_staging: string;
 			usePerEnvConfig: boolean;
+			models: ProviderModel[];
 		}) => {
 			await createProvider(workspaceId, {
 				name: values.name,
 				type: values.type,
 				data_production: values.data_production,
 				data_staging: values.usePerEnvConfig ? values.data_staging : null,
+				models: values.models,
 			});
 		},
 		onSuccess: () => {
@@ -120,15 +137,20 @@ function RouteComponent() {
 			usePerEnvConfig: boolean;
 			updateProduction: boolean;
 			updateStaging: boolean;
+			models: ProviderModel[];
 		}) => {
 			const updatePayload: {
 				name: string;
 				type: string;
 				data_production?: string;
 				data_staging?: string | null;
+				models?: ProviderModel[];
 			} = {
 				name: values.name,
 				type: values.type,
+				// Always sent: an emptied field is how you drop back to the
+				// built-in catalog.
+				models: values.models,
 			};
 
 			if (values.updateProduction) {
@@ -167,6 +189,7 @@ function RouteComponent() {
 			type: currentProvider?.type || "",
 			data_production: DEFAULT_CONFIG,
 			data_staging: DEFAULT_CONFIG,
+			models: currentProvider?.models ?? [],
 		},
 		onSubmit: async ({ value }) => {
 			if (isNewProvider) {
@@ -210,7 +233,7 @@ function RouteComponent() {
 							e.stopPropagation();
 							form.handleSubmit();
 						}}
-						className="space-y-4"
+						className="space-y-6"
 					>
 						<form.Field
 							name="name"
@@ -291,26 +314,20 @@ function RouteComponent() {
 							)}
 						</form.Field>
 
-						<div className="flex items-start justify-between rounded-lg border border-border p-4">
-							<div className="pr-4">
-								<p className="text-sm font-medium text-foreground">
-									Use different config for staging
-								</p>
-								<p className="text-xs text-muted mt-1">
-									When enabled, you can provide a separate configuration that
-									the runner will use for staging requests. Otherwise the
-									production config is used for both environments.
-								</p>
-							</div>
-							<Switch
-								isSelected={usePerEnvConfig}
-								onChange={handleTogglePerEnv}
-							>
-								<Switch.Control>
-									<Switch.Thumb />
-								</Switch.Control>
-							</Switch>
-						</div>
+						<FormSection
+							title="Use different config for staging"
+							description="When enabled, you can provide a separate configuration that the runner will use for staging requests. Otherwise the production config is used for both environments."
+							action={
+								<Switch
+									isSelected={usePerEnvConfig}
+									onChange={handleTogglePerEnv}
+								>
+									<Switch.Control>
+										<Switch.Thumb />
+									</Switch.Control>
+								</Switch>
+							}
+						/>
 
 						<ConfigSection
 							title={
@@ -386,6 +403,20 @@ function RouteComponent() {
 							</ConfigSection>
 						)}
 
+						<form.Field
+							name="models"
+							validators={{
+								onChange: ({ value }) => validateModelsField(value),
+							}}
+						>
+							{(field) => (
+								<ProviderModelsField
+									value={field.state.value}
+									onValueChange={field.handleChange}
+								/>
+							)}
+						</form.Field>
+
 						<div className="flex justify-end gap-3">
 							<Button
 								variant="tertiary"
@@ -448,17 +479,15 @@ function ConfigSection({
 }: ConfigSectionProps) {
 	if (isNew) {
 		return (
-			<div className="space-y-2">
-				<p className="text-sm font-medium text-foreground">{title}</p>
+			<FormSection title={title} description={helpText}>
 				{children}
-			</div>
+			</FormSection>
 		);
 	}
 
 	if (isExpanded) {
 		return (
-			<div className="space-y-3">
-				<p className="text-sm font-medium text-foreground">{title}</p>
+			<FormSection title={title} description={helpText}>
 				<div className="flex items-center gap-2 rounded-lg bg-warning-soft px-3 py-2 text-warning text-sm">
 					<ShieldAlert className="size-4 shrink-0" />
 					<span>
@@ -467,25 +496,20 @@ function ConfigSection({
 					</span>
 				</div>
 				{children}
-			</div>
+			</FormSection>
 		);
 	}
 
 	return (
-		<div className="rounded-lg border border-border p-4">
-			<div className="flex items-center justify-between">
-				<div>
-					<p className="text-sm font-medium text-foreground">{title}</p>
-					<p className="text-xs text-muted mt-1">
-						{helpText} The configuration is stored encrypted. Click edit to
-						replace it with a new config.
-					</p>
-				</div>
+		<FormSection
+			title={title}
+			description={`${helpText} The configuration is stored encrypted. Click edit to replace it with a new config.`}
+			action={
 				<Button size="sm" variant="tertiary" onPress={onEdit}>
 					<Pencil className="size-3" />
 					Edit Config
 				</Button>
-			</div>
-		</div>
+			}
+		/>
 	);
 }

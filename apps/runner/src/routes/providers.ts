@@ -1,4 +1,5 @@
 import { providers } from "@repo/database";
+import type { ProviderModel } from "@repo/models";
 import { and, desc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
@@ -14,6 +15,7 @@ const providerColumns = {
 	created_at: providers.created_at,
 	updated_at: providers.updated_at,
 	encrypted_data_staging: providers.encrypted_data_staging,
+	models: providers.models,
 };
 
 function toProvider(row: {
@@ -23,6 +25,7 @@ function toProvider(row: {
 	created_at: string;
 	updated_at: string;
 	encrypted_data_staging: string | null;
+	models: ProviderModel[] | null;
 }) {
 	const { encrypted_data_staging, created_at, updated_at, ...rest } = row;
 	return {
@@ -33,6 +36,32 @@ function toProvider(row: {
 	};
 }
 
+// A custom model entry. `cost` is required because run accounting has no other
+// source of truth for a model the built-in catalog doesn't list.
+const ModelSchema = {
+	type: "object" as const,
+	properties: {
+		id: { type: "string" as const, minLength: 1 },
+		status: {
+			type: "string" as const,
+			enum: ["active", "deprecated", "retired"],
+		},
+		releaseDate: { type: "string" as const },
+		cost: {
+			type: "object" as const,
+			properties: {
+				noCacheInput: { type: "number" as const, minimum: 0 },
+				cacheInput: { type: "number" as const, minimum: 0 },
+				output: { type: "number" as const, minimum: 0 },
+			},
+			required: ["noCacheInput", "cacheInput", "output"],
+			additionalProperties: false,
+		},
+	},
+	required: ["id", "cost"],
+	additionalProperties: false,
+};
+
 const ProviderSchema = {
 	type: "object" as const,
 	properties: {
@@ -42,6 +71,7 @@ const ProviderSchema = {
 		has_staging_config: { type: "boolean" as const },
 		created_at: { type: "string" as const, format: "date-time" },
 		updated_at: { type: "string" as const, format: "date-time" },
+		models: { type: "array" as const, items: ModelSchema, nullable: true },
 	},
 };
 
@@ -101,6 +131,7 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 						minLength: 1,
 						nullable: true,
 					},
+					models: { type: "array" as const, items: ModelSchema },
 				},
 				required: ["name", "type", "data_production"],
 				additionalProperties: false,
@@ -116,12 +147,14 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 		},
 		handler: async (request, reply) => {
 			const { workspaceId } = request.params as { workspaceId: string };
-			const { name, type, data_production, data_staging } = request.body as {
-				name: string;
-				type: string;
-				data_production: string;
-				data_staging?: string | null;
-			};
+			const { name, type, data_production, data_staging, models } =
+				request.body as {
+					name: string;
+					type: string;
+					data_production: string;
+					data_staging?: string | null;
+					models?: ProviderModel[];
+				};
 
 			const trimmedName = name.trim();
 			if (trimmedName.length === 0) {
@@ -139,6 +172,7 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 						encrypted_data_production: encryptSecret(data_production),
 						encrypted_data_staging:
 							data_staging != null ? encryptSecret(data_staging) : null,
+						models: models ?? null,
 					})
 					.returning(providerColumns);
 
@@ -175,6 +209,9 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 						minLength: 1,
 						nullable: true,
 					},
+					// An empty array drops back to the built-in catalog; omitting
+					// leaves the current list untouched.
+					models: { type: "array" as const, items: ModelSchema },
 				},
 				additionalProperties: false,
 			},
@@ -198,6 +235,7 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 				type?: string;
 				data_production?: string;
 				data_staging?: string | null;
+				models?: ProviderModel[];
 			};
 
 			const updates: Partial<typeof providers.$inferInsert> = {};
@@ -209,6 +247,9 @@ export async function registerProvidersRoutes(fastify: FastifyInstance) {
 				updates.name = trimmedName;
 			}
 			if (body.type !== undefined) updates.type = body.type;
+			if (body.models !== undefined) {
+				updates.models = body.models.length > 0 ? body.models : null;
+			}
 			if (body.data_production !== undefined) {
 				updates.encrypted_data_production = encryptSecret(body.data_production);
 			}
