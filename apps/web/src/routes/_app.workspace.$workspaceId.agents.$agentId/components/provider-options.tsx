@@ -30,11 +30,11 @@ type BedrockReasoningConfig = {
 
 export type ProviderOptionsValue = {
 	openai?: {
-		reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+		reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
 		reasoningSummary?: "auto" | "detailed";
 	};
 	xai?: {
-		reasoningEffort?: "low" | "medium" | "high";
+		reasoningEffort?: "none" | "low" | "medium" | "high" | "xhigh";
 	};
 	google?: GoogleVertexOptionsValue;
 	vertex?: GoogleVertexOptionsValue;
@@ -396,6 +396,7 @@ export function ProviderOptions({
 										| "low"
 										| "medium"
 										| "high"
+										| "xhigh"
 										| undefined,
 								},
 							});
@@ -427,6 +428,9 @@ export function ProviderOptions({
 								</ListBox.Item>
 								<ListBox.Item id="high" textValue="High">
 									High
+								</ListBox.Item>
+								<ListBox.Item id="xhigh" textValue="Extra High">
+									Extra High
 								</ListBox.Item>
 							</ListBox>
 						</Select.Popover>
@@ -479,9 +483,11 @@ export function ProviderOptions({
 							...value,
 							xai: {
 								reasoningEffort: selected as
+									| "none"
 									| "low"
 									| "medium"
 									| "high"
+									| "xhigh"
 									| undefined,
 							},
 						});
@@ -495,6 +501,9 @@ export function ProviderOptions({
 					</Select.Trigger>
 					<Select.Popover>
 						<ListBox>
+							<ListBox.Item id="none" textValue="None">
+								None
+							</ListBox.Item>
 							<ListBox.Item id="low" textValue="Low">
 								Low
 							</ListBox.Item>
@@ -503,6 +512,9 @@ export function ProviderOptions({
 							</ListBox.Item>
 							<ListBox.Item id="high" textValue="High">
 								High
+							</ListBox.Item>
+							<ListBox.Item id="xhigh" textValue="Extra High">
+								Extra High
 							</ListBox.Item>
 						</ListBox>
 					</Select.Popover>

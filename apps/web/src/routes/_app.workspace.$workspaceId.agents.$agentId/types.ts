@@ -46,13 +46,15 @@ export const agentFormSchema = z.object({
 		openai: z
 			.object({
 				reasoningEffort: z
-					.enum(["none", "minimal", "low", "medium", "high"])
+					.enum(["none", "minimal", "low", "medium", "high", "xhigh"])
 					.optional(),
 			})
 			.optional(),
 		xai: z
 			.object({
-				reasoningEffort: z.enum(["low", "medium", "high"]).optional(),
+				reasoningEffort: z
+					.enum(["none", "low", "medium", "high", "xhigh"])
+					.optional(),
 			})
 			.optional(),
 		google: z
