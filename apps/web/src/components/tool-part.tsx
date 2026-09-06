@@ -8,6 +8,12 @@ import {
 	Wrench,
 } from "lucide-react";
 import { useState } from "react";
+import {
+	formatBase64Size,
+	imageSrc,
+	isImageMediaType,
+	resolveFileData,
+} from "@/lib/file-data";
 import type { AssistantMessageT } from "./assistant-message";
 import type { ToolMessageT } from "./tool-message";
 
@@ -18,10 +24,13 @@ type ToolCallPart = Extract<
 type ToolResultPart = ToolMessageT["content"][number];
 
 // One part of a `content`-type result (the multi-part shape MCP servers
-// return). v3 uses `file-data`, older payloads use `media`.
+// return). AI SDK v7 emits `file` with a tagged `data` union; before it the
+// part was `file-data` (and `media` earlier still) with a bare base64 string.
+// Run logs hold every one of those shapes, so `data` is read as unknown and
+// normalized by `resolveFileData`.
 type ToolContentItem =
 	| { type: "text"; text: string }
-	| { type: "file-data" | "media"; data: string; mediaType: string };
+	| { type: "file" | "file-data" | "media"; data: unknown; mediaType?: string };
 
 // AI SDK tool-result output envelope. The model output is always wrapped as
 // `{ type, value }`.
@@ -88,25 +97,33 @@ function TextBlock({ text }: { text: string }) {
 	);
 }
 
-function imageSrc(data: string, mediaType: string) {
-	if (data.startsWith("data:") || data.startsWith("http")) return data;
-	return `data:${mediaType || "image/png"};base64,${data}`;
-}
-
-function FilePart({
+export function FilePart({
 	data,
 	mediaType,
 	filename,
 }: {
-	data: string;
-	mediaType: string;
+	data: unknown;
+	mediaType?: string;
 	filename?: string;
 }) {
-	if (mediaType?.startsWith("image/")) {
+	const file = resolveFileData(data);
+
+	// Raw bytes or a provider reference — nothing to render on its own, so show
+	// the payload rather than breaking the whole message list.
+	if (!file) {
+		return <JsonBlock value={data} />;
+	}
+
+	// A tagged `{ type: "text" }` file is an inline text document.
+	if (file.kind === "text") {
+		return <TextBlock text={file.value} />;
+	}
+
+	if (isImageMediaType(mediaType)) {
 		return (
 			<div className="bg-surface-secondary w-full rounded-[10px] p-2 flex justify-center items-center">
 				<img
-					src={imageSrc(data, mediaType)}
+					src={imageSrc(file, mediaType)}
 					alt={filename || "Tool output"}
 					className="max-w-full max-h-72 object-contain"
 				/>
@@ -114,9 +131,7 @@ function FilePart({
 		);
 	}
 
-	const approxKb = data ? Math.round((data.length * 3) / 4 / 1024) : 0;
-	const size =
-		approxKb > 1024 ? `${(approxKb / 1024).toFixed(2)} MB` : `${approxKb} KB`;
+	const size = file.kind === "base64" ? formatBase64Size(file.value) : null;
 
 	return (
 		<div className="bg-surface-secondary w-full rounded-[10px] p-3 flex items-center gap-3">
@@ -127,7 +142,18 @@ function FilePart({
 				<p className="text-sm font-medium text-foreground truncate">
 					{filename || mediaType || "File"}
 				</p>
-				{approxKb > 0 && <p className="text-xs text-muted">{size}</p>}
+				{file.kind === "url" ? (
+					<a
+						href={file.value}
+						target="_blank"
+						rel="noreferrer"
+						className="text-xs text-muted hover:underline break-all"
+					>
+						{file.value}
+					</a>
+				) : (
+					size && <p className="text-xs text-muted">{size}</p>
+				)}
 			</div>
 		</div>
 	);
@@ -221,16 +247,26 @@ function ToolResultBody({ output }: { output: ToolOutput }) {
 			return (
 				<div className="space-y-2">
 					{((output.value ?? []) as ToolContentItem[]).map((item, index) => {
-						if (item.type === "text") {
-							return <TextBlock key={`${index + 1}`} text={item.text} />;
+						if (item?.type === "text") {
+							return (
+								<TextBlock
+									key={`${index + 1}`}
+									text={String(item.text ?? "")}
+								/>
+							);
 						}
-						return (
-							<FilePart
-								key={`${index + 1}`}
-								data={item.data}
-								mediaType={item.mediaType}
-							/>
-						);
+
+						if (item && typeof item === "object" && "data" in item) {
+							return (
+								<FilePart
+									key={`${index + 1}`}
+									data={item.data}
+									mediaType={item.mediaType}
+								/>
+							);
+						}
+
+						return <JsonBlock key={`${index + 1}`} value={item} />;
 					})}
 				</div>
 			);

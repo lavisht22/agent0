@@ -13,6 +13,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { format } from "date-fns";
 import { Code, FlaskConical, LucideInfo, RotateCcw } from "lucide-react";
 import type { ReactNode } from "react";
+import { ErrorBoundary } from "@/components/error-boundary";
 import {
 	Messages,
 	type MessageT,
@@ -89,14 +90,22 @@ function Stat({
 
 // Read-only messages. Long text parts cap their own height and scroll inside
 // the card (see the message components); tool calls stay fully visible.
-function ReadOnlyMessages({ messages }: { messages: MessageT[] }) {
+function ReadOnlyMessages({
+	title,
+	messages,
+}: {
+	title: string;
+	messages: MessageT[];
+}) {
 	return (
-		<Messages
-			value={messages}
-			onValueChange={() => {}}
-			isReadOnly
-			onVariablePress={() => {}}
-		/>
+		<ErrorBoundary title={title}>
+			<Messages
+				value={messages}
+				onValueChange={() => {}}
+				isReadOnly
+				onVariablePress={() => {}}
+			/>
+		</ErrorBoundary>
 	);
 }
 
@@ -538,6 +547,7 @@ function RouteComponent() {
 									{runData.request?.messages &&
 									runData.request.messages.length > 0 ? (
 										<ReadOnlyMessages
+											title="Could not render the request messages"
 											messages={normalizeMessages(runData.request.messages)}
 										/>
 									) : (
@@ -559,6 +569,7 @@ function RouteComponent() {
 							>
 								{responseMessages && responseMessages.length > 0 ? (
 									<ReadOnlyMessages
+										title="Could not render the response messages"
 										messages={normalizeMessages(responseMessages)}
 									/>
 								) : (

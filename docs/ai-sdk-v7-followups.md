@@ -33,9 +33,16 @@ of it.
 
 Worth recording so nobody re-investigates these:
 
-- **Tool output `media` parts** — `apps/web/src/components/tool-part.tsx` already
-  accepts `{ type: "file-data" | "media" }`. v7 renamed `media` → `file-data`;
-  the app handled both before the upgrade.
+- **Tool output file parts** — ~~`apps/web/src/components/tool-part.tsx` already
+  accepts `{ type: "file-data" | "media" }`~~ **This was wrong, and it broke the
+  run viewer.** v7 emits a third shape: `{ type: "file", mediaType, data }`
+  where `data` is the tagged union (`{ type: "data", data }`, `{ type: "url",
+  url }`, …), not a bare base64 string. Reading it as a string threw
+  `data.startsWith is not a function`, which took down the whole run detail
+  page for any run whose tools returned a file. Fixed by `resolveFileData` in
+  `apps/web/src/lib/file-data.ts`, which normalizes every shape; the read-only
+  message lists are also wrapped in an error boundary so a future unknown shape
+  degrades to one section instead of a blank page.
 - **Assistant content parts** — `assistant-message.tsx` already uses `file`,
   never `image`.
 - **CLI and SDK packages** — `packages/cli` passes messages through as

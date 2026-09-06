@@ -25,6 +25,14 @@ export const toolMessageSchema = z.object({
 
 type ToolMessageContent = z.infer<typeof toolMessageSchema>["content"];
 
+// `output` is stored as-is from the provider, so its `type` can be missing or
+// non-string on hand-edited or older payloads.
+function isErrorOutput(output: unknown): boolean {
+	const type = (output as { type?: unknown } | null)?.type;
+
+	return typeof type === "string" && type.startsWith("error");
+}
+
 function ToolMessagePart({
 	isReadOnly,
 	value,
@@ -43,11 +51,7 @@ function ToolMessagePart({
 			<div
 				className={cn(
 					"border border-border overflow-hidden rounded-[14px] w-full space-y-2",
-					(value.output as { type: string; value: unknown })?.type.startsWith(
-						"error",
-					)
-						? "border-danger"
-						: "",
+					isErrorOutput(value.output) ? "border-danger" : "",
 				)}
 			>
 				<MonacoJsonEditor

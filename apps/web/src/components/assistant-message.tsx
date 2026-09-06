@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { z } from "zod";
 import { MonacoJsonEditor } from "./monaco-json-editor";
-import { ToolCallView } from "./tool-part";
+import { FilePart, ToolCallView } from "./tool-part";
 import { Variables } from "./variables";
 
 export const assistantMessageSchema = z.object({
@@ -98,6 +98,18 @@ function AssistantMessagePart({
 					}}
 				/>
 			</div>
+		);
+	}
+
+	// Files the model produced (e.g. generated images). Read-only either way —
+	// there is nothing to edit about the bytes.
+	if (value.type === "file") {
+		return (
+			<FilePart
+				data={value.data}
+				mediaType={value.mediaType}
+				filename={value.fileName}
+			/>
 		);
 	}
 

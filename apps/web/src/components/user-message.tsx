@@ -19,6 +19,12 @@ import {
 import { useMemo, useRef, useState } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { z } from "zod";
+import {
+	formatBase64Size,
+	imageSrc,
+	isImageMediaType,
+	resolveFileData,
+} from "@/lib/file-data";
 import { Variables } from "./variables";
 
 export const userMessageSchema = z.object({
@@ -79,16 +85,18 @@ function UserMessagePart({
 	}
 
 	if (value.type === "image") {
-		const imageSrc = value.image.startsWith("data:")
-			? value.image
-			: value.image.startsWith("http")
-				? value.image
-				: `data:${value.mediaType || "image/png"};base64,${value.image}`;
+		// v7 may wrap the bytes as `{ type: "data", data }`; older parts (and
+		// everything the editor writes) store a bare base64 string or URL.
+		const file = resolveFileData(value.image);
+
+		if (!file) {
+			return null;
+		}
 
 		return (
 			<div className="bg-surface-secondary w-full rounded-[14px] p-2 flex justify-center items-center">
 				<img
-					src={imageSrc}
+					src={imageSrc(file, value.mediaType)}
 					alt="Preview"
 					className="max-w-full max-h-full h-48 object-contain"
 					onError={(e) => {
@@ -100,14 +108,26 @@ function UserMessagePart({
 	}
 
 	if (value.type === "file") {
-		// Calculate approximate file size from base64 string
-		const approximateSize = value.data
-			? Math.round((value.data.length * 3) / 4 / 1024)
-			: 0;
+		const file = resolveFileData(value.data);
+
+		// v7 writes images as file parts too, so preview them like image parts.
+		if (file && file.kind !== "text" && isImageMediaType(value.mediaType)) {
+			return (
+				<div className="bg-surface-secondary w-full rounded-[14px] p-2 flex justify-center items-center">
+					<img
+						src={imageSrc(file, value.mediaType)}
+						alt="Preview"
+						className="max-w-full max-h-full h-48 object-contain"
+						onError={(e) => {
+							e.currentTarget.style.display = "none";
+						}}
+					/>
+				</div>
+			);
+		}
+
 		const sizeDisplay =
-			approximateSize > 1024
-				? `${(approximateSize / 1024).toFixed(2)} MB`
-				: `${approximateSize} KB`;
+			file?.kind === "base64" ? formatBase64Size(file.value) : null;
 
 		return (
 			<div className="bg-surface-secondary w-full rounded-[14px] p-3">
@@ -119,9 +139,7 @@ function UserMessagePart({
 						<p className="text-sm font-medium text-foreground truncate">
 							{value.mediaType || "Unknown file type"}
 						</p>
-						{approximateSize > 0 && (
-							<p className="text-xs text-muted">{sizeDisplay}</p>
-						)}
+						{sizeDisplay && <p className="text-xs text-muted">{sizeDisplay}</p>}
 					</div>
 				</div>
 			</div>
