@@ -1,14 +1,4 @@
-import {
-	Button,
-	Card,
-	Dropdown,
-	Input,
-	Label,
-	Modal,
-	Radio,
-	RadioGroup,
-	TextField,
-} from "@heroui/react";
+import { Button, Card } from "@heroui/react";
 import { Reorder, useDragControls } from "framer-motion";
 import {
 	LucideFileText,
@@ -16,7 +6,7 @@ import {
 	LucidePlus,
 	LucideX,
 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import { z } from "zod";
 import {
@@ -163,10 +153,6 @@ export function UserMessage({
 	onVariablePress: () => void;
 }) {
 	const fileInputRef = useRef<HTMLInputElement>(null);
-	const [isEmbedModalOpen, setIsEmbedModalOpen] = useState(false);
-	const [embedType, setEmbedType] = useState<"image" | "file">("image");
-	const [embedData, setEmbedData] = useState("");
-	const [embedMediaType, setEmbedMediaType] = useState("");
 
 	const variables = useMemo(() => {
 		const str = JSON.stringify(value.content);
@@ -194,28 +180,27 @@ export function UserMessage({
 	const handleFileUpload = async (
 		event: React.ChangeEvent<HTMLInputElement>,
 	) => {
-		const file = event.target.files?.[0];
-		if (!file) return;
+		const files = Array.from(event.target.files ?? []);
+		if (files.length === 0) return;
 
 		try {
-			const base64Data = await fileToBase64(file);
-			const newContent = [...value.content];
+			// v7 deprecated `image` parts; images and other files are both `file`
+			// parts now, told apart only by media type. `mediaType` is required
+			// here where it was optional on `image`, and the browser reports an
+			// empty `file.type` for extensionless files.
+			const parts = files.map(async (file) => ({
+				type: "file" as const,
+				data: await fileToBase64(file),
+				mediaType: file.type || "application/octet-stream",
+			}));
 
-			if (file.type.startsWith("image/")) {
-				newContent.push({
-					type: "image",
-					image: base64Data,
-					mediaType: file.type,
-				});
-			} else {
-				newContent.push({
-					type: "file",
-					data: base64Data,
-					mediaType: file.type,
-				});
-			}
-
-			onValueChange({ ...value, content: newContent });
+			// One update for the whole selection. `value` is captured from props,
+			// so appending a part at a time would have each write overwrite the
+			// one before it and only the last file would survive.
+			onValueChange({
+				...value,
+				content: [...value.content, ...(await Promise.all(parts))],
+			});
 		} catch (error) {
 			console.error("Error converting file to base64:", error);
 		}
@@ -223,30 +208,6 @@ export function UserMessage({
 		if (fileInputRef.current) {
 			fileInputRef.current.value = "";
 		}
-	};
-
-	const handleEmbedSubmit = () => {
-		const newContent = [...value.content];
-
-		if (embedType === "image") {
-			newContent.push({
-				type: "image",
-				image: embedData,
-				mediaType: embedMediaType || undefined,
-			});
-		} else {
-			newContent.push({
-				type: "file",
-				data: embedData,
-				mediaType: embedMediaType,
-			});
-		}
-
-		onValueChange({ ...value, content: newContent });
-		setIsEmbedModalOpen(false);
-		setEmbedData("");
-		setEmbedMediaType("");
-		setEmbedType("image");
 	};
 
 	const controls = useDragControls();
@@ -274,29 +235,15 @@ export function UserMessage({
 							<span className="text-sm text-muted">User</span>
 						</div>
 						{!isReadOnly && (
-							<Dropdown>
-								<Button size="sm" isIconOnly variant="tertiary">
-									<LucidePlus className="size-3.5" />
-								</Button>
-								<Dropdown.Popover>
-									<Dropdown.Menu
-										onAction={(key) => {
-											if (key === "upload") {
-												fileInputRef.current?.click();
-											} else if (key === "embed") {
-												setIsEmbedModalOpen(true);
-											}
-										}}
-									>
-										<Dropdown.Item id="upload" textValue="Upload">
-											<Label>Upload</Label>
-										</Dropdown.Item>
-										<Dropdown.Item id="embed" textValue="Embed">
-											<Label>Embed</Label>
-										</Dropdown.Item>
-									</Dropdown.Menu>
-								</Dropdown.Popover>
-							</Dropdown>
+							<Button
+								size="sm"
+								isIconOnly
+								variant="tertiary"
+								aria-label="Attach files"
+								onPress={() => fileInputRef.current?.click()}
+							>
+								<LucidePlus className="size-3.5" />
+							</Button>
 						)}
 					</Card.Header>
 					<Card.Content className="gap-2">
@@ -347,92 +294,10 @@ export function UserMessage({
 			<input
 				ref={fileInputRef}
 				type="file"
+				multiple
 				className="hidden"
 				onChange={handleFileUpload}
 			/>
-
-			<Modal>
-				<Modal.Backdrop
-					isOpen={isEmbedModalOpen}
-					onOpenChange={setIsEmbedModalOpen}
-				>
-					<Modal.Container>
-						<Modal.Dialog>
-							{({ close }) => (
-								<>
-									<Modal.Header>
-										<Modal.Heading>Embed Content</Modal.Heading>
-									</Modal.Header>
-									<Modal.Body>
-										<RadioGroup
-											value={embedType}
-											onChange={(value) =>
-												setEmbedType(value as "image" | "file")
-											}
-										>
-											<Label>Content Type</Label>
-											<Radio value="image">
-												<Radio.Control>
-													<Radio.Indicator />
-												</Radio.Control>
-												<Radio.Content>
-													<Label>Image</Label>
-												</Radio.Content>
-											</Radio>
-											<Radio value="file">
-												<Radio.Control>
-													<Radio.Indicator />
-												</Radio.Control>
-												<Radio.Content>
-													<Label>File</Label>
-												</Radio.Content>
-											</Radio>
-										</RadioGroup>
-
-										<TextField>
-											<Label>
-												{embedType === "image" ? "Image Data" : "File Data"}
-											</Label>
-											<Input
-												placeholder="Base64 encoded data or URL"
-												value={embedData}
-												onChange={(e) => setEmbedData(e.target.value)}
-											/>
-										</TextField>
-
-										<TextField isRequired={embedType === "file"}>
-											<Label>Media Type</Label>
-											<Input
-												placeholder={
-													embedType === "image"
-														? "e.g., image/png (optional)"
-														: "e.g., application/pdf"
-												}
-												value={embedMediaType}
-												onChange={(e) => setEmbedMediaType(e.target.value)}
-											/>
-										</TextField>
-									</Modal.Body>
-									<Modal.Footer>
-										<Button variant="tertiary" onPress={close}>
-											Cancel
-										</Button>
-										<Button
-											variant="primary"
-											onPress={handleEmbedSubmit}
-											isDisabled={
-												!embedData || (embedType === "file" && !embedMediaType)
-											}
-										>
-											Add
-										</Button>
-									</Modal.Footer>
-								</>
-							)}
-						</Modal.Dialog>
-					</Modal.Container>
-				</Modal.Backdrop>
-			</Modal>
 		</>
 	);
 }

@@ -1,13 +1,13 @@
 # AI SDK v7 — deferred follow-ups
 
 Tracking document for the two deprecation cleanups left over after the AI SDK
-6 → 7 upgrade. Each is its own task and its own PR. Do them in the order below;
-Task 1 is an afternoon, Task 2 is a real piece of work.
+6 → 7 upgrade. Each is its own task and its own PR. **Task 1 is done.** Task 2
+is a real piece of work and is still open.
 
-> **Neither task is required.** The app runs correctly on v7 today. Both old
-> data shapes still work, held in place by the two compatibility decisions
-> recorded below. Nothing here is blocking — these are cleanups you schedule,
-> not breakage you chase.
+> **Neither task was required.** The app ran correctly on v7 before either of
+> them. Both old data shapes still work, held in place by the compatibility
+> decisions recorded below. Nothing here is blocking — these are cleanups you
+> schedule, not breakage you chase.
 
 ---
 
@@ -23,7 +23,7 @@ working by explicit compatibility decisions rather than by accident:
 | v6 shape | Where it lives | What holds it working |
 | --- | --- | --- |
 | `{ role: "system" }` inside `messages` | `agent_versions.data.messages[0]` | `allowSystemInMessages: true` on all four SDK call sites |
-| `{ type: "image", image, mediaType? }` | user message content parts in `agent_versions.data` | v7 still accepts `ImagePart`; it is deprecated, not removed |
+| `{ type: "image", image, mediaType? }` | user message content parts in `agent_versions.data`, and in the `request.messages` snapshot on every run | v7 still accepts `ImagePart`; it is deprecated, not removed. The editor stopped *writing* it in Task 1; the read path is permanent (see there) |
 
 Both were verified against the real v7 runtime with `MockLanguageModelV3` — see
 [Appendix: verification harness](#appendix-verification-harness) to re-run any
@@ -65,9 +65,91 @@ pre-upgrade run has aged out of retention.
 
 ---
 
-## Task 1 — user message `image` parts → `file` parts
+## Task 1 — user message `image` parts → `file` parts — **DONE**
 
 **Size:** one file. **Blocks nothing. Do this first.**
+
+### Outcome
+
+Both write paths in `apps/web/src/components/user-message.tsx` now push a
+`file` part; the `image` branches are gone. Two details worth keeping:
+
+- **The upload path needed a media-type fallback the plan didn't call out.**
+  Browsers report an empty `file.type` for extensionless files. That was legal
+  on an `image` part (media type optional) and is not on a `file` part, so the
+  push uses `file.type || "application/octet-stream"`. The embed path uses
+  `embedMediaType || "image"` as planned.
+- **The embed modal was removed outright**, and with it the Image / File radio
+  toggle, the media-type field, and the Upload / Embed dropdown. The `+` button
+  in the message header now opens the file picker directly, and accepts a
+  multi-file selection. This was a product call, not a consequence of the v7
+  change.
+  - The multi-file handler appends **one** part list in a single
+    `onValueChange`. Appending file by file reads the stale `value` prop and
+    silently keeps only the last file; `user-message.test.tsx` pins that.
+  - **It cost the ability to attach content by URL.** Embed accepted "base64
+    encoded data or URL"; upload only ever produces base64. Nothing in the
+    database used it (every stored part is base64 — see the audit below), and
+    the *read* path still renders URL-backed parts, so only authoring went
+    away. v7 file parts do support `{ type: "url", url }` if it is ever wanted
+    back.
+
+Covered by a regression test in `apps/web/src/components/messages.test.tsx`
+asserting that legacy `image` parts and the `file` parts replacing them both
+render as previews.
+
+### No backfill — decided, not deferred
+
+We considered rewriting the stored `{type:"image"}` parts and chose not to.
+The reason is not caution about the transform, which is provably lossless
+(byte-identical provider payloads, verified below). It is that a backfill buys
+nothing you can spend:
+
+- **The read path is permanent regardless, and SQL cannot reach it.**
+  `userMessageSchema` parses run history as well as agent versions —
+  `runs.$runId.tsx` feeds `runData.request.messages` through the same
+  `Messages` component. Those snapshots do not live in Postgres at all: the
+  `runs` table has no `data` column, and `uploadRunData` writes the blob to
+  `runLogStore` (object storage). So run logs keep their `image` parts no
+  matter what a migration does, and the `image` member of the zod union plus
+  its render branch have to stay. There is no code to delete at the end of a
+  backfill. *(This supersedes the earlier note to "revisit removing the `image`
+  union member once no live agent version contains one" — that day never
+  comes.)*
+- **The cost is disproportionate.** `agent_versions` is insert-only across the
+  whole runner — one `.insert()` in `agents.ts`, zero `UPDATE`s. A backfill
+  would be the first mutation of that table, and `run-agent.ts` caches versions
+  for 10 minutes *because* "versions are immutable once created", so it would
+  also serve stale rows for up to 10 minutes after running.
+
+### What is actually out there (audited 2026-09-06)
+
+Measured against production, not estimated:
+
+| | |
+| --- | --- |
+| `agent_versions` rows | 2263 |
+| …containing an `image` part | **6**, across 4 agents |
+| …reachable by a live deploy pointer | **1** — `Moodboard Sub Agent` (staging) |
+| Total `image` parts | 10 — all base64, none URL-backed |
+| Parts missing `mediaType` | 1 (in `Ex09yXz_YNPewTWr_8R2C`) |
+
+**Read `is_deployed` carefully.** It records that a version *was* deployed at
+some point, not that it is live now. Three versions carry the flag; only what
+`agents.staging_version_id` / `production_version_id` actually point at can
+still run. Joining on those pointers instead of the flag drops the live
+exposure to a single agent — `Moodboard Sub Agent` on staging, version
+`pASsVSp7UwypfWXmyNYYJ`. The image parts in `Generate AI Items`, `Zara -
+General Agent` and `Test Lavish Tools` sit only in superseded history and can
+never run again.
+
+So the live exposure is one staging deploy. Small enough to backfill trivially
+— which is the point: also small enough that the warnings are not worth an
+`UPDATE` against an insert-only table.
+
+**To silence it, re-save and redeploy that agent through the editor.** That
+produces `file` parts, creates a new immutable version, and respects the cache.
+Same outcome as a backfill, none of the cost.
 
 ### Why
 
@@ -139,18 +221,18 @@ place in the repo that constructs or validates image parts.
 
 ### Backward compatibility
 
-No backfill and no DB migration. Old `{type:'image'}` rows keep working
-because v7 still accepts them and the zod union still parses them; the
-deprecation warnings drain naturally as versions get re-saved. Revisit removing
-the `image` union member only once no live agent version contains one.
+No backfill and no DB migration — see the decision recorded above. Old
+`{type:'image'}` rows keep working because v7 still accepts them and the zod
+union still parses them.
 
 ### Done when
 
-- The editor writes only `file` parts for both images and non-images.
-- An agent version saved *before* this change still loads, renders and runs.
-- A version saved *after* it round-trips through save → run → run-detail view.
-- No `DeprecationWarning: … "image" content part` in runner logs for a run
-  whose version was saved post-change.
+- ~~The editor writes only `file` parts for both images and non-images.~~ Done.
+- ~~An agent version saved *before* this change still loads and renders.~~
+  Covered by the test above.
+- Still worth confirming by hand once, against a real provider: a version saved
+  *after* the change round-trips through save → run → run-detail view, and no
+  `DeprecationWarning: … "image" content part` appears in runner logs for it.
 
 ---
 
