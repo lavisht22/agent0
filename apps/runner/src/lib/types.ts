@@ -1,10 +1,16 @@
 import type { GoogleLanguageModelOptions } from "@ai-sdk/google";
+import type { OpenResponsesLanguageModelOptions } from "@ai-sdk/open-responses";
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
+import type { OpenAICompatibleProviderOptions } from "@ai-sdk/openai-compatible";
 import type { XaiProviderOptions } from "@ai-sdk/xai";
 import type { LanguageModelUsage, ModelMessage, StepResult, ToolSet } from "ai";
 
 export type ProviderOptions = {
 	openai?: OpenAIResponsesProviderOptions;
+	// Keyed to match OPENAI_COMPATIBLE_PROVIDER_NAME in providers.ts.
+	openaiCompatible?: OpenAICompatibleProviderOptions;
+	// Keyed to match OPEN_RESPONSES_PROVIDER_NAME in providers.ts.
+	openResponses?: OpenResponsesLanguageModelOptions;
 	xai?: XaiProviderOptions;
 	google?: GoogleLanguageModelOptions;
 	vertex?: GoogleLanguageModelOptions;

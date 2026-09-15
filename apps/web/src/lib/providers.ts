@@ -39,6 +39,16 @@ export function getModelStatus(
 export const PROVIDER_TYPES = [
 	{ key: "xai", icon: XaiIcon, label: "XAI" },
 	{ key: "openai", icon: OpenaiIcon, label: "OpenAI" },
+	{
+		key: "openai-compatible",
+		icon: OpenaiIcon,
+		label: "OpenAI Compatible",
+	},
+	{
+		key: "open-responses",
+		icon: OpenaiIcon,
+		label: "Open Responses",
+	},
 	{ key: "google-vertex", icon: GoogleCloudIcon, label: "Google Vertex AI" },
 	{ key: "google", icon: GeminiIcon, label: "Google Generative AI" },
 	{ key: "azure", icon: MicrosoftIcon, label: "Azure OpenAI" },

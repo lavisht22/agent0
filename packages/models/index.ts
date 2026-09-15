@@ -3,6 +3,8 @@ export type ModelStatus = "active" | "deprecated" | "retired";
 export type ProviderType =
 	| "xai"
 	| "openai"
+	| "openai-compatible"
+	| "open-responses"
 	| "azure"
 	| "google"
 	| "google-vertex"
