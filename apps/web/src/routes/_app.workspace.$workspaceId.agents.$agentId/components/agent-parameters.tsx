@@ -433,6 +433,10 @@ export function AgentParameters({
 				</div>
 			))}
 
+			{added.length > 0 && available.length > 0 && (
+				<div className="border-t border-dashed border-border" />
+			)}
+
 			{available.length > 0 && (
 				<Select
 					aria-label="Add parameter"
