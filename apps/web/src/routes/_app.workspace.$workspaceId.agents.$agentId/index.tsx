@@ -476,7 +476,7 @@ function RouteComponent() {
 									Parameters
 								</Button>
 								<Popover.Content placement="bottom">
-									<Popover.Dialog className="p-4 w-96">
+									<Popover.Dialog className="p-4 w-96 max-h-[70vh] overflow-y-auto">
 										<form.Subscribe selector={(state) => state.values}>
 											{(values) => {
 												const providerType = providers?.find(
