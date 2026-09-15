@@ -60,6 +60,28 @@ describe("read-only run messages", () => {
 		expect(screen.getAllByText("read_asset").length).toBeGreaterThan(0);
 	});
 
+	// The editor stopped writing `image` parts when v7 deprecated them, but they
+	// stay readable forever: old agent versions still hold them, and so does the
+	// `request.messages` snapshot on every run recorded before the switch.
+	it("still renders a legacy user image part alongside the file part that replaced it", () => {
+		renderMessages([
+			{
+				id: "m1",
+				role: "user",
+				content: [
+					{ type: "image", image: "QUJD", mediaType: "image/png" },
+					{ type: "image", image: "QUJD" },
+					{ type: "file", data: "QUJD", mediaType: "image/png" },
+					{ type: "file", data: "QUJD", mediaType: "image" },
+				],
+			},
+		] as unknown as MessageT[]);
+
+		// Every part above is an image, so none should fall through to the
+		// file-card branch that names the media type in text.
+		expect(screen.getAllByAltText("Preview")).toHaveLength(4);
+	});
+
 	it("renders every other file-data shape without throwing", () => {
 		const shapes = ["file-data", "media", "file"].flatMap((type) => [
 			{ type, mediaType: "image/png", data: "QUJD" },
