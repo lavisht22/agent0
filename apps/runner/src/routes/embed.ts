@@ -142,7 +142,12 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 			const { provider, aiProvider } = result;
 
 			try {
-				const embeddingModel = aiProvider?.textEmbeddingModel(body.model.name);
+				// Some provider types are language-model only (e.g. open-responses)
+				// and expose no embedding model; narrow before calling.
+				const embeddingModel =
+					aiProvider && "textEmbeddingModel" in aiProvider
+						? aiProvider.textEmbeddingModel(body.model.name)
+						: undefined;
 
 				if (!embeddingModel) {
 					return reply.code(400).send({
@@ -266,7 +271,12 @@ export async function registerEmbedRoutes(fastify: FastifyInstance) {
 			const { provider, aiProvider } = result;
 
 			try {
-				const embeddingModel = aiProvider?.textEmbeddingModel(body.model.name);
+				// Some provider types are language-model only (e.g. open-responses)
+				// and expose no embedding model; narrow before calling.
+				const embeddingModel =
+					aiProvider && "textEmbeddingModel" in aiProvider
+						? aiProvider.textEmbeddingModel(body.model.name)
+						: undefined;
 
 				if (!embeddingModel) {
 					return reply.code(400).send({
