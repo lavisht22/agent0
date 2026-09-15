@@ -15,10 +15,15 @@ export const agentFormSchema = z.object({
 		provider_id: z.string(),
 		name: z.string(),
 	}),
-	maxOutputTokens: z.number(),
-	outputFormat: z.enum(["text", "json"]),
-	temperature: z.number(),
-	maxStepCount: z.number(),
+	// Every parameter is add/remove: present with a value, or absent (undefined)
+	// and omitted from the request. Undefined values are dropped on serialize;
+	// the runner falls back where it needs to (Max Step Count → 10, Output Format
+	// → text). Modeled as `T | undefined` (key kept, not `.optional()`) so the
+	// form's defaultValues stay type-compatible.
+	maxOutputTokens: z.union([z.number(), z.undefined()]),
+	outputFormat: z.union([z.enum(["text", "json"]), z.undefined()]),
+	temperature: z.union([z.number(), z.undefined()]),
+	maxStepCount: z.union([z.number(), z.undefined()]),
 	messages: z.array(messageSchema).min(1, "At least one message is required"),
 	tools: z.array(
 		z.union([
@@ -42,61 +47,12 @@ export const agentFormSchema = z.object({
 		]),
 	),
 	skills: z.array(skillSchema),
-	providerOptions: z.object({
-		openai: z
-			.object({
-				reasoningEffort: z
-					.enum(["none", "minimal", "low", "medium", "high", "xhigh"])
-					.optional(),
-			})
-			.optional(),
-		xai: z
-			.object({
-				reasoningEffort: z
-					.enum(["none", "low", "medium", "high", "xhigh"])
-					.optional(),
-			})
-			.optional(),
-		google: z
-			.object({
-				thinkingConfig: z
-					.object({
-						thinkingBudget: z.number().optional(),
-						thinkingLevel: z
-							.enum(["minimal", "low", "medium", "high"])
-							.optional(),
-						includeThoughts: z.boolean().optional(),
-					})
-					.optional(),
-			})
-			.optional(),
-		vertex: z
-			.object({
-				thinkingConfig: z
-					.object({
-						thinkingBudget: z.number().optional(),
-						thinkingLevel: z
-							.enum(["minimal", "low", "medium", "high"])
-							.optional(),
-						includeThoughts: z.boolean().optional(),
-					})
-					.optional(),
-			})
-			.optional(),
-		bedrock: z
-			.object({
-				reasoningConfig: z
-					.object({
-						type: z.enum(["adaptive", "disabled"]).optional(),
-						maxReasoningEffort: z
-							.enum(["low", "medium", "high", "xhigh", "max"])
-							.optional(),
-						display: z.enum(["omitted", "summarized"]).optional(),
-					})
-					.optional(),
-			})
-			.optional(),
-	}),
+	// Keyed by provider namespace (openai, openaiCompatible, openResponses, xai,
+	// google, vertex, bedrock, …) → provider-specific options. The parameter
+	// catalog in agent-parameters.tsx is the single source of truth for which
+	// options are valid per provider, so this stays a permissive record rather
+	// than an exhaustive shape that has to be kept in lockstep with the catalog.
+	providerOptions: z.record(z.string(), z.record(z.string(), z.unknown())),
 });
 
 export type AgentFormValues = z.infer<typeof agentFormSchema>;

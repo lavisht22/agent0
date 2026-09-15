@@ -4,12 +4,8 @@ import {
 	Dropdown,
 	Input,
 	Label,
-	ListBox,
 	Modal,
-	NumberField,
 	Popover,
-	Select,
-	Slider,
 	TextField,
 	useOverlayState,
 } from "@heroui/react";
@@ -48,9 +44,9 @@ import {
 } from "@/lib/queries";
 import { Action } from "./components/action";
 import { AddMessage } from "./components/add-message";
+import { AgentParameters } from "./components/agent-parameters";
 import { Alerts } from "./components/alerts";
 import { ModelSelector } from "./components/model-selector";
-import { ProviderOptions } from "./components/provider-options";
 import SkillsSection from "./components/skills-section";
 import ToolsSection from "./components/tools-section";
 import { VariablesDrawer } from "./components/variables-drawer";
@@ -167,10 +163,10 @@ function RouteComponent() {
 	const form = useForm({
 		defaultValues: {
 			model: { provider_id: "", name: "" },
-			maxOutputTokens: 2048,
-			outputFormat: "text" as "text" | "json",
-			temperature: 0.7,
-			maxStepCount: 10,
+			maxOutputTokens: undefined as number | undefined,
+			outputFormat: undefined as "text" | "json" | undefined,
+			temperature: undefined as number | undefined,
+			maxStepCount: undefined as number | undefined,
 			messages: [
 				{
 					id: "system-init",
@@ -220,10 +216,10 @@ function RouteComponent() {
 		form.reset(
 			{
 				model: data.model || { provider_id: "", name: "" },
-				maxOutputTokens: data.maxOutputTokens || 2048,
-				outputFormat: data.outputFormat || "text",
-				temperature: data.temperature ?? 0.7,
-				maxStepCount: data.maxStepCount || 10,
+				maxOutputTokens: data.maxOutputTokens,
+				outputFormat: data.outputFormat,
+				temperature: data.temperature,
+				maxStepCount: data.maxStepCount,
 				messages: messagesWithIds,
 				tools: data.tools || [],
 				skills: data.skills || [],
@@ -255,10 +251,10 @@ function RouteComponent() {
 		// editors, which assume an array of parts, don't crash.
 		const replayValues = {
 			model: data.model || { provider_id: "", name: "" },
-			maxOutputTokens: data.maxOutputTokens || 2048,
-			outputFormat: data.outputFormat || "text",
-			temperature: data.temperature ?? 0.7,
-			maxStepCount: data.maxStepCount || 10,
+			maxOutputTokens: data.maxOutputTokens,
+			outputFormat: data.outputFormat,
+			temperature: data.temperature,
+			maxStepCount: data.maxStepCount,
 			messages: normalizeMessages(data.messages || []),
 			tools: data.tools || [],
 			skills: data.skills || [],
@@ -480,118 +476,30 @@ function RouteComponent() {
 									Parameters
 								</Button>
 								<Popover.Content placement="bottom">
-									<Popover.Dialog className="p-4 flex flex-col items-start gap-4 w-96">
-										<form.Field name="maxOutputTokens">
-											{(field) => (
-												<>
-													<NumberField
-														minValue={0}
-														name="Max Output Tokens"
-														value={field.state.value}
-														onChange={field.handleChange}
-														variant="secondary"
-														fullWidth
-													>
-														<Label>Max Output Tokens</Label>
-														<NumberField.Group>
-															<NumberField.DecrementButton />
-															<NumberField.Input />
-															<NumberField.IncrementButton />
-														</NumberField.Group>
-													</NumberField>
-												</>
-											)}
-										</form.Field>
-										<form.Field name="outputFormat">
-											{(field) => (
-												<Select
-													className="w-full"
-													value={field.state.value}
-													onChange={(value) => {
-														field.handleChange(value as "text" | "json");
-													}}
-													variant="secondary"
-												>
-													<Label>Output Format</Label>
-													<Select.Trigger>
-														<Select.Value />
-														<Select.Indicator />
-													</Select.Trigger>
-													<Select.Popover>
-														<ListBox>
-															<ListBox.Item id="text" textValue="Text">
-																Text
-															</ListBox.Item>
-															<ListBox.Item id="json" textValue="JSON">
-																JSON
-															</ListBox.Item>
-														</ListBox>
-													</Select.Popover>
-												</Select>
-											)}
-										</form.Field>
-										<form.Field name="temperature">
-											{(field) => (
-												<Slider
-													className="w-full"
-													value={field.state.value}
-													onChange={(value) =>
-														field.handleChange(value as number)
-													}
-													minValue={0}
-													maxValue={1}
-													step={0.01}
-												>
-													<Label>Temperature</Label>
-													<Slider.Output />
-													<Slider.Track>
-														<Slider.Fill />
-														<Slider.Thumb />
-													</Slider.Track>
-												</Slider>
-											)}
-										</form.Field>
-										<form.Field name="maxStepCount">
-											{(field) => (
-												<Slider
-													className="w-full"
-													value={field.state.value}
-													onChange={(value) =>
-														field.handleChange(value as number)
-													}
-													minValue={1}
-													maxValue={50}
-													step={1}
-												>
-													<Label>Max Step Count</Label>
-													<Slider.Output />
-													<Slider.Track>
-														<Slider.Fill />
-														<Slider.Thumb />
-													</Slider.Track>
-												</Slider>
-											)}
-										</form.Field>
-
-										<form.Subscribe selector={(state) => state.values.model}>
-											{(model) => {
-												const selectedProvider = providers?.find(
-													(p) => p.id === model.provider_id,
-												);
-												const providerType = selectedProvider?.type;
-
-												if (!providerType) return null;
+									<Popover.Dialog className="p-4 w-96 max-h-[70vh] overflow-y-auto">
+										<form.Subscribe selector={(state) => state.values}>
+											{(values) => {
+												const providerType = providers?.find(
+													(p) => p.id === values.model.provider_id,
+												)?.type;
 
 												return (
-													<form.Field name="providerOptions">
-														{(field) => (
-															<ProviderOptions
-																providerType={providerType}
-																value={field.state.value}
-																onValueChange={field.handleChange}
-															/>
-														)}
-													</form.Field>
+													<AgentParameters
+														providerType={providerType}
+														values={values}
+														onChange={(patch) => {
+															for (const [key, value] of Object.entries(
+																patch,
+															)) {
+																(
+																	form.setFieldValue as (
+																		name: string,
+																		value: unknown,
+																	) => void
+																)(key, value);
+															}
+														}}
+													/>
 												);
 											}}
 										</form.Subscribe>
