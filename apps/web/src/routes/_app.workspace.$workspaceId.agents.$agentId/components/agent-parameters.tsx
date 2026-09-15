@@ -1,11 +1,4 @@
-import {
-	Button,
-	Label,
-	ListBox,
-	NumberField,
-	Select,
-	Switch,
-} from "@heroui/react";
+import { Button, Label, ListBox, NumberField, Select } from "@heroui/react";
 import { LucideX } from "lucide-react";
 import type { AgentFormValues } from "../types";
 
@@ -484,18 +477,34 @@ function ParamEditor({
 	const { editor, label, description } = param;
 
 	if (editor.kind === "boolean") {
+		// Rendered as a Yes/No select for visual parity with the other editors,
+		// but the stored value stays a real boolean.
 		return (
-			<Switch
-				isSelected={value === true}
-				onChange={(checked) => onValueChange(checked)}
+			<Select
+				value={value === true ? "true" : value === false ? "false" : null}
+				onChange={(selected) => onValueChange(selected === "true")}
+				variant="secondary"
+				fullWidth
 			>
-				<Switch.Control>
-					<Switch.Thumb />
-				</Switch.Control>
-				<Switch.Content>
-					<Label>{label}</Label>
-				</Switch.Content>
-			</Switch>
+				<Label>{label}</Label>
+				<Select.Trigger>
+					<Select.Value />
+					<Select.Indicator />
+				</Select.Trigger>
+				{description && (
+					<p className="text-xs text-muted mt-1">{description}</p>
+				)}
+				<Select.Popover>
+					<ListBox>
+						<ListBox.Item id="true" textValue="Yes">
+							Yes
+						</ListBox.Item>
+						<ListBox.Item id="false" textValue="No">
+							No
+						</ListBox.Item>
+					</ListBox>
+				</Select.Popover>
+			</Select>
 		);
 	}
 
