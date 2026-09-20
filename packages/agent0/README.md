@@ -22,6 +22,10 @@ Or using pnpm:
 pnpm add agent0-js
 ```
 
+## Requirements
+
+Node 24 or newer. The SDK is built on the Vercel AI SDK v7, which sets that floor.
+
 ## Quick Start
 
 ```typescript
@@ -842,6 +846,42 @@ const response = await client.generate({
   ]
 });
 ```
+
+#### Attachments
+
+Images, PDFs and audio travel as a **file part** inside a user message's `content` array. One part shape covers every media type:
+
+```typescript
+const response = await client.generate({
+  agentId: 'agent_123',
+  extraMessages: [
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: 'What is in this photo?' },
+        { type: 'file', mediaType: 'image/jpeg', data: base64OrDataUrl }
+      ]
+    }
+  ]
+});
+```
+
+`data` takes either a bare shorthand or a tagged shape:
+
+| Bare | Tagged |
+| --- | --- |
+| base64 string, `Uint8Array`, `ArrayBuffer`, `Buffer` | `{ type: 'data', data }` |
+| a `URL`, or a plain string that parses as one | `{ type: 'url', url }` |
+| a `ProviderReference` from `uploadFile()` | `{ type: 'reference', reference }` |
+| (tagged only) | `{ type: 'text', text }` |
+
+`mediaType` is **required** and nothing infers it for you. A full IANA type such as `image/png` is best; the top-level segment alone (`image`, `audio`, `video`) also works, and the provider layer refines it from the bytes. Omitting it fails prompt validation outright:
+
+```
+AI_InvalidPromptError: The messages do not match the ModelMessage[] schema.
+```
+
+The older `{ type: 'image', image }` part is still accepted, but it is deprecated in the AI SDK v7 that agent0-js 3.0.0 pulls in, and each one logs a `DeprecationWarning` on the runner. Both shapes arrive at the provider as the same payload, so moving over is a rename of the key plus an explicit `mediaType`.
 
 ### Custom Tools (extraTools)
 
