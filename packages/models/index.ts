@@ -65,6 +65,20 @@ export const MODELS: Model[] = [
 	},
 
 	{
+		id: "gpt-6-sol",
+		providers: ["openai"],
+		status: "active",
+		cost: { noCacheInput: 2, cacheInput: 0.2, output: 10 },
+		releaseDate: "2026-09-22",
+	},
+	{
+		id: "gpt-6-luna",
+		providers: ["openai"],
+		status: "active",
+		cost: { noCacheInput: 0.1, cacheInput: 0.01, output: 0.5 },
+		releaseDate: "2026-09-22",
+	},
+	{
 		id: "gpt-5.6-sol",
 		providers: ["openai"],
 		status: "active",
@@ -336,6 +350,13 @@ export const MODELS: Model[] = [
 		cost: { noCacheInput: 3, cacheInput: 0.3, output: 15 },
 	},
 
+	{
+		id: "global.anthropic.claude-opus-5-5",
+		providers: ["bedrock"],
+		status: "active",
+		cost: { noCacheInput: 4, cacheInput: 0.2, output: 20 },
+		releaseDate: "2026-09-22",
+	},
 	{
 		id: "global.anthropic.claude-opus-5",
 		providers: ["bedrock"],
