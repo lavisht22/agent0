@@ -18,7 +18,7 @@ import type {
 } from "./types";
 
 /** Runs can legitimately take a very long time; reads cannot. */
-const RUN_TIMEOUT_MS = 30 * 60 * 1000;
+const RUN_TIMEOUT_MS = 60 * 60 * 1000;
 const READ_TIMEOUT_MS = 30 * 1000;
 
 type FetchOptions = {
@@ -112,6 +112,7 @@ export class Agent0 {
 					stream: false,
 				},
 				signal: options.signal,
+				timeoutMs: options.timeoutMs,
 			},
 		);
 
@@ -137,6 +138,7 @@ export class Agent0 {
 					stream: true,
 				},
 				signal: options.signal,
+				timeoutMs: options.timeoutMs,
 			},
 		);
 

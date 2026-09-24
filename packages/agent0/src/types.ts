@@ -99,6 +99,11 @@ export interface RunOptions {
 	 * abort signal here to propagate cancellation end-to-end.
 	 */
 	signal?: AbortSignal;
+	/**
+	 * How long to wait for the run before giving up, in milliseconds. Defaults to
+	 * 60 minutes, matching the runner's own default cap on a run.
+	 */
+	timeoutMs?: number;
 }
 
 export interface GenerateResponse {
