@@ -105,6 +105,7 @@ interface RunOptions {
     headers?: Record<string, string>; // Custom HTTP headers to send with MCP requests
   }>;
   signal?: AbortSignal;               // Abort signal to cancel the run (see Cancellation section)
+  timeoutMs?: number;                 // How long to wait for the run, in ms (default: 60 minutes)
 }
 
 interface CustomTool {

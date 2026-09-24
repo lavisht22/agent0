@@ -9,7 +9,7 @@
  * @see https://ai-sdk.dev/docs/ai-sdk-core/settings#timeout
  */
 export const RUN_TIMEOUT = {
-	totalMs: 20 * 60 * 1000, // 20 minutes overall
+	totalMs: Number(process.env.RUN_TIMEOUT_MS ?? 60 * 60 * 1000), // 60 minutes overall unless RUN_TIMEOUT_MS says otherwise
 	chunkMs: 10 * 60 * 1000, // 10 minutes stall detection between stream chunks
 } as const;
 
