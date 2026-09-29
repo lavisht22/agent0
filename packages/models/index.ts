@@ -341,7 +341,7 @@ export const MODELS: Model[] = [
 		id: "claude-sonnet-5",
 		providers: ["anthropic-vertex"],
 		status: "active",
-		cost: { noCacheInput: 3, cacheInput: 0.3, output: 15 },
+		cost: { noCacheInput: 2, cacheInput: 0.2, output: 10 },
 	},
 	{
 		id: "claude-sonnet-4-6",
@@ -375,7 +375,7 @@ export const MODELS: Model[] = [
 		id: "global.anthropic.claude-sonnet-5",
 		providers: ["bedrock"],
 		status: "active",
-		cost: { noCacheInput: 3, cacheInput: 0.3, output: 15 },
+		cost: { noCacheInput: 2, cacheInput: 0.2, output: 10 },
 	},
 	{
 		id: "global.anthropic.claude-opus-4-8",
