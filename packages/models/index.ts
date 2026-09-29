@@ -365,6 +365,13 @@ export const MODELS: Model[] = [
 		releaseDate: "2026-07-24",
 	},
 	{
+		id: "global.anthropic.claude-sonnet-5-5",
+		providers: ["bedrock"],
+		status: "active",
+		cost: { noCacheInput: 2, cacheInput: 0.2, output: 10 },
+		releaseDate: "2026-09-28",
+	},
+	{
 		id: "global.anthropic.claude-sonnet-5",
 		providers: ["bedrock"],
 		status: "active",
