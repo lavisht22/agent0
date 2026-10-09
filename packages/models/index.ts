@@ -358,6 +358,13 @@ export const MODELS: Model[] = [
 	},
 
 	{
+		id: "global.anthropic.claude-haiku-5-5",
+		providers: ["bedrock"],
+		status: "active",
+		cost: { noCacheInput: 0.1, cacheInput: 0.01, output: 0.5 },
+		releaseDate: "2026-10-07",
+	},
+	{
 		id: "global.anthropic.claude-opus-5-5",
 		providers: ["bedrock"],
 		status: "active",
