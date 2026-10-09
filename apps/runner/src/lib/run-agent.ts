@@ -1,5 +1,4 @@
 import { agents, agentVersions, type RunStatus, runs } from "@repo/database";
-import type { ModelCost } from "@repo/models";
 import {
 	generateText,
 	isStepCount,
@@ -16,7 +15,7 @@ import {
 import { and, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { cachedQuery } from "./cache.js";
-import { calculateRunCost, sumUsage } from "./cost.js";
+import { type Pricing, priceRun, sumUsage } from "./cost.js";
 import {
 	applyMessageVariables,
 	applySkillCatalog,
@@ -155,7 +154,7 @@ export type PrepareRunOptions = {
 export type PreparedRun = {
 	model: LanguageModel;
 	modelId: string;
-	modelCost: ModelCost | null;
+	pricing: Pricing | null;
 	versionId: string;
 	data: VersionData;
 	finalMessages: ModelMessage[];
@@ -314,7 +313,7 @@ export type AssembleRunOptions = {
 export type AssembledRun = {
 	model: LanguageModel;
 	modelId: string;
-	modelCost: ModelCost | null;
+	pricing: Pricing | null;
 	data: VersionData;
 	finalMessages: ModelMessage[];
 	allTools: ToolSet;
@@ -347,7 +346,7 @@ export const assembleRun = async (
 
 	const processedMessages = applyMessageVariables(data, variables);
 	const [
-		{ model, providerType, modelCost },
+		{ model, providerType, pricing },
 		{ tools, closeAll },
 		{ systemAddendum, skillTools },
 	] = await Promise.all([
@@ -396,7 +395,7 @@ export const assembleRun = async (
 	return {
 		model,
 		modelId,
-		modelCost,
+		pricing,
 		data,
 		finalMessages,
 		allTools,
@@ -420,8 +419,7 @@ export type RecordRunOptions = {
 	// Already resolved from the provider's custom catalog or the built-in one;
 	// null means the model has no known price. Carrying the price rather than a
 	// model id is what lets a custom model be priced at all.
-	modelCost: ModelCost | null;
-	usage?: LanguageModelUsage;
+	pricing: Pricing | null;
 	runData: RunData;
 	id?: string;
 	parentRunId?: string | null;
@@ -432,6 +430,17 @@ export type RecordRunOptions = {
 
 export const recordRun = async (opts: RecordRunOptions): Promise<string> => {
 	const id = opts.id ?? nanoid();
+
+	// Priced from the completed model calls, each against the usage and metadata
+	// its own response carried; see priceRun for why not the summed usage.
+	const steps = opts.runData.steps ?? [];
+	const usage = sumUsage(steps);
+	const runCost = priceRun(steps, opts.pricing, {
+		interrupted: opts.status !== "success",
+	});
+	if (steps.length > 0) opts.runData.totalUsage ??= usage;
+	opts.runData.cost = runCost;
+
 	// `numeric` columns are string-typed in the schema (see D12); stringify the
 	// numeric run metrics at the insert boundary.
 	await db.insert(runs).values({
@@ -448,10 +457,14 @@ export const recordRun = async (opts: RecordRunOptions): Promise<string> => {
 		pre_processing_time: String(opts.preProcessingTime),
 		first_token_time: String(opts.firstTokenTime),
 		response_time: String(opts.responseTime),
-		...(opts.usage
+		...(steps.length > 0
 			? {
-					tokens: String(opts.usage.totalTokens),
-					cost: String(calculateRunCost(opts.usage, opts.modelCost)),
+					tokens: String(usage.totalTokens),
+					cost: runCost.total === null ? null : String(runCost.total),
+					cost_estimate_reason:
+						runCost.estimateReasons.length > 0
+							? runCost.estimateReasons.join("; ")
+							: null,
 				}
 			: {}),
 	});
@@ -513,7 +526,7 @@ export const runAgent = async (
 	const {
 		model,
 		modelId,
-		modelCost,
+		pricing,
 		versionId,
 		data,
 		finalMessages,
@@ -588,8 +601,7 @@ export const runAgent = async (
 			status: "success",
 			isStream: false,
 			isTest: opts.isTest,
-			modelCost,
-			usage: totalUsage,
+			pricing,
 			runData,
 			metadata: opts.metadata,
 		});
@@ -641,8 +653,7 @@ export const runAgent = async (
 			status: aborted ? "aborted" : "error",
 			isStream: false,
 			isTest: opts.isTest,
-			modelCost,
-			usage: collectedSteps.length > 0 ? totalUsage : undefined,
+			pricing,
 			runData,
 			metadata: opts.metadata,
 		});

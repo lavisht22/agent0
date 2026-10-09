@@ -615,6 +615,8 @@ export type RunListItem = {
 	is_test: boolean;
 	is_stream: boolean | null;
 	cost: number | null;
+	// Why `cost` is an estimate; null when it is the exact billed amount.
+	cost_estimate_reason: string | null;
 	tokens: number | null;
 	response_time: number;
 	first_token_time: number;

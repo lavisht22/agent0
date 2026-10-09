@@ -121,7 +121,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 		const {
 			model,
 			modelId,
-			modelCost,
+			pricing,
 			finalMessages,
 			allTools,
 			prepareStep,
@@ -157,6 +157,10 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 		});
 		runLog.onAbortSignal(controller.signal);
 
+		// Kept for pricing a run that errors out: the steps that completed before
+		// the failure were billed.
+		const completedSteps: StepResult<ToolSet>[] = [];
+
 		const result = streamText({
 			model,
 			maxOutputTokens,
@@ -181,6 +185,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 				}
 			},
 			onStepEnd: (step) => {
+				completedSteps.push(step as StepResult<ToolSet>);
 				runLog.onStepEnd(step as StepResult<ToolSet>);
 			},
 			onEnd: async ({ steps, responseMessages, usage: totalUsage }) => {
@@ -213,8 +218,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 					status: "success",
 					isStream: true,
 					isTest: true,
-					modelCost,
-					usage: totalUsage,
+					pricing,
 					runData,
 				});
 			},
@@ -229,6 +233,9 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 
 				runLog.onError(error);
 				runLog.end("error");
+
+				runData.steps = completedSteps;
+				runData.responseMessages = collectResponseMessages(completedSteps);
 
 				runData.error = {
 					name: error instanceof Error ? error.name : "UnknownError",
@@ -255,7 +262,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 					status: "error",
 					isStream: true,
 					isTest: true,
-					modelCost,
+					pricing,
 					runData,
 				});
 			},
@@ -298,8 +305,7 @@ export async function registerTestRoute(fastify: FastifyInstance) {
 					status: "aborted",
 					isStream: true,
 					isTest: true,
-					modelCost,
-					usage: totalUsage,
+					pricing,
 					runData,
 				});
 			},

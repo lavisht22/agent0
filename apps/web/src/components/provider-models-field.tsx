@@ -21,6 +21,19 @@ const EMPTY_MODEL: ProviderModel = {
 	status: "active",
 };
 
+type CostKey =
+	| "noCacheInput"
+	| "cacheInput"
+	| "cacheWriteInput"
+	| "cacheWriteInput1h"
+	| "output";
+
+const REQUIRED_COSTS = new Set<CostKey>([
+	"noCacheInput",
+	"cacheInput",
+	"output",
+]);
+
 const STATUSES: { id: ModelStatus; label: string }[] = [
 	{ id: "active", label: "Active" },
 	{ id: "deprecated", label: "Deprecated" },
@@ -32,7 +45,7 @@ const STATUSES: { id: ModelStatus; label: string }[] = [
 // and pairing `hidden` with a `grid` baked in here would leave two conflicting
 // display classes whose winner depends on stylesheet order.
 const COLS =
-	"grid-cols-1 md:grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_7.5rem_9rem_2.25rem] gap-2";
+	"grid-cols-1 lg:grid-cols-[minmax(0,1fr)_6.5rem_6.5rem_6.5rem_6.5rem_6.5rem_8rem_2.25rem] gap-2";
 
 /**
  * React Aria's NumberField keeps its own text while the field is being edited,
@@ -44,16 +57,22 @@ function CostInput({
 	label,
 	value,
 	onValueChange,
+	placeholder,
 }: {
 	label: string;
-	value: number;
-	onValueChange: (value: number) => void;
+	value: number | undefined;
+	// Optional fields report a cleared box as undefined rather than 0.
+	onValueChange: (value: number | undefined) => void;
+	placeholder?: string;
 }) {
 	return (
 		<NumberField
 			aria-label={label}
-			value={value}
-			onChange={(next) => onValueChange(Number.isFinite(next) ? next : 0)}
+			// NaN is React Aria's empty value.
+			value={value ?? Number.NaN}
+			onChange={(next) =>
+				onValueChange(Number.isFinite(next) ? next : undefined)
+			}
 			minValue={0}
 			fullWidth
 			// Fine enough for the smallest real per-1M prices (0.005) without the
@@ -70,7 +89,7 @@ function CostInput({
 			 * than a utility class so it wins on specificity outright.
 			 */}
 			<NumberField.Group style={{ gridTemplateColumns: "1fr" }}>
-				<NumberField.Input />
+				<NumberField.Input placeholder={placeholder} />
 			</NumberField.Group>
 		</NumberField>
 	);
@@ -88,12 +107,21 @@ export function ProviderModelsField({
 
 	const updateCostAt = (
 		index: number,
-		key: keyof ProviderModel["cost"],
-		next: number,
+		key: CostKey,
+		next: number | undefined,
 	) => {
 		const model = models[index];
 		if (!model) return;
-		updateAt(index, { cost: { ...model.cost, [key]: next } });
+		const cost = { ...model.cost };
+		if (next === undefined) {
+			// A required price can't be blank; an optional one falls back to its
+			// default (see RateSheet) when removed.
+			if (REQUIRED_COSTS.has(key)) cost[key] = 0;
+			else delete cost[key];
+		} else {
+			cost[key] = next;
+		}
+		updateAt(index, { cost });
 	};
 
 	// A duplicate id makes the model picker ambiguous and would price the run off
@@ -107,7 +135,7 @@ export function ProviderModelsField({
 	return (
 		<FormSection
 			title="Custom Models"
-			description="Optional. Set these when the provider points somewhere the built-in model list doesn't describe — an OpenAI-compatible gateway, Bedrock's OpenAI-compatible endpoint, a self-hosted server. When set, they replace the built-in models for this provider. Costs are USD per 1M tokens and drive run cost reporting."
+			description="Optional. Set these when the provider points somewhere the built-in model list doesn't describe — an OpenAI-compatible gateway, Bedrock's OpenAI-compatible endpoint, a self-hosted server. When set, they replace the built-in models for this provider. Costs are USD per 1M tokens and drive run cost reporting. Leave cache write blank if the provider bills cache writes as ordinary input."
 			action={
 				<Button
 					size="sm"
@@ -121,10 +149,12 @@ export function ProviderModelsField({
 		>
 			{models.length > 0 && (
 				<div className="flex flex-col gap-2">
-					<div className={`hidden md:grid ${COLS} px-1`}>
+					<div className={`hidden lg:grid ${COLS} px-1`}>
 						<span className="text-xs text-muted">Model ID</span>
 						<span className="text-xs text-muted">Input</span>
-						<span className="text-xs text-muted">Cached in</span>
+						<span className="text-xs text-muted">Cache read</span>
+						<span className="text-xs text-muted">Cache write</span>
+						<span className="text-xs text-muted">1h write</span>
 						<span className="text-xs text-muted">Output</span>
 						<span className="text-xs text-muted">Status</span>
 						<span />
@@ -161,6 +191,22 @@ export function ProviderModelsField({
 										label="Cached input cost per 1M tokens"
 										value={model.cost.cacheInput}
 										onValueChange={(v) => updateCostAt(index, "cacheInput", v)}
+									/>
+									<CostInput
+										label="Cache write cost per 1M tokens"
+										placeholder="= input"
+										value={model.cost.cacheWriteInput}
+										onValueChange={(v) =>
+											updateCostAt(index, "cacheWriteInput", v)
+										}
+									/>
+									<CostInput
+										label="1-hour cache write cost per 1M tokens"
+										placeholder="= write"
+										value={model.cost.cacheWriteInput1h}
+										onValueChange={(v) =>
+											updateCostAt(index, "cacheWriteInput1h", v)
+										}
 									/>
 									<CostInput
 										label="Output cost per 1M tokens"

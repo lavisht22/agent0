@@ -53,6 +53,10 @@ const ModelSchema = {
 				noCacheInput: { type: "number" as const, minimum: 0 },
 				cacheInput: { type: "number" as const, minimum: 0 },
 				output: { type: "number" as const, minimum: 0 },
+				// Unset: cache writes are billed as ordinary input, and 1-hour
+				// writes at the 5-minute rate.
+				cacheWriteInput: { type: "number" as const, minimum: 0 },
+				cacheWriteInput1h: { type: "number" as const, minimum: 0 },
 			},
 			required: ["noCacheInput", "cacheInput", "output"],
 			additionalProperties: false,

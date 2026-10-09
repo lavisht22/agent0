@@ -373,11 +373,24 @@ function RouteComponent() {
 														s
 													</span>
 												</span>
-												<span className="text-xs text-muted">
-													{item.cost
-														? `$${item.cost.toFixed(5)} · ${formatTokens(item.tokens ?? 0)} tokens`
-														: "-"}
-												</span>
+												{item.cost && item.cost_estimate_reason ? (
+													<Tooltip delay={0}>
+														<Tooltip.Trigger>
+															<span className="text-xs text-muted underline decoration-dotted underline-offset-2">
+																{`~$${item.cost.toFixed(5)} · ${formatTokens(item.tokens ?? 0)} tokens`}
+															</span>
+														</Tooltip.Trigger>
+														<Tooltip.Content className="max-w-xs">
+															Estimated: {item.cost_estimate_reason}
+														</Tooltip.Content>
+													</Tooltip>
+												) : (
+													<span className="text-xs text-muted">
+														{item.cost
+															? `$${item.cost.toFixed(5)} · ${formatTokens(item.tokens ?? 0)} tokens`
+															: "-"}
+													</span>
+												)}
 											</div>
 										</Table.Cell>
 

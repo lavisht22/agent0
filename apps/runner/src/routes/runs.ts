@@ -45,6 +45,7 @@ const runSelectColumns = {
 	is_test: runs.is_test,
 	is_stream: runs.is_stream,
 	cost: runs.cost,
+	cost_estimate_reason: runs.cost_estimate_reason,
 	tokens: runs.tokens,
 	response_time: runs.response_time,
 	first_token_time: runs.first_token_time,
@@ -120,6 +121,12 @@ const RunSummarySchema = {
 		is_test: { type: "boolean" as const },
 		is_stream: { type: "boolean" as const, nullable: true },
 		cost: { type: "number" as const, nullable: true },
+		cost_estimate_reason: {
+			type: "string" as const,
+			nullable: true,
+			description:
+				"Why `cost` is an estimate rather than the exact billed amount. Null when exact.",
+		},
 		tokens: { type: "number" as const, nullable: true },
 		response_time: { type: "number" as const },
 		first_token_time: { type: "number" as const },
@@ -835,7 +842,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 			const {
 				model,
 				modelId,
-				modelCost,
+				pricing,
 				versionId: preparedVersionId,
 				data,
 				finalMessages,
@@ -875,6 +882,10 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 					});
 					runLog.onAbortSignal(controller.signal);
 
+					// Kept for pricing a run that errors out: the steps that completed before
+					// the failure were billed.
+					const completedSteps: StepResult<ToolSet>[] = [];
+
 					const result = streamText({
 						model,
 						maxOutputTokens,
@@ -899,6 +910,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 							}
 						},
 						onStepEnd: (step) => {
+							completedSteps.push(step as StepResult<ToolSet>);
 							runLog.onStepEnd(step as StepResult<ToolSet>);
 						},
 
@@ -940,8 +952,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 									startTime,
 								status: "success",
 								isStream: true,
-								modelCost,
-								usage: totalUsage,
+								pricing,
 								runData,
 							});
 						},
@@ -956,6 +967,10 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 
 							runLog.onError(error);
 							runLog.end("error");
+
+							runData.steps = completedSteps;
+							runData.responseMessages =
+								collectResponseMessages(completedSteps);
 
 							runData.error = {
 								name: error instanceof Error ? error.name : "UnknownError",
@@ -986,7 +1001,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 									startTime,
 								status: "error",
 								isStream: true,
-								modelCost,
+								pricing,
 								runData,
 							});
 						},
@@ -1031,8 +1046,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 									startTime,
 								status: "aborted",
 								isStream: true,
-								modelCost,
-								usage: totalUsage,
+								pricing,
 								runData,
 							});
 						},
@@ -1127,8 +1141,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						responseTime: 0,
 						status: "aborted",
 						isStream: false,
-						modelCost,
-						usage: totalUsage,
+						pricing,
 						runData,
 					});
 				};
@@ -1191,8 +1204,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						responseTime: 0,
 						status: "success",
 						isStream: false,
-						modelCost,
-						usage: totalUsage,
+						pricing,
 						runData,
 					});
 
@@ -1218,6 +1230,9 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 					runLog.onError(error);
 					runLog.end("error");
 
+					// The steps that completed before the failure were billed.
+					runData.steps = collectedSteps;
+					runData.responseMessages = collectResponseMessages(collectedSteps);
 					runData.error = {
 						name: error instanceof Error ? error.name : "UnknownError",
 						message:
@@ -1241,7 +1256,7 @@ export async function registerRunsRoutes(fastify: FastifyInstance) {
 						responseTime: 0,
 						status: "error",
 						isStream: false,
-						modelCost,
+						pricing,
 						runData,
 					});
 

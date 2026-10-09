@@ -53,7 +53,9 @@ const stepMessages = (
  * for the provider on every agent step. Returns `undefined` for providers
  * without explicit prompt-cache support so callers can pass it through as-is.
  *
- * - anthropic-vertex: Anthropic-style `cacheControl` (1h TTL)
+ * - anthropic-vertex: Anthropic-style `cacheControl` (default 5m TTL; a 1h
+ *   write costs 2x input against 1.25x for 5m, and cost.ts prices the TTL the
+ *   response reports either way)
  * - bedrock: Converse `cachePoint` (default 5m TTL — supported on all
  *   caching-capable Claude models; `1h` errors on models that don't support it)
  *
