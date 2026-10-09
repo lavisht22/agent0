@@ -11,7 +11,7 @@ import {
 } from "ai";
 import { eq } from "drizzle-orm";
 import { cachedQuery } from "./cache.js";
-import { getCatalogCost } from "./cost.js";
+import { resolvePricing } from "./cost.js";
 import { decryptSecret } from "./crypto.js";
 import { db } from "./pg.js";
 import { getAIProvider } from "./providers.js";
@@ -42,7 +42,7 @@ export const resolveProviderModel = async (
 ) => {
 	const { model } = data;
 
-	const { provider, aiProvider } = await cachedQuery(
+	const { provider, aiProvider, location } = await cachedQuery(
 		`provider-resolved:${model.provider_id}:${environment}`,
 		300_000, // 5 min TTL — credentials change rarely
 		async () => {
@@ -68,22 +68,27 @@ export const resolveProviderModel = async (
 				throw new Error(`Unsupported provider type: ${row.type}`);
 			}
 
-			return { provider: row, aiProvider: resolved };
+			// Vertex bills regional endpoints above global, so pricing needs it.
+			const location =
+				typeof config.location === "string" ? config.location : undefined;
+
+			return { provider: row, aiProvider: resolved, location };
 		},
 	);
 
-	// A provider serving a custom catalog prices its own models; fall back to the
-	// built-in catalog for everything else. Resolved here, where both the
-	// provider row and the model name are in hand, so nothing downstream has to
-	// re-derive it.
-	const modelCost =
-		provider.models?.find((m) => m.id === model.name)?.cost ??
-		getCatalogCost(model.name);
+	// Resolved here, where the provider row, its config and the model name are
+	// all in hand, so nothing downstream has to re-derive it.
+	const pricing = resolvePricing({
+		providerType: provider.type,
+		modelId: model.name,
+		location,
+		customModels: provider.models,
+	});
 
 	return {
 		model: aiProvider(model.name) as LanguageModel,
 		providerType: provider.type as string,
-		modelCost,
+		pricing,
 	};
 };
 

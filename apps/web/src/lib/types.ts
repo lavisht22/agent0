@@ -42,9 +42,35 @@ export type RunData = {
 	 */
 	responseMessages?: MessageT[];
 	totalUsage?: LanguageModelUsage;
+	/** Per-step price breakdown behind the run's cost (runner's RunCost). */
+	cost?: RunCostBreakdown;
 	error?: {
 		name: string;
 		message: string;
 		cause?: unknown;
 	};
+};
+
+export type CostLineKind =
+	| "input"
+	| "audioInput"
+	| "toolUseInput"
+	| "cacheRead"
+	| "audioCacheRead"
+	| "cacheWrite5m"
+	| "cacheWrite1h"
+	| "output";
+
+export type RunCostBreakdown = {
+	total: number | null;
+	estimateReasons: string[];
+	steps: {
+		cost: number;
+		source: "rates" | "provider";
+		tier: string;
+		longContext: boolean;
+		regional: boolean;
+		// USD per 1M tokens, after tier, long-context and regional adjustments.
+		lines: { kind: CostLineKind; tokens: number; rate: number; cost: number }[];
+	}[];
 };

@@ -24,6 +24,7 @@ import { PageHeader } from "@/components/page-header";
 import { RunMetadataCard } from "@/components/run-metadata-card";
 import { RunStatusChip } from "@/components/run-status-chip";
 import { childRunsQuery, runQuery } from "@/lib/queries";
+import type { CostLineKind, RunCostBreakdown } from "@/lib/types";
 import type { AgentFormValues } from "./_app.workspace.$workspaceId.agents.$agentId/types";
 
 export const Route = createFileRoute(
@@ -52,6 +53,114 @@ function Section({
 			</div>
 			{children}
 		</section>
+	);
+}
+
+const COST_LINE_LABELS: Record<CostLineKind, string> = {
+	input: "Input",
+	audioInput: "Audio input",
+	toolUseInput: "Tool-use input",
+	cacheRead: "Cache read",
+	audioCacheRead: "Cached audio",
+	cacheWrite5m: "Cache write",
+	cacheWrite1h: "Cache write (1h)",
+	output: "Output",
+};
+
+const formatUsd = (value: number) => `$${value.toFixed(6)}`;
+
+// What the run's cost is made of: one row per kind of token at each rate it was
+// billed at (long-context or tiered steps bill the same kind at another rate),
+// plus anything the provider reported as a billed amount directly.
+function CostBreakdown({ cost }: { cost: RunCostBreakdown }) {
+	const rows = new Map<
+		string,
+		{ kind: CostLineKind; rate: number; tokens: number; cost: number }
+	>();
+	let reported = { steps: 0, cost: 0 };
+	for (const step of cost.steps) {
+		if (step.source === "provider") {
+			reported = { steps: reported.steps + 1, cost: reported.cost + step.cost };
+			continue;
+		}
+		for (const line of step.lines) {
+			const key = `${line.kind}:${line.rate}`;
+			const row = rows.get(key) ?? { ...line, tokens: 0, cost: 0 };
+			row.tokens += line.tokens;
+			row.cost += line.cost;
+			rows.set(key, row);
+		}
+	}
+
+	const tiers = [
+		...new Set(
+			cost.steps.map((s) => s.tier).filter((tier) => tier !== "standard"),
+		),
+	];
+	const longContextSteps = cost.steps.filter((s) => s.longContext).length;
+	const regional = cost.steps.some((s) => s.regional);
+
+	return (
+		<div className="mt-4 space-y-2 border-t border-default pt-3 text-xs">
+			<div className="flex flex-wrap items-center gap-2">
+				<span className="text-muted">Cost breakdown</span>
+				{tiers.map((tier) => (
+					<Chip key={tier} size="sm" variant="soft">
+						{tier} tier
+					</Chip>
+				))}
+				{longContextSteps > 0 && (
+					<Chip size="sm" variant="soft">
+						long context · {longContextSteps}{" "}
+						{longContextSteps === 1 ? "step" : "steps"}
+					</Chip>
+				)}
+				{regional && (
+					<Chip size="sm" variant="soft">
+						regional endpoint
+					</Chip>
+				)}
+			</div>
+			<div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-x-4 gap-y-1">
+				<span className="text-muted">Tokens</span>
+				<span className="text-right text-muted">Count</span>
+				<span className="text-right text-muted">Per 1M</span>
+				<span className="text-right text-muted">Cost</span>
+				{[...rows.values()].map((row) => (
+					<div key={`${row.kind}:${row.rate}`} className="contents">
+						<span>{COST_LINE_LABELS[row.kind]}</span>
+						<span className="text-right tabular-nums">
+							{row.tokens.toLocaleString()}
+						</span>
+						<span className="text-right tabular-nums">
+							${Number(row.rate.toFixed(6))}
+						</span>
+						<span className="text-right tabular-nums">
+							{formatUsd(row.cost)}
+						</span>
+					</div>
+				))}
+				{reported.steps > 0 && (
+					<div className="contents">
+						<span>Billed amount reported by provider</span>
+						<span className="text-right tabular-nums">
+							{reported.steps} {reported.steps === 1 ? "step" : "steps"}
+						</span>
+						<span />
+						<span className="text-right tabular-nums">
+							{formatUsd(reported.cost)}
+						</span>
+					</div>
+				)}
+			</div>
+			{cost.estimateReasons.length > 0 && (
+				<ul className="list-disc space-y-0.5 pl-4 text-warning">
+					{cost.estimateReasons.map((reason) => (
+						<li key={reason}>{reason}</li>
+					))}
+				</ul>
+			)}
+		</div>
 	);
 }
 
@@ -338,7 +447,15 @@ function RouteComponent() {
 						<Card className="text-default-foreground">
 							<Card.Content>
 								<div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm md:grid-cols-4">
-									<Stat label="Cost" value={`$${(run.cost || 0).toFixed(6)}`} />
+									<Stat
+										label="Cost"
+										value={`${run.cost_estimate_reason ? "~" : ""}$${(run.cost || 0).toFixed(6)}`}
+										tooltip={
+											run.cost_estimate_reason
+												? `Estimated: ${run.cost_estimate_reason}`
+												: undefined
+										}
+									/>
 									<Stat label="Total Tokens" value={run.tokens || 0} />
 									{runData?.totalUsage && (
 										<>
@@ -404,6 +521,9 @@ function RouteComponent() {
 										</>
 									)}
 								</div>
+								{runData?.cost && runData.cost.steps.length > 0 && (
+									<CostBreakdown cost={runData.cost} />
+								)}
 							</Card.Content>
 						</Card>
 					</Section>

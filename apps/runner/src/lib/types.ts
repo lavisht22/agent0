@@ -4,6 +4,7 @@ import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import type { OpenAICompatibleProviderOptions } from "@ai-sdk/openai-compatible";
 import type { XaiProviderOptions } from "@ai-sdk/xai";
 import type { LanguageModelUsage, ModelMessage, StepResult, ToolSet } from "ai";
+import type { RunCost } from "./cost.js";
 
 export type ProviderOptions = {
 	openai?: OpenAIResponsesProviderOptions;
@@ -93,6 +94,8 @@ export type RunData = {
 		cause?: unknown;
 	};
 	totalUsage?: LanguageModelUsage;
+	/** Per-step price breakdown behind the run's `cost`. */
+	cost?: RunCost;
 };
 
 export type MCPConfig = {

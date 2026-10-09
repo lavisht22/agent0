@@ -481,6 +481,9 @@ export const runs = pgTable(
 		is_stream: boolean(),
 		tokens: numeric(),
 		cost: numeric(),
+		// Why `cost` may differ from what the provider billed (e.g. a service tier
+		// with no published price). Null when the cost is exact.
+		cost_estimate_reason: text(),
 		parent_run_id: text(),
 		// Set when the run's S3 log object has been purged (retention/cleanup) while
 		// the metrics row is retained. Non-null ⇒ the object is gone; the detail
