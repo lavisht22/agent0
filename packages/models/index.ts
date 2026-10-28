@@ -163,6 +163,26 @@ export const MODELS: Model[] = [
 	),
 
 	{
+		id: "gpt-6.1-terra",
+		providers: ["openai"],
+		status: "active",
+		cost: {
+			noCacheInput: 1,
+			cacheInput: 0.05,
+			cacheWriteInput: 1.25,
+			output: 5,
+			longContext: {
+				threshold: OPENAI_LONG_CONTEXT,
+				noCacheInput: 2,
+				cacheInput: 0.1,
+				cacheWriteInput: 2.5,
+				output: 7.5,
+			},
+			tiers: { flex: 0.5, priority: 2 },
+		},
+		releaseDate: "2026-10-26",
+	},
+	{
 		id: "gpt-6.1-sol",
 		providers: ["openai"],
 		status: "active",
